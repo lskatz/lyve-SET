@@ -329,7 +329,7 @@ sub checkJob{
         sleep 5;
         my $newstatus=$self->checkJob($job);
         if($newstatus !~ /0/){
-          logmsg "  Phew! It finished!";
+          logmsg "  Phew! Job $$job{jobid} finished!";
           return $newstatus;
         }
       }
