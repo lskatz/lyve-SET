@@ -11,8 +11,9 @@ if [ "$out_vcf" = "" ]; then
 fi;
 
 # freebayes params
-minAltFrac=0.85
-minCoverage=20
+minAltFrac=0.75
+minCoverage=10
+echo "TODO: put minAltFrac and minCoverage as parameters to launch_all.pl"
 
 # for filtering, for later
 new_vcf="$out_vcf".tmp
