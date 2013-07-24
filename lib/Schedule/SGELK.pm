@@ -253,6 +253,8 @@ sub pleaseExecute{
     die "Command timed out!\n  $cmd" if((time-$started)>$$settings{timeout});
     die "Command resulted in an error. qstat -j $jobid for more info\n  $cmd" if($self->jobStatus($jobid) eq 'Eqw');
   }
+
+  # TODO create a link from the jobid to the random id
   
   my %return=(jobid=>$jobid,submitted=>$submitted,running=>$running,finished=>$finished,tempdir=>$tempdir,output=>$output,cmd=>$cmd,script=>$script);
   push(@jobsToClean,\%return) if(!$self->settings("keep"));
@@ -310,30 +312,30 @@ $self->error can be set if there is an error in the job. Return values:
 
 sub checkJob{
   my($self,$job)=@_;
+  # see what the job status is {jobid}
+  my $status=$self->jobStatus($$job{jobid});
+  return 0 if($status eq 'qw'); # queued but not running
   # see if the job has even started: {submitted}
   return 0 if(!-e $$job{submitted});
   # if the job finished, then great! {finished}
   return 1 if(-e $$job{finished});
   # see if the job is running: {running}
   if(-e $$job{running}){
-    # see what the job status is {jobid}
-    my $status=$self->jobStatus($$job{jobid});
     if($status eq 'Eqw'){
       $self->error("Command resulted in an error. qstat -j $$job{jobid} for more info\n  $$job{cmd}");
       return -1;
     } elsif($status =~/[rt]/){
       return 0;
     } elsif($status=~/0/){
-      logmsg "Warning: job $$job{jobid} indicates it has started running but hasn't finished. However, qstat indicates it is no longer running. I will check again to see what the status is." if((caller(1))[3] !~/checkJob/);
-      for(1..10){
-        sleep 5;
+      logmsg "Warning: job $$job{jobid} indicates it has started running but hasn't finished. However, qstat indicates it is no longer running. I will check intermittently to see what the status is." if((caller(1))[3] !~/checkJob/);
+      for my $i(0..50){
+        sleep (($i+1)*2); # the sleep timer's interval goes slower each time
         my $newstatus=$self->checkJob($job);
-        if($newstatus !~ /0/){
-          logmsg "  Phew! Job $$job{jobid} finished!";
-          return $newstatus;
-        }
+        return $newstatus if($newstatus);
       }
-    } else { logmsg "WARNING: I don't know how to interpret status $status for jobid $$job{jobid}. I'm not going to do anything about it."; }
+    } else { 
+      logmsg "WARNING: I don't know how to interpret status $status for jobid $$job{jobid}. I'm not going to do anything about it."; 
+    }
     my @output=read_file($$job{output});
     if($output[-3] =~/QSUB ERROR/){
       $self->error("ERROR: $output[-2], exit code: $output[-1]");
@@ -355,6 +357,8 @@ Given an SGE job id, it returns its qstat status
 
 =cut
 
+#TODO cache the qstat results so that it is only run every 1-2 seconds. 
+#  I don't want to overload the machine with system calls.
 sub jobStatus{
   my($self,$jobid)=@_;
   my $state=0;
