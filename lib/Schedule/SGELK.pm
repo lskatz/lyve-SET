@@ -340,7 +340,7 @@ sub checkJob{
     }
     return -1;
   }
-  die "Could not understand what the status is of job!\n".Dumper($job);
+  logmsg "ERROR: Could not understand what the status is of job $$job{jobid}!\n".Dumper($job);
 }
 
 =pod
