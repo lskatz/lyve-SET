@@ -136,8 +136,11 @@ sub variantsToMSA{
 sub msaToPhylogeny{
   my ($msadir,$settings)=@_;
   $sge->set("numcpus",$$settings{numcpus});
-  $sge->set("jobname","msaToPhylogeny");
-  $sge->pleaseExecute_andWait("(cd $msadir; $scriptsdir/launch_raxml.sh out.aln.fas.phy out)");
+  $sge->set("jobname","SET_raxml");
+  $sge->pleaseExecute("(cd $msadir; $scriptsdir/launch_raxml.sh out.aln.fas.phy out)");
+  $sge->set("jobname","SET_phyml");
+  $sge->pleaseExecute("PhyML -i $msadir/out.aln.fas.phy -b -4 -m GTR -s BEST --quiet");
+  $sge->wrapItUp();
   #system("cd $msadir; qsub -pe smp $$settings{numcpus} -cwd -o out -e out -V $scriptsdir/launch_raxml.sh out.aln.fas.phy out");
   return 1;
 }
