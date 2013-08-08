@@ -24,10 +24,11 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s));
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i));
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
+  $$settings{allowedFlanking}||=20;
 
   logmsg "Checking to make sure all directories are in place";
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir)){
@@ -117,9 +118,18 @@ sub variantCalls{
 sub variantsToMSA{
   my ($ref,$bamdir,$vcfdir,$msadir,$settings)=@_;
   my $logdir=$$settings{logdir};
+
+  # find all "bad" sites
+  $bad="$vcfdir/allsites.txt"
+  system("sort $vcfDir/*.badsites.txt | uniq > $bad"); die if $?;
+
+  # convert VCFs to an MSA (long step)
   $sge->set("jobname","variantsToMSA");
   $sge->set("numcpus",$$settings{numcpus});
-  $sge->pleaseExecute_andWait("$scriptsdir/launch_vcfToAlignment.sh $bamdir $vcfdir $ref $msadir/out.aln.fas");
+  $sge->pleaseExecute_andWait("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o $msadir/out.aln.fas -r $ref -b $bad -a $$settings{allowedFlanking}");
+  # convert fasta to phylip and remove uninformative sites
+  $sge->set("jobname","msaToPhylip");
+  $sge->pleaseExecute_andWait("convertAlignment.pl -i $msadir/out.aln.fas -o $msadir/out.aln.fas.phy -f phylip -r");
   return 1;
 }
 
@@ -143,5 +153,6 @@ sub usage{
     -numcpus number of cpus
     -numnodes maximum number of nodes
     -w working directory where qsub commands can be stored. Default: CWD
+    -a allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
   "
 }

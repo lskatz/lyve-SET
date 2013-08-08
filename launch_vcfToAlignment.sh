@@ -18,7 +18,7 @@ bad="$vcfDir/allsites.txt"
 sort $vcfDir/*.badsites.txt | uniq > $bad
 
 echo "vcfToAlignment.pl"
-vcfToAlignment.pl bam/*.sorted.bam vcf/*.vcf -o $out -r $ref -b $bad
+vcfToAlignment.pl bam/*.sorted.bam vcf/*.vcf -o $out -r $ref -b $bad -a 20
 
 echo "convertAlignment.pl"
 convertAlignment.pl -i $out -o $out.phy -f phylip -r
