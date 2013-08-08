@@ -4,22 +4,13 @@ bam=$2
 out_vcf=$3
 
 b=`basename $out_vcf .vcf`;
+doneFile="progress/freebayes.$b.done"
 
 if [ "$out_vcf" = "" ]; then
   echo usage: $0 ref.fasta query.bam out.vcf;
   exit 1;
 fi;
-
-if [ -e "$out_vcf" ]; then
-  echo "Found $out_vcf! I will not rewrite it."
-  exit 0;
-fi;
-
-# freebayes params
-minAltFrac=0.75
-minCoverage=10
-readSnpLimit=3;
-echo "TODO: put minAltFrac and minCoverage as parameters to launch_all.pl"
+echo "Done file is $doneFile"
 
 # for filtering, for later
 new_vcf="$out_vcf".tmp
@@ -51,10 +42,10 @@ freebayes       \
                 `# input filters`\
                 --min-mapping-quality 0 `# Exclude alignments from analysis if they have a mapping quality less than Q.  default: 30`\
                 --min-base-quality 20 `# Exclude alleles from analysis if their supporting base quality is less than Q.  default: 20`\
-                --read-snp-limit $readSnpLimit `# Exclude reads with more than N base mismatches, ignoring gaps with quality >= mismatch-base-quality-threshold. default: ~unbounded`\
+                --read-snp-limit 10 `# Exclude reads with more than N base mismatches, ignoring gaps with quality >= mismatch-base-quality-threshold. default: ~unbounded`\
                 --indel-exclusion-window 5 `# Ignore portions of alignments this many bases from a putative insertion or deletion allele.  default: 0`\
-                --min-alternate-fraction $minAltFrac `# Require at least this fraction of observations supporting an alternate allele within a single individual in the in order to evaluate the position.  default: 0.0`\
-                --min-coverage $minCoverage `# Require at least this coverage to process a site.  default: 0`
+                --min-alternate-fraction 0.75 `# Require at least this fraction of observations supporting an alternate allele within a single individual in the in order to evaluate the position.  default: 0.0`\
+                --min-coverage 5 `# Require at least this coverage to process a site.  default: 0`
 
 
 echo "Filtering FreeBayes calls"
@@ -62,3 +53,4 @@ filterVcf.pl $out_vcf --noindels -d 10 -o $new_vcf -b $bad
 if [ "$?" -gt 0 ]; then exit 1; fi;
 mv -v $new_vcf $out_vcf
 
+touch $doneFile

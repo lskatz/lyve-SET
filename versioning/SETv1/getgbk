@@ -1,0 +1,199 @@
+#!/usr/bin/perl
+
+# Authors: Peter Fisher Hallin, Matloob Qureshi
+# For license see /usr/biotools/CMG-biotools.license
+
+use strict;
+use Getopt::Long;
+use Data::Dumper;
+use HTML::Parser;
+
+my ($a,$p,$d,$h,$l,$v);
+
+&GetOptions     (
+ "h"  => \$h, # help
+ "l" => \$l, # instead of downloading gbk records, just show segments
+ "a:s"  , \$a, # accession       
+ "p:i"  , \$p, # project id
+ "d:s"  , \$d,  # database:refseq/genbank 
+ "v" => \$v,  # verbose
+);
+# --limit-rate=150k
+my $WGET = '/usr/bin/wget';
+my $FIXGB = "/usr/biotools/fixgb";
+
+usage() if $h;
+usage() if ! $a and ! $p;
+usage() if $a and $d;
+
+# default parameters
+$d = 'genbank' unless defined $d;
+
+error ("# option can only be 'genbank' and 'refseq'\n") unless $d =~ m/^refseq$|^genbank$/;
+
+# this variable holds the project to be downloaded
+# even if specifying only an accession (or range) this is still used!
+
+my @project;
+
+if ( defined ( $p ) ) {
+  verbose("# query project id $p\n");
+  @project = getpid ($p);
+  if ( scalar ( @project ) <= 0) {
+    error ("# unable to retrieve project info\n");
+  }
+} elsif ( defined ( $a ) )  {
+  if ( $a =~ /^N[ZC]_/ ) {
+    verbose("# database 'refseq' auto detected\n");
+    $d = 'refseq';
+    $project[0]->{refseq} = $a;
+  } else {
+    verbose("# database 'genbank' auto detected\n");
+    $d = 'genbank';
+    $project[0]->{genbank} = $a;
+  }
+  verbose("# unable to resolve segment name (using accession)\n");
+  $project[0]->{segment} = "unknown";
+}
+
+if ( $l ) {
+  verbose ("# listing segment names\n");
+  for (my $i = 0 ; $i < scalar ( @project ) ; $i++ ) {
+    print "$project[$i]->{segment}\t$project[$i]->{$d}\n";
+  }
+} else {
+  verbose ("# downloading $d records\n");
+  for (my $i = 0 ; $i < scalar ( @project ) ; $i++ ) {
+    verbose ("# .. accession = $project[$i]->{$d}\n");
+    getseq ( $project[$i]->{$d});
+  }
+}
+
+exit 0;
+
+sub verbose {
+  return unless $v;
+  print STDERR $_[0];
+}
+
+sub getseq {
+  my $a = $_[0];
+  my @acc;
+  my $url = "http://www.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nucleotide&id=$a&rettype=gbwithparts&retmode=gb";
+  verbose("# .. retrieving url '$url'\n");
+  if ( $a =~ /^[^\-]*[A-Z]{4,4}0*0{5,5}$/ ) {
+    open GETGENE , "$WGET  -O - '$url'|";
+    while (<GETGENE>) {
+      next unless /^WGS\s+(.*)/;
+      $a = $1;
+    }
+    close GETGENE;
+  }
+  if ( $a =~ /^(\D*)(\d+)\-(\D*)(\d+)$/) {
+    my ($from,$from_num ,$to,$to_num)  = ($1,$2,$3,$4);
+    foreach my $n ($from_num .. $to_num) {
+      push @acc , $from.$n;
+    }
+  } else {
+    push @acc , $a;
+  }
+  for ( my $i = 0 ; $i < scalar ( @acc ) ; $i++) {
+    $a = $acc[$i];
+    my $url = "http://www.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nucleotide&id=$a&rettype=gbwithparts&retmode=gb";
+    verbose("# .. .. retrieving url '$url'\n");
+    my $tofix = "";
+    open GBK , "$WGET -O - '$url' |";
+    while (<GBK>) {
+      print;
+    }
+    close GBK;
+  }
+}
+
+sub getpid {
+  my $pid = $_[0];
+  my $url = "http://www.ncbi.nlm.nih.gov/sites/entrez?db=genomeprj&cmd=Retrieve&dopt=Overview&list_uids=$pid";
+  verbose("# .. retrieving url $url\n");
+  open PRJ , "wget -O - '$url' |";
+  my @ret;
+  my $prj = join("", <PRJ>);
+  
+  my (@matches) = ($prj =~ m/<a href="\/nuccore\/(.*?)\">/g);
+  for(my $i = 0; $i < @matches; $i++) {
+    $ret[$i]->{genbank} = $matches[$i];
+  }
+  
+  (@matches) = ($prj = m|<a href="/sites/entrez?db=genome&amp;cmd=Retrieve&amp;dopt=Overview&amp;list_uids=.*?">(.*?)</a>/|g);
+  for(my $i = 0; $i < @matches; $i++) {
+    $ret[$i]->{refseq} = $matches[$i];
+  }
+  
+  return @ret;
+}
+
+
+sub error {
+  print STDERR $_[0];
+  exit 1;
+}
+
+
+sub usage {
+  while (<DATA>) {
+    print $_;
+  }
+  close DATA;
+ exit 1;
+}
+
+
+__DATA__
+NAME
+     getgbk.pl - downloads genbank/refseq records in genbank format, specifying either 
+                accessions number, accession ranges, or project id.
+
+SYNOPSIS
+
+     getgbk.pl (-h) (-p [PROJECT_ID]) (-a [ACCESSION/RANGE]) (-d [DATABASE])
+DESCRIPTION
+     When defining the project id, using -p option, option -a is ignored and all
+     accession numbers for all segments of that project, are fetched from tje project.
+     When using the -p option, the -d option is in effect, allowing you to control which
+     database to use (refseq/genbank)
+     When using the -a option, the program will retrieve only that accession (or range 
+     of accessions). It will ignore the -d option. The program printes genbank format 
+     data to stdout. Option -l is used to show only a TAB separated list showing accession
+     and segment name
+
+VERSION
+     2008-08-15: version 1.0 created / pfh
+
+     -p [number]
+     The NCBI Genome Project number, like what can be found here: 
+     http://www.ncbi.nlm.nih.gov/genomes/lproks.cgi. This option overrules the -a option.
+
+     -a [accession no. or accession number range]
+     When using this option, the program is instructed to download only this record (or 
+     these records, of a range is defined). The -d option is ignored
+
+     -d [genbank/refseq]
+     Choice of database. Has only effect when using option -p.
+
+     -l
+     Boolean, instructing the program not to show genbank records, but only list segment
+     names for each accession.
+
+     -h
+     Showing this help page
+
+EXAMPLES
+     getgbk.pl -p 19391 -d refseq | grep LOCUS
+     getgbk.pl -p 19391 -d genbank | grep LOCUS
+     getgbk.pl -a NZ_ABIZ00000000 | grep LOCUS
+     getgbk.pl -a NZ_ABIH01000001-NZ_ABIH01000038 | grep LOCUS
+     getgbk.pl -a CP000896 | grep LOCUS
+     getgbk.pl -p 12997 -d refseq -l
+
+AUTHOR
+     Peter Fischer Hallin, August 2008, pfh\@cbs.dtu.dk
+

@@ -13,11 +13,10 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help outfile=s reference=s badPosition=s coverage=i allowedFlanking=i));
+  GetOptions($settings,qw(help outfile=s reference=s badPosition=s coverage=i));
   $$settings{outfile}||="$0.out.fasta";
   $$settings{coverage}||=10;
   $$settings{numcpus}||=1;
-  $$settings{allowedFlanking}||=20;
   die usage($settings) if($$settings{help} || @ARGV<2);
   my $reference=$$settings{reference} or die "ERROR: need reference file\n".usage($settings);
 
@@ -120,27 +119,17 @@ sub vcfToFasta{
   }
 
   # now that we have base calls for each genome at each site, make a fasta
-  my $allowedFlanking=$$settings{allowedFlanking};
-  my ($fasta,@legitPos);
-  my $numPositions=@pos;
+  my ($fasta,%legitPos);
   for my $genome(@genome){
-    my ($prevContig,$prevPos);
     $fasta.=">$genome\n";
-    for(my $i=0;$i<$numPositions;$i++){
-      my $posKey=$pos[$i];
+    for my $posKey(@pos){
       next if($badPos{$posKey});
-
-      # do not accept positions that are too close together
-      my($contig,$position)=split /_/,$posKey;
-      next if($prevPos && ($contig eq $prevContig) && ($position-$allowedFlanking < $prevPos));
-
+      $legitPos{$posKey}=1;
       $fasta.=$pos{$posKey}{$genome};
-      push(@legitPos,$posKey);
-      $prevContig=$contig;
-      $prevPos=$position;
     }
     $fasta.="\n";
   }
+  my @legitPos=keys(%legitPos);
   return ($fasta,\@legitPos);
 }
 
@@ -201,7 +190,5 @@ sub usage{
   "Creates an alignment of SNPs, given a set of VCFs
   usage: $0 *.bam *.vcf -o alignment.fasta -r reference.fasta -b bad.txt
     -b bad.txt: all positions that should not be used, in format of contig_pos
-    -a allowed flanking in bp (default: 20)
-      nucleotides downstream of another snp this many bp away will not be accepted
   "
 }

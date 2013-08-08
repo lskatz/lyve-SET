@@ -48,11 +48,8 @@ sub main{
   indexReference($ref,$settings);
   logmsg "Mapping reads";
   mapReads($ref,$$settings{readsdir},$$settings{bamdir},$settings);
-  logmsg "Calling variants";
   variantCalls($ref,$$settings{bamdir},$$settings{vcfdir},$settings);
-  logmsg "Creating a core hqSNP MSA";
   variantsToMSA($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
-  logmsg "MSA => phylogeny";
   msaToPhylogeny($$settings{msadir},$settings);
 
   logmsg "Done!";
@@ -84,12 +81,7 @@ sub mapReads{
   my @job;
   for my $fastq(@file){
     my $b=fileparse $fastq;
-    if(-e "$bamdir/$b.sorted.bam"){
-      logmsg "Found $bamdir/$b.sorted.bam. Skipping.";
-      next;
-    }else{
-      logmsg "Mapping to create $bamdir/$b.sorted.bam";
-    }
+    next if(-e "$b.sorted.bam");
     $sge->set("jobname","map$b");
     $sge->pleaseExecute("$scriptsdir/launch_smalt.sh $ref $fastq $bamdir/$b.bam $tmpdir");
   }
@@ -119,7 +111,9 @@ sub variantsToMSA{
   my $logdir=$$settings{logdir};
   $sge->set("jobname","variantsToMSA");
   $sge->set("numcpus",$$settings{numcpus});
+  logmsg "Creating a core hqSNP MSA";
   $sge->pleaseExecute_andWait("$scriptsdir/launch_vcfToAlignment.sh $bamdir $vcfdir $ref $msadir/out.aln.fas");
+  #system("qsub -pe smp $$settings{numcpus} -cwd -o $logdir/toMsa.log -e $logdir/toMsa.log -V $scriptsdir/launch_vcfToAlignment.sh $bamdir $vcfdir $ref $msadir/out.aln.fas");
   return 1;
 }
 
@@ -127,6 +121,7 @@ sub msaToPhylogeny{
   my ($msadir,$settings)=@_;
   $sge->set("numcpus",$$settings{numcpus});
   $sge->set("jobname","msaToPhylogeny");
+  logmsg "Inferring the phylogeny from the MSA";
   $sge->pleaseExecute_andWait("(cd $msadir; $scriptsdir/launch_raxml.sh out.aln.fas.phy out)");
   #system("cd $msadir; qsub -pe smp $$settings{numcpus} -cwd -o out -e out -V $scriptsdir/launch_raxml.sh out.aln.fas.phy out");
   return 1;

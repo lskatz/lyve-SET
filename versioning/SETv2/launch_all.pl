@@ -24,13 +24,13 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s));
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s logdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s));
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
 
   logmsg "Checking to make sure all directories are in place";
-  for my $param (qw(vcfdir bamdir msadir readsdir tmpdir)){
+  for my $param (qw(logdir vcfdir bamdir msadir readsdir tmpdir)){
     my $b=$param;
     $b=~s/dir$//;
     $$settings{$param}||=$b;
@@ -48,11 +48,8 @@ sub main{
   indexReference($ref,$settings);
   logmsg "Mapping reads";
   mapReads($ref,$$settings{readsdir},$$settings{bamdir},$settings);
-  logmsg "Calling variants";
   variantCalls($ref,$$settings{bamdir},$$settings{vcfdir},$settings);
-  logmsg "Creating a core hqSNP MSA";
   variantsToMSA($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
-  logmsg "MSA => phylogeny";
   msaToPhylogeny($$settings{msadir},$settings);
 
   logmsg "Done!";
@@ -84,12 +81,6 @@ sub mapReads{
   my @job;
   for my $fastq(@file){
     my $b=fileparse $fastq;
-    if(-e "$bamdir/$b.sorted.bam"){
-      logmsg "Found $bamdir/$b.sorted.bam. Skipping.";
-      next;
-    }else{
-      logmsg "Mapping to create $bamdir/$b.sorted.bam";
-    }
     $sge->set("jobname","map$b");
     $sge->pleaseExecute("$scriptsdir/launch_smalt.sh $ref $fastq $bamdir/$b.bam $tmpdir");
   }
@@ -119,7 +110,9 @@ sub variantsToMSA{
   my $logdir=$$settings{logdir};
   $sge->set("jobname","variantsToMSA");
   $sge->set("numcpus",$$settings{numcpus});
+  logmsg "Creating a core hqSNP MSA";
   $sge->pleaseExecute_andWait("$scriptsdir/launch_vcfToAlignment.sh $bamdir $vcfdir $ref $msadir/out.aln.fas");
+  #system("qsub -pe smp $$settings{numcpus} -cwd -o $logdir/toMsa.log -e $logdir/toMsa.log -V $scriptsdir/launch_vcfToAlignment.sh $bamdir $vcfdir $ref $msadir/out.aln.fas");
   return 1;
 }
 
@@ -127,6 +120,7 @@ sub msaToPhylogeny{
   my ($msadir,$settings)=@_;
   $sge->set("numcpus",$$settings{numcpus});
   $sge->set("jobname","msaToPhylogeny");
+  logmsg "Inferring the phylogeny from the MSA";
   $sge->pleaseExecute_andWait("(cd $msadir; $scriptsdir/launch_raxml.sh out.aln.fas.phy out)");
   #system("cd $msadir; qsub -pe smp $$settings{numcpus} -cwd -o out -e out -V $scriptsdir/launch_raxml.sh out.aln.fas.phy out");
   return 1;
@@ -134,7 +128,7 @@ sub msaToPhylogeny{
 
 sub usage{
   $0=fileparse $0;
-  "Usage: $0 -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/]
+  "Usage: $0 -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -l log/ -reads reads/ -m msa/]
     Where parameters with a / are directories
     -r where fastq and fastq.gz files are located
     -b where to put bams
