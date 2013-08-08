@@ -45,17 +45,19 @@ use File::Temp qw/tempdir/;
 use String::Escape qw/escape/;
 
 sub logmsg {local $0=basename $0;my $FH = *STDOUT; print $FH "$0: ".(caller(1))[3].": @_\n";}
-local $SIG{'__DIE__'} = sub { my $e = $_[0]; cleanAllJobs(); $e =~ s/(at [^\s]+? line \d+\.$)/\nStopped $1/; die("$0: ".(caller(1))[3].": ".$e); };
+local $SIG{'__DIE__'} = sub { my $e = $_[0]; $e =~ s/(at [^\s]+? line \d+\.$)/\nStopped $1/; die("$0: ".(caller(1))[3].": ".$e); };
 
 # to be called when the script exits
 my @jobsToClean=();
 my @jobsToMonitor=();
 sub cleanAllJobs{
-  logmsg "TODO: Figure out why this sub isn't being called when the script dies";
   logmsg "Cleaning all jobs";
   for (@jobsToClean){
     cleanAJob($_);
   }
+}
+END{
+  cleanAllJobs();
 }
 
 =pod
