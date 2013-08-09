@@ -120,8 +120,8 @@ sub variantsToMSA{
   my $logdir=$$settings{logdir};
 
   # find all "bad" sites
-  $bad="$vcfdir/allsites.txt"
-  system("sort $vcfDir/*.badsites.txt | uniq > $bad"); die if $?;
+  my $bad="$vcfdir/allsites.txt";
+  system("sort $vcfdir/*.badsites.txt | uniq > $bad"); die if $?;
 
   # convert VCFs to an MSA (long step)
   $sge->set("jobname","variantsToMSA");
