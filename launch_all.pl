@@ -137,11 +137,12 @@ sub msaToPhylogeny{
   my ($msadir,$settings)=@_;
   $sge->set("numcpus",$$settings{numcpus});
   $sge->set("jobname","SET_raxml");
-  $sge->pleaseExecute("(cd $msadir; $scriptsdir/launch_raxml.sh out.aln.fas.phy out)");
+  my $rand =int(rand(999999999));
+  my $rand2=int(rand(999999999));
+  $sge->pleaseExecute("(cd $msadir; raxmlHPC-PTHREADS -f a -s $msadir/out.aln.fas.phy -n out -T $$settings{numcpus} -m GTRGAMMA -p $rand -x $rand2 -N 100)");
   $sge->set("jobname","SET_phyml");
   $sge->pleaseExecute("PhyML -i $msadir/out.aln.fas.phy -b -4 -m GTR -s BEST --quiet");
   $sge->wrapItUp();
-  #system("cd $msadir; qsub -pe smp $$settings{numcpus} -cwd -o out -e out -V $scriptsdir/launch_raxml.sh out.aln.fas.phy out");
   return 1;
 }
 
