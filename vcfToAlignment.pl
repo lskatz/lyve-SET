@@ -17,7 +17,7 @@ sub main{
   $$settings{outfile}||="$0.out.fasta";
   $$settings{coverage}||=10;
   $$settings{numcpus}||=1;
-  $$settings{allowedFlanking}||=20;
+  $$settings{allowedFlanking}||=0;
   die usage($settings) if($$settings{help} || @ARGV<2);
   my $reference=$$settings{reference} or die "ERROR: need reference file\n".usage($settings);
 

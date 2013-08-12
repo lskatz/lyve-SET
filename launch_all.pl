@@ -28,7 +28,7 @@ sub main{
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
-  $$settings{allowedFlanking}||=20;
+  $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
 
   logmsg "Checking to make sure all directories are in place";
