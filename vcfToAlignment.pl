@@ -13,7 +13,7 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help outfile=s reference=s badPosition=s coverage=i allowedFlanking=i));
+  GetOptions($settings,qw(help outfile=s reference=s badPosition=s coverage=i allowedFlanking=i numcpus=i));
   $$settings{outfile}||="$0.out.fasta";
   $$settings{coverage}||=10;
   $$settings{numcpus}||=1;
@@ -203,5 +203,6 @@ sub usage{
     -b bad.txt: all positions that should not be used, in format of contig_pos
     -a allowed flanking in bp (default: 20)
       nucleotides downstream of another snp this many bp away will not be accepted
+    -n numcpus (default: 1)
   "
 }
