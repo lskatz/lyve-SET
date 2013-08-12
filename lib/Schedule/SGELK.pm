@@ -324,9 +324,18 @@ $self->error can be set if there is an error in the job. Return values:
 
 sub checkJob{
   my($self,$job)=@_;
-  # see what the job status is {jobid}
+  # See what the job status is {jobid} for fast checking
   my $status=$self->jobStatus($$job{jobid});
-  return 0 if($status eq 'qw'); # queued but not running
+  if($status eq 'qw'){ # queued but not running
+    return 0;
+  } elsif($status eq 'Eqw'){  # error
+    $self->error("Command resulted in an error. qstat -j $$job{jobid} for more info\n  $$job{cmd}");
+    return -1;
+  } elsif($status=~/[rt]/){ # running or is delayed
+    return 0;
+  }
+
+  # look at files to check on the job status, for slower checking.
   # see if the job has even started: {submitted}
   return 0 if(!-e $$job{submitted});
   # if the job finished, then great! {finished}
@@ -337,30 +346,10 @@ sub checkJob{
     $self->error($content[-1]);
     return -1;
   }
-  # see if the job is running: {running}
-  if(-e $$job{running}){
-    if($status eq 'Eqw'){
-      $self->error("Command resulted in an error. qstat -j $$job{jobid} for more info\n  $$job{cmd}");
-      return -1;
-    } elsif($status =~/[rt]/){
-      return 0;
-    } elsif($status=~/0/){
-      logmsg "Warning: job $$job{jobid} indicates it has started running but hasn't finished. However, qstat indicates it is no longer running. I will check intermittently to see what the status is." if((caller(1))[3] !~/checkJob/);
-      for my $i(0..30){
-        sleep (($i+1)*2); # the sleep timer's interval goes slower each time
-        my $newstatus=$self->checkJob($job);
-        return $newstatus if($newstatus);
-      }
-    } else { 
-      logmsg "WARNING: I don't know how to interpret status $status for jobid $$job{jobid}. I'm not going to do anything about it."; 
-    }
-    my @output=read_file($$job{output});
-    if($output[-3] =~/QSUB ERROR/){
-      $self->error("ERROR: $output[-2], exit code: $output[-1]");
-    }
-    return -1;
-  }
+  # It's running if the die-file isn't there and if the running file is there
+  return 0 if(-e $$job{running});
   logmsg "ERROR: Could not understand what the status is of job $$job{jobid}!\n".Dumper($job);
+  return -1;
 }
 
 =pod
@@ -467,11 +456,11 @@ Do not use externally.
 
 sub cleanAJob{
   my($job)=@_;
+  logmsg $$job{jobid};
   for (qw(running submitted finished output script)){
-    logmsg $$job{$_};
     unlink $$job{$_};
   }
-  system("qdel $$job{jobid}");
+  system("qdel $$job{jobid} 2>/dev/null");
   #die "Internal error" if $?;
   return 1;
 }
