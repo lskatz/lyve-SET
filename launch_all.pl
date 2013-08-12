@@ -24,11 +24,12 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i));
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep));
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
   $$settings{allowedFlanking}||=20;
+  $$settings{keep}||=0;
 
   logmsg "Checking to make sure all directories are in place";
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir)){
@@ -39,7 +40,7 @@ sub main{
     $$settings{$param}=File::Spec->rel2abs($$settings{$param});
   }
   # SGE params
-  for (qw(workingdir numnodes numcpus)){
+  for (qw(workingdir numnodes numcpus keep)){
     $sge->set($_,$$settings{$_});
   }
 
@@ -85,14 +86,15 @@ sub mapReads{
   my @job;
   for my $fastq(@file){
     my $b=fileparse $fastq;
-    if(-e "$bamdir/$b.sorted.bam"){
-      logmsg "Found $bamdir/$b.sorted.bam. Skipping.";
+    my $bamPrefix="$bamdir/$b-".basename($ref,qw(.fasta .fna .fa));
+    if(-e "$bamPrefix.sorted.bam"){
+      logmsg "Found $bamPrefix.sorted.bam. Skipping.";
       next;
     }else{
-      logmsg "Mapping to create $bamdir/$b.sorted.bam";
+      logmsg "Mapping to create $bamPrefix.sorted.bam";
     }
     $sge->set("jobname","map$b");
-    $sge->pleaseExecute("$scriptsdir/launch_smalt.sh $ref $fastq $bamdir/$b.bam $tmpdir");
+    $sge->pleaseExecute("$scriptsdir/launch_smalt.sh $ref $fastq $bamPrefix.bam $tmpdir");
   }
   logmsg "All mapping jobs have been submitted. Waiting on them to finish.";
   $sge->wrapItUp();
