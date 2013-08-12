@@ -472,7 +472,7 @@ sub cleanAJob{
     unlink $$job{$_};
   }
   system("qdel $$job{jobid}");
-  die "Internal error" if $?;
+  #die "Internal error" if $?;
   return 1;
 }
 
