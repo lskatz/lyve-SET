@@ -21,6 +21,9 @@ A module for submitting jobs to an SGE queue.
   # or in one step
   $sge->pleaseExecute_andWait("sleep 60");
 
+A quick test for this module is the following one-liner
+  perl -MSchedule::SGELK -e '$sge=Schedule::SGELK->new(-numnodes=>5); for(1..3){$sge->pleaseExecute("sleep 3");}$sge->wrapItUp();'
+
 =head1 DESCRIPTION
 
 A module for submitting jobs to an SGE queue. Monitoring is 
@@ -256,8 +259,18 @@ END
   #system("cat $script");sleep 60;die;
 
   # now run the script and get the jobid
-  my $out=`qsub $script`; chomp($out);
-  #logmsg $out."\n  Waiting on a confirmation";
+  my %return=(submitted=>$submitted,running=>$running,finished=>$finished,died=>$died,tempdir=>$tempdir,output=>$output,cmd=>$cmd,script=>$script);
+  my $qsub=$self->get("qsub");
+  if(!$qsub){
+    logmsg "Warning: qsub was not found! Running a system call instead.";
+    system("perl $script;");
+    die if $?;
+    return %return if wantarray;
+    return \%return;
+  } 
+
+  # At this point, qsub is on this computer. Submit the job.
+  my $out=`$qsub $script`; chomp($out);
   if($out=~/Your job (\d+)/){
     $jobid=$1;
     logmsg $out if($$settings{verbose});
@@ -276,7 +289,7 @@ END
 
   # TODO create a link from the jobid to the random id
   
-  my %return=(jobid=>$jobid,submitted=>$submitted,running=>$running,finished=>$finished,died=>$died,tempdir=>$tempdir,output=>$output,cmd=>$cmd,script=>$script);
+  $return{jobid}=$jobid;
   push(@jobsToClean,\%return) if(!$self->settings("keep"));
   push(@jobsToMonitor,\%return);
   return %return if wantarray;
