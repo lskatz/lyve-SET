@@ -40,7 +40,7 @@ if [ ! -e "$b.sorted.bam" ]; then
   if [ `grep '>' $ref | grep -c _` -gt 0 ]; then
     echo "ERROR: You cannot have deflines with underscores in them because of the way this script handles deflines internally."
     echo "Suggestion: change all underscores to dashes"
-    echo "  sed -ip 's/_/-/' $ref # an example "
+    echo "  sed -ip 's/_/-/g' $ref # an example "
     exit 1;
   fi
   echo "$out not found. I'm really doing the mapping now!"
