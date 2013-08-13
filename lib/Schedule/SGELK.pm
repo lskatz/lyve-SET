@@ -114,6 +114,14 @@ sub new{
     $self->settings($key,$value) if(!defined($self->settings($key)));
   }
 
+  # executables
+  for(qw(qsub qstat qdel)){
+    my $exec=`which $_ 2>/dev/null`; 
+    $exec="" if $?;
+    chomp($exec);
+    $self->set($_,$exec);
+  }
+
   return $self;
 }
 
