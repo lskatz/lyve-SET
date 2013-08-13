@@ -364,14 +364,11 @@ Given an SGE job id, it returns its qstat status
 
 =cut
 
-#TODO cache the qstat results so that it is only run every 1-2 seconds. 
-#  I don't want to overload the machine with system calls.
 sub jobStatus{
   my($self,$jobid)=@_;
   my $state=0;
-  open(QSTAT,"qstat|") or die "ERROR: could not execute qstat! $!";
-  while(<QSTAT>){
-    s/^\s+|\s+$//g;
+  my $qstat=$self->qstat;
+  for(split(/\n/,$qstat)){
     my @F=split /\s+/;
     if($F[0] eq $jobid){
       $state=$F[4];
@@ -379,6 +376,31 @@ sub jobStatus{
   }
   close QSTAT;
   return $state;
+}
+
+=pod
+
+=item qstat
+
+Runs qstat and caches the result for one second. Or, returns the cached result of qstat
+
+=cut
+
+sub qstat{
+  my($self)=@_;
+  # return the cached value if it was just accessed a second ago
+  #return $self->get("qstat") if(defined($self->get("qstat")) && $self->get("qstat_timestamp") <= time - 1);
+
+  my $content="";
+  open(QSTAT,"qstat|") or die "ERROR: could not execute qstat! $!";
+  while(<QSTAT>){
+    s/^\s+|\s+$//g;
+    $content.="$_\n";
+  }
+  close QSTAT;
+  $self->set("qstat",$content);
+  $self->set("qstat_timestamp",time);
+  return $self->get("qstat");
 }
 
 =pod
