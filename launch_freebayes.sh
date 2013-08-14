@@ -16,7 +16,7 @@ if [ -e "$out_vcf" ]; then
 fi;
 
 # freebayes params
-minAltFrac=0.75
+minAltFrac=0.95
 minCoverage=10
 readSnpLimit=3;
 echo "TODO: put minAltFrac and minCoverage as parameters to launch_all.pl"

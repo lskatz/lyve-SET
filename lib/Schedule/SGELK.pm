@@ -49,6 +49,7 @@ use String::Escape qw/escape/;
 
 sub logmsg {local $0=basename $0;my $FH = *STDOUT; print $FH "$0: ".(caller(1))[3].": @_\n";}
 local $SIG{'__DIE__'} = sub { my $e = $_[0]; $e =~ s/(at [^\s]+? line \d+\.$)/\nStopped $1/; die("$0: ".(caller(1))[3].": ".$e); };
+local $SIG{INT} = sub{ cleanAllJobs(); };
 
 # to be called when the script exits
 my @jobsToClean=();
