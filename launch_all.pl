@@ -24,12 +24,14 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep));
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i));
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
+  $$settings{min_alt_frac}||=0.75;
+  $$settings{min_coverage}||=10;
 
   logmsg "Checking to make sure all directories are in place";
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir)){
@@ -109,7 +111,7 @@ sub variantCalls{
   for my $bam(@bam){
     my $b=fileparse($bam,".sorted.bam");
     $sge->set("jobname","varcall$b");
-    $sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam vcf/$b.vcf");
+    $sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam vcf/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}");
     #system("qsub -N 'q$b' -cwd -V -o log/$b.out -e log/$b.out $scriptsdir/launch_freebayes.sh $ref $bam vcf/$b.vcf");
   }
   logmsg "All variant-calling jobs have been submitted. Waiting on them to finish";
