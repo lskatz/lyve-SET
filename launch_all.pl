@@ -94,7 +94,7 @@ sub mapReads{
       logmsg "Mapping to create $bamPrefix.sorted.bam";
     }
     $sge->set("jobname","map$b");
-    $sge->pleaseExecute("$scriptsdir/launch_smalt.sh $ref $fastq $bamPrefix.bam $tmpdir");
+    $sge->pleaseExecute("$scriptsdir/launch_smalt.sh $ref $fastq $bamPrefix.sorted.bam $tmpdir");
   }
   logmsg "All mapping jobs have been submitted. Waiting on them to finish.";
   $sge->wrapItUp();
