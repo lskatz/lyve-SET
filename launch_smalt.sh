@@ -2,6 +2,8 @@
 
 # qsub -N 'q$b' -cwd -V -o $log/$b.out -e $log/$b.out $scriptsdir/launch_smalt.sh $ref $fastq $bamdir/$b.bam $tmpdir
 
+# TODO turn this into a perl script already
+
 ref=$1
 query=$2
 out=$3
@@ -12,7 +14,7 @@ if [ "$tempdir"="" ]; then
   echo "No tempdir was given. Setting it as $tempdir";
 fi;
 
-numCpus=24
+numCpus=8
 
 export ref; # for bioperl, below
 b=`basename $out .bam`;
@@ -39,7 +41,7 @@ fi;
 
 echo
 echo "Mapping against the reference"
-if [ ! -e "$b.sorted.bam.depth" ]; then
+if [ ! -e "$out.depth" ]; then
   if [ `grep '>' $ref | grep -c _` -gt 0 ]; then
     echo "ERROR: You cannot have deflines with underscores in them because of the way this script handles deflines internally."
     echo "Suggestion: change all underscores to dashes"
@@ -67,9 +69,11 @@ if [ ! -e "$b.sorted.bam.depth" ]; then
     perl -MBio::Perl -e 'while(<>){chomp; @F=split /\t/;$depth{$F[0]}{$F[1]}=$F[2];} $in=Bio::SeqIO->new(-file=>"'$ref'");while($seq=$in->next_seq){$max{$seq->id}=$seq->length;} for $chr(keys(%max)){for $i(1..$max{$chr}){$depth{chr}{$i}||=0; print join("\t",$chr,$i,$depth{$chr}{$i})."\n";}}'\
     > "$sorted.depth"
 
+  # cleanup
+  mv -v $sorted $out
+  mv -v $sorted.depth $out.depth
+  rm -v $tmpOut
+
 fi
 
-# cleanup
-mv -v $sorted $out
-rm -v $tmpOut
 
