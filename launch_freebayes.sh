@@ -2,11 +2,16 @@
 ref=$1
 bam=$2
 out_vcf=$3
+minAltFrac=$4
+minCoverage=$5
+
+readSnpLimit=3;
 
 b=`basename $out_vcf .vcf`;
 
 if [ "$out_vcf" = "" ]; then
-  echo usage: $0 ref.fasta query.bam out.vcf;
+  echo usage: $0 ref.fasta query.bam out.vcf min_alt_frac min_coverage;
+  echo "  where min_al_frac can be 0.75 and min_coverage can be 10"
   exit 1;
 fi;
 
@@ -16,10 +21,8 @@ if [ -e "$out_vcf" ]; then
 fi;
 
 # freebayes params
-minAltFrac=0.95
-minCoverage=10
-readSnpLimit=3;
-echo "TODO: put minAltFrac and minCoverage as parameters to launch_all.pl"
+if [ "$minAltFrac" = "" ]; then minAltFrac=0.75; fi;
+if [ "$minCoverage" = "" ]; then minCoverage=10; fi;
 
 # for filtering, for later
 new_vcf="$out_vcf".tmp
