@@ -111,6 +111,10 @@ sub variantCalls{
   for my $bam(@bam){
     my $b=fileparse($bam,".sorted.bam");
     $sge->set("jobname","varcall$b");
+    if(-e "$vcfdir/$b.vcf"){
+      logmsg "Found $vcfdir/$b.vcf. Skipping";
+      next;
+    }
     my $j=$sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}");
     push(@jobid,$j);
   }
