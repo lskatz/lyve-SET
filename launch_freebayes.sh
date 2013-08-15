@@ -59,6 +59,7 @@ freebayes       \
                 --min-alternate-fraction $minAltFrac `# Require at least this fraction of observations supporting an alternate allele within a single individual in the in order to evaluate the position.  default: 0.0`\
                 --min-coverage $minCoverage `# Require at least this coverage to process a site.  default: 0`
 
+if [ $? -gt 0 ]; then exit 1; fi;
 
 echo "Filtering FreeBayes calls"
 filterVcf.pl $out_vcf --noindels -d 10 -o $new_vcf -b $bad

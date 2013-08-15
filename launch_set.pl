@@ -111,9 +111,11 @@ sub variantCalls{
   for my $bam(@bam){
     my $b=fileparse($bam,".sorted.bam");
     $sge->set("jobname","varcall$b");
-    $sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}");
-    #system("qsub -N 'q$b' -cwd -V -o log/$b.out -e log/$b.out $scriptsdir/launch_freebayes.sh $ref $bam vcf/$b.vcf");
+    my $j=$sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}");
+    push(@jobid,$j);
   }
+  logmsg "TODO check freebayes more closely for an error message like this:";
+  # terminate called after throwing an instance of 'std::out_of_range'
   logmsg "All variant-calling jobs have been submitted. Waiting on them to finish";
   $sge->wrapItUp();
   return 1;
