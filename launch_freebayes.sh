@@ -48,13 +48,13 @@ freebayes       \
                 --no-mnps `# Ignore multi-nuceotide polymorphisms, MNPs.`\
                 \
                 `# indel realignment`\
-                `--left-align-indels` `# Left-realign and merge gaps embedded in reads. default: false`\
-                #--no-indels \
+                `#--left-align-indels` `# Left-realign and merge gaps embedded in reads. default: false`\
+                `#--no-indels` \
                 \
                 `# input filters`\
                 --min-mapping-quality 0 `# Exclude alignments from analysis if they have a mapping quality less than Q.  default: 30`\
                 --min-base-quality 20 `# Exclude alleles from analysis if their supporting base quality is less than Q.  default: 20`\
-                #--read-snp-limit $readSnpLimit `# Exclude reads with more than N base mismatches, ignoring gaps with quality >= mismatch-base-quality-threshold. default: ~unbounded`\
+                `#--read-snp-limit $readSnpLimit` `# Exclude reads with more than N base mismatches, ignoring gaps with quality >= mismatch-base-quality-threshold. default: ~unbounded`\
                 --indel-exclusion-window 5 `# Ignore portions of alignments this many bases from a putative insertion or deletion allele.  default: 0`\
                 --min-alternate-fraction $minAltFrac `# Require at least this fraction of observations supporting an alternate allele within a single individual in the in order to evaluate the position.  default: 0.0`\
                 --min-coverage $minCoverage `# Require at least this coverage to process a site.  default: 0`
