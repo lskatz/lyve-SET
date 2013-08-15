@@ -122,6 +122,10 @@ sub variantCalls{
 sub variantsToMSA{
   my ($ref,$bamdir,$vcfdir,$msadir,$settings)=@_;
   my $logdir=$$settings{logdir};
+  if(-e "$msadir/out.aln.fas.phy"){
+    logmsg "Found $msadir/out.aln.fas.phy already present. Not re-converting.";
+    return 1;
+  }
 
   # find all "bad" sites
   my $bad="$vcfdir/allsites.txt";
@@ -139,11 +143,22 @@ sub variantsToMSA{
 
 sub msaToPhylogeny{
   my ($msadir,$settings)=@_;
+
   $sge->set("numcpus",$$settings{numcpus});
-  $sge->set("jobname","SET_raxml");
-  my $rand =int(rand(999999999));
-  my $rand2=int(rand(999999999));
-  $sge->pleaseExecute("(cd $msadir; raxmlHPC-PTHREADS -f a -s $msadir/out.aln.fas.phy -n out -T $$settings{numcpus} -m GTRGAMMA -p $rand -x $rand2 -N 100)");
+  # raxml
+  if(-e "$msadir/RAxML_info.out"){
+    if(!-e "$msadir/RAxML_bipartitions.out"){
+      unlink("$msadir/RAxML_info.out");
+    }
+  }
+  if(!-e "$msadir/RAxML_info.out"){
+    $sge->set("jobname","SET_raxml");
+    my $rand =int(rand(999999999));
+    my $rand2=int(rand(999999999));
+    $sge->pleaseExecute("(cd $msadir; raxmlHPC-PTHREADS -f a -s $msadir/out.aln.fas.phy -n out -T $$settings{numcpus} -m GTRGAMMA -p $rand -x $rand2 -N 100)");
+  }
+
+  # phyml
   $sge->set("jobname","SET_phyml");
   $sge->pleaseExecute("PhyML -i $msadir/out.aln.fas.phy -b -4 -m GTR -s BEST --quiet");
   $sge->wrapItUp();
