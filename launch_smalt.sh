@@ -71,6 +71,7 @@ if [ ! -e "$out.depth" ]; then
 
   # cleanup
   mv -v $sorted $out
+  mv -v $sorted.bai $out.bai
   mv -v $sorted.depth $out.depth
   rm -v $tmpOut
 
