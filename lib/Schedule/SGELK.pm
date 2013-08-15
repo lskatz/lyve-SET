@@ -260,7 +260,7 @@ END
   #system("cat $script");sleep 60;die;
 
   # now run the script and get the jobid
-  my %return=(submitted=>$submitted,running=>$running,finished=>$finished,died=>$died,tempdir=>$tempdir,output=>$output,cmd=>$cmd,script=>$script);
+  my %return=(submitted=>$submitted,running=>$running,finished=>$finished,died=>$died,tempdir=>$tempdir,output=>$output,cmd=>$cmd,script=>$script,name=>$$settings{jobname});
   my $qsub=$self->get("qsub");
   if(!$qsub){
     logmsg "Warning: qsub was not found! Running a system call instead.";
@@ -471,7 +471,7 @@ sub waitOnJobs{
     for(my $i=0;$i<@$job;$i++){
       my $state=$self->checkJob($$job[$i]);
       if($state==1){
-        logmsg "A job finished: $$job[$i]{jobid}" if($settings{verbose});
+        logmsg "A job finished: $$job[$i]{jobname} ($$job[$i]{jobid})" if($settings{verbose});
         splice(@$job,$i,1);
         last;
       } elsif($state==-1){
