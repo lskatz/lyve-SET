@@ -260,7 +260,7 @@ END
   #system("cat $script");sleep 60;die;
 
   # now run the script and get the jobid
-  my %return=(submitted=>$submitted,running=>$running,finished=>$finished,died=>$died,tempdir=>$tempdir,output=>$output,cmd=>$cmd,script=>$script,name=>$$settings{jobname});
+  my %return=(submitted=>$submitted,running=>$running,finished=>$finished,died=>$died,tempdir=>$tempdir,output=>$output,cmd=>$cmd,script=>$script,jobname=>$$settings{jobname});
   my $qsub=$self->get("qsub");
   if(!$qsub){
     logmsg "Warning: qsub was not found! Running a system call instead.";
@@ -364,8 +364,9 @@ sub checkJob{
   return 1 if(-e $$job{finished});
   # if the job died
   if(-e $$job{died}){
-    my @content=read_file($$job{died});
-    $self->error($content[-1]);
+    my @content=read_file($$job{output});
+    chomp(@content);
+    $self->error(join("\n",@content[-3..-1]));
     return -1;
   }
   # It's running if the die-file isn't there and if the running file is there
@@ -475,7 +476,7 @@ sub waitOnJobs{
         splice(@$job,$i,1);
         last;
       } elsif($state==-1){
-        die "A job failed! Look at $$job[$i]{output} for more details.\nError message was ".$self->error()."\n".Dumper($$job[$i]);
+        die "A job failed ($$job[$i]{jobname} [$$job[$i]{jobid}]! Look at $$job[$i]{output} for more details.\nError message was ".$self->error()."\n".Dumper($$job[$i]);
       }
     }
     sleep 1;
@@ -501,10 +502,10 @@ Do not use externally.
 sub cleanAJob{
   my($job)=@_;
   logmsg $$job{jobid};
-  for (qw(running submitted finished output script)){
+  for (qw(running submitted finished output script died)){
     unlink $$job{$_};
   }
-  system("qdel $$job{jobid} 2>/dev/null");
+  system("qdel $$job{jobid} 2>/dev/null | grep -v 'does not exist'");
   #die "Internal error" if $?;
   return 1;
 }
