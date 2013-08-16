@@ -113,9 +113,13 @@ sub new{
   }
 
   # set defaults if they are not set
-  my %default=(numnodes=>1,numcpus=>1,verbose=>1,workingdir=>$ENV{PWD},waitForEachJobToStart=>0);
+  my %default=(numnodes=>1,numcpus=>1,verbose=>1,waitForEachJobToStart=>0);
   while(my($key,$value)=each(%default)){
     $self->settings($key,$value) if(!defined($self->settings($key)));
+  }
+  if(!$self->get("workingdir")){
+    $self->set("workingdir",$self->mktempdir());
+    logmsg "Working directory not set. Using ".$self->get("workingdir");
   }
 
   # executables
