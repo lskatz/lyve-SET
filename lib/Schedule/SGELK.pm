@@ -518,7 +518,10 @@ sub mktempdir{
   my ($self,$settings) = @_;
   $settings||={};
   # SGELK.22623.XXXXX
-  my $tempdir_path = File::Spec->join(File::Spec->tmpdir(), (split("::",(caller(1))[3]))[1].".$$.XXXXX");
+  #my $tempdir_path = File::Spec->join(File::Spec->tmpdir(), (split("::",(caller(1))[3]))[1].".$$.XXXXX");
+  mkdir "./.SGELK" if(!-d "./.SGELK");
+  die if $?;
+  my $tempdir_path = File::Spec->join("./.SGELK",(split("::",(caller(1))[3]))[1].".$$.XXXXX");
   my $tempdir = tempdir($tempdir_path, CLEANUP => !($$settings{keep}));
   return $tempdir;
 }
