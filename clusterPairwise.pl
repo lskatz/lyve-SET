@@ -48,9 +48,10 @@ sub findClusters{
   my %neighbor=%$neighbor; # make a copy so that the internal pointer isn't messed up
 
   my @cluster;
+  my %seen; # keep track of which nodes have been parsed
   while(my($centerNode,undef)=each(%neighbor)){
-    my $seen={};
-    my $cluster=findClusterAroundNode($centerNode,\%neighbor,$seen,$settings);
+    next if($seen{$centerNode}); # %seen is set within findClusterAroundNode()
+    my $cluster=findClusterAroundNode($centerNode,\%neighbor,\%seen,$settings);
     next if(!@$cluster);
     unshift(@$cluster,$centerNode);
     next if(@$cluster<$$settings{perCluster});
@@ -63,16 +64,21 @@ sub findClusters{
 # given a "center" node, find the cluster around it
 sub findClusterAroundNode{
   my($centerNode,$neighbor,$seen,$settings)=@_;
-  my @cluster; # the output
-  
-  # Failsafe: don't keep processing if you are recursing too deep
-  return \@cluster if($$settings{cluster_level}++ > 9999);
+  my @cluster=(); # the output
+
+  # Don't process this cluster if you've already processed it.
+  # Lock $seen just to make sure!
+  { 
+    lock $seen;
+    return \@cluster if($$seen{$centerNode});
+    $$seen{$centerNode}++; # and now we've seen it
+    # Failsafe: don't keep processing if you are recursing too deep
+    return \@cluster if($$settings{cluster_level}++ > 9999);
+  }
 
   my $neighbors=$$neighbor{$centerNode};
   for my $n(@$neighbors){
-    next if(!$n || $$seen{$n});
-    $$seen{$n}=1;
-    deleteNode($centerNode,$neighbor,$settings);
+    next if($$seen{$n});
     my $secondaries=findClusterAroundNode($n,$neighbor,$seen,$settings);
     push(@cluster,$n,@$secondaries);
   }
