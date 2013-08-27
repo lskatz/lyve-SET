@@ -8,7 +8,7 @@ use warnings;
 use Data::Dumper;
 use Getopt::Long;
 
-sub logmsg{$|++;print STDERR "@\n"; $|--;}
+sub logmsg{$|++;print STDERR "@_\n"; $|--;}
 my $settings={};
 GetOptions($settings,qw(help verbose));
 die usage() if($$settings{help});
