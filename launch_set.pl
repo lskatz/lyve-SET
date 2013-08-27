@@ -23,8 +23,8 @@ my $sge=Schedule::SGELK->new(-verbose=>1,-numnodes=>5,-numcpus=>8);
 exit(main());
 
 sub main{
-  my $settings={};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i));
+  my $settings={trees=>1};
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees!));
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
@@ -57,7 +57,7 @@ sub main{
   logmsg "Creating a core hqSNP MSA";
   variantsToMSA($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
   logmsg "MSA => phylogeny";
-  msaToPhylogeny($$settings{msadir},$settings);
+  msaToPhylogeny($$settings{msadir},$settings) if($$settings{trees});
 
   logmsg "Done!";
 
@@ -160,7 +160,7 @@ sub msaToPhylogeny{
     $sge->set("jobname","SET_raxml");
     my $rand =int(rand(999999999));
     my $rand2=int(rand(999999999));
-    $sge->pleaseExecute("(cd $msadir; raxmlHPC-PTHREADS -f a -s $msadir/out.aln.fas.phy -n out -T $$settings{numcpus} -m GTRGAMMA -p $rand -x $rand2 -N 100)");
+    $sge->pleaseExecute("(cd $msadir; raxmlHPC-PTHREADS -f a -s $msadir/out.aln.fas.phy -n out -T $$settings{numcpus} -m GTRGAMMA -N 100 -p $rand -x $rand2)");
   }
 
   # phyml
@@ -182,5 +182,6 @@ sub usage{
     -numnodes maximum number of nodes
     -w working directory where qsub commands can be stored. Default: CWD
     -a allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+    --notrees to not make phylogenies
   "
 }
