@@ -48,8 +48,8 @@ POSITION:for(my $j=0;$j<$length;$j++){
   next if($refNt=~/[nN\-]/); # if it's informative, but the ref base isn't good, then skip
   push(@pos,$j);
   
-  logmsg $j if($informativeCount % 100 == 0 && $$settings{verbose});
   $informativeCount++;
+  logmsg $j if($informativeCount % 1000 == 0 && $$settings{verbose});
 }
 
 ## print all nucleotides found at informative positions
@@ -74,3 +74,4 @@ sub usage{
   -v for verbose (technically makes the script slower)
   "
 }
+
