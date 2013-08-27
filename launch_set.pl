@@ -150,7 +150,7 @@ sub msaToPhylogeny{
   my ($msadir,$settings)=@_;
 
   $sge->set("numcpus",$$settings{numcpus});
-  # raxml
+  # raxml: remove the previous run, but not if it finished successfully
   if(-e "$msadir/RAxML_info.out"){
     if(!-e "$msadir/RAxML_bipartitions.out"){
       unlink("$msadir/RAxML_info.out");

@@ -9,6 +9,7 @@ use File::Basename;
 use threads;
 use Thread::Queue;
 
+sub logmsg{$|++;print "@_\n";$|--;}
 exit(main());
 
 sub main{
@@ -37,7 +38,7 @@ sub main{
   my %depth=depths(\@BAM,$settings);
   my $refBase=findReferenceBases($reference,$settings);
 
-  print "Ok! Done getting depths and reference sequence information. Converting vcf to fasta alignment now\n";
+  logmsg "Ok! Done getting depths and reference sequence information. Converting vcf to fasta alignment now";
   my ($fastaStr,$pos)=vcfToFasta(\@VCF,\@BAM,$refBase,\%depth,$settings);
 
   # print fasta to a file
