@@ -8,11 +8,10 @@ use warnings;
 use Data::Dumper;
 use Getopt::Long;
 
+sub logmsg{$|++;print STDERR "@\n"; $|--;}
 my $settings={};
 GetOptions($settings,qw(help verbose));
 die usage() if($$settings{help});
-
-$|++ if($$settings{verbose});
 
 ## read in the fasta file into @seq and %seq, and keep the deflines
 my($length,$defline,@defline,@seq,%seq);
@@ -35,6 +34,7 @@ my $refSeq=shift(@seq);
 my $refId=shift(@defline); 
 my (%aln,@pos);
 my $numOtherSeq=@seq;
+my $informativeCount=0;
 POSITION:for(my $j=0;$j<$length;$j++){ 
   my $informative=0; 
   for(my $i=0;$i<$numOtherSeq;$i++){
@@ -47,8 +47,9 @@ POSITION:for(my $j=0;$j<$length;$j++){
   my $refNt=substr($refSeq,$j,1);
   next if($refNt=~/[nN\-]/); # if it's informative, but the ref base isn't good, then skip
   push(@pos,$j);
-  print STDERR "$j\n" if($$settings{verbose});
-  #last if(@pos>4); #DEBUG
+  
+  logmsg $j if($informativeCount % 100 == 0 && $$settings{verbose});
+  $informativeCount++;
 }
 
 ## print all nucleotides found at informative positions
