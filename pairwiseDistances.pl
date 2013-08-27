@@ -47,6 +47,14 @@ sub main{
     $pwQueue->enqueue($i);
   }
 
+  # get the status while the threads are still working on it
+  while($pwQueue->pending > 0){
+    my $num=$pwQueue->pending;
+    logmsg "$num queries left in the queue";
+    sleep 30;
+  }
+  logmsg "No more left in the queue";
+
   # close off the threads
   $pwQueue->enqueue(undef) for(@thr);
   $_->join for(@thr);
