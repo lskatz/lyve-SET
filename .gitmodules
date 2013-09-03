@@ -1,3 +1,3 @@
-[submodule "Schedule"]
-	path = Schedule
+[submodule "lib/Schedule"]
+	path = lib/Schedule
 	url = /home/gzu2/src/lib/Schedule
