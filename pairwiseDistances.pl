@@ -80,13 +80,14 @@ sub pairwiseDistanceWorker{
 
 sub pairwiseDistance{
   my($seq1,$seq2,$settings)=@_;
+  $seq1=lc($seq1); $seq2=lc($seq2);
   my $length=length($seq1);
   my $pdist=0;
   for(my $i=0;$i<$length;$i++){
     my $nt1=substr($seq1,$i,1);
     my $nt2=substr($seq2,$i,1);
-    next if($nt1=~/[N\-\*]/i || $nt2=~/[N\-\*]/i);
-    $pdist++ if($nt1 ne $nt2);
+    next if($nt1=~/[^atcg]/ || $nt2=~/[^atcg]/ || $nt1 eq $nt2);
+    $pdist++;
   }
   return $pdist;
 }
