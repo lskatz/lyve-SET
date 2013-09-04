@@ -9,7 +9,7 @@ query=$2
 out=$3
 tempdir=$4
 
-if [ "$tempdir"="" ]; then
+if [ "$tempdir" = "" ]; then
   tempdir="tmp"
   echo "No tempdir was given. Setting it as $tempdir";
 fi;
