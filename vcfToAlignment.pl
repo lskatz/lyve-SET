@@ -35,7 +35,9 @@ sub main{
     }
   }
 
+  logmsg "Finding depths for all genomes";
   my %depth=depths(\@BAM,$settings);
+  logmsg "Putting all bases into a hash of arrays";
   my $refBase=findReferenceBases($reference,$settings);
 
   logmsg "Ok! Done getting depths and reference sequence information. Converting vcf to fasta alignment now";
@@ -191,6 +193,7 @@ sub findReferenceBases{
   my $base={};
   my $in=Bio::SeqIO->new(-file=>$reference);
   while(my $seq=$in->next_seq){
+    logmsg $seq->id;
     my @seq=split(//,$seq->seq);
     unshift(@seq,undef);
     $$base{$seq->id}=\@seq;
