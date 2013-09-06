@@ -9,7 +9,8 @@ use File::Basename;
 use threads;
 use Thread::Queue;
 
-sub logmsg{$|++;print "@_\n";$|--;}
+my $time=time;
+sub logmsg{local $time=time-$time; $|++;print "$time\t@_\n";$|--;}
 exit(main());
 
 sub main{
