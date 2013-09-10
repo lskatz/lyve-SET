@@ -62,8 +62,14 @@ sub filterVcf{
     my %info;
     for(@info){
       my($key,$value)=split /=/;
+      $key=uc($key); # just to be sure
       $info{$key}=$value;
     }
+
+    # If the cigar line has any indels indicated and indels are not wanted, move on.
+    # CIGAR is defined in the SAM specifications, http://samtools.sourceforge.net/SAMv1.pdf
+    $info{CIGAR}||=""; # make sure CIGAR is defined before testing it
+    next if(!$$settings{indels} && $info{CIGAR}=~/[ID]/);
 
     # multibase snps are printed to a line per position, but this works for single base calls too
     my @alt=split(//,$F[4]);
@@ -81,7 +87,6 @@ sub filterVcf{
       $ref[$i]||="*";
       $alt[$i]||="*";
       next if($alt[$i] eq $ref[$i]); # if equal, then not a variant
-      #my $newLine=join("\t",$rseq,($pos+$i),$i,$ref[$i],$alt[$i],@F[5..($numFields-1)]); # debug
       my $newLine=join("\t",$rseq,($pos+$i),$F[2],$ref[$i],$alt[$i],@F[5..($numFields-1)]);
       $vcfStr.="$newLine\n";
     }
