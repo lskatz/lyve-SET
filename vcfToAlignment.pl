@@ -10,7 +10,7 @@ use threads;
 use Thread::Queue;
 
 my $time=time;
-sub logmsg{local $time=time-$time; $|++;print "$time\t@_\n";$|--;}
+sub logmsg{my $duration=time-$time; $|++;print "$duration\t@_\n";$|--;}
 exit(main());
 
 sub main{
