@@ -51,7 +51,8 @@ sub main{
     push(@pos,$j);
     
     $informativeCount++;
-    logmsg $j if($informativeCount % 1000 == 0 && $$settings{verbose});
+    #logmsg $j if($informativeCount % 1000 == 0 && $$settings{verbose});
+    logmsg $j if($$settings{verbose});
   }
 
   ## print all nucleotides found at informative positions

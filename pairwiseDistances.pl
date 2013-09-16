@@ -13,9 +13,10 @@ sub logmsg{$|++;print STDERR "@_\n";$|--;}
 exit(main());
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help numcpus=i));
+  GetOptions($settings,qw(help numcpus=i estimate samplingFrequency=s));
   die usage() if($$settings{help});
   $$settings{numcpus}||=1;
+  $$settings{samplingFrequency}||=0.25;
 
   my $alignment=$ARGV[0];
   die usage() if(!$alignment);
@@ -84,11 +85,13 @@ sub pairwiseDistance{
   my $length=length($seq1);
   my $pdist=0;
   for(my $i=0;$i<$length;$i++){
+    next if($$settings{estimate} && rand() >$$settings{samplingFrequency});
     my $nt1=substr($seq1,$i,1);
     my $nt2=substr($seq2,$i,1);
     next if($nt1=~/[^atcg]/ || $nt2=~/[^atcg]/ || $nt1 eq $nt2);
     $pdist++;
   }
+  $pdist=int($pdist / $$settings{samplingFrequency}) if($$settings{estimate});
   return $pdist;
 }
 sub printer{
@@ -103,5 +106,7 @@ sub usage{
   "Finds pairwise distances of entries in an alignment file
   Usage: $0 alignment.fasta > pairwise.tsv
   -n numcpus (Default: 1)
+  -e Estimate the number of pairwise distances using random sampling. 1/4 of all pairwise bases will be analyzed instead of 100%.
+  -s 0.25 (to be used with -e) The frequency at which to analyze positions for pairwise differences
   "
 }

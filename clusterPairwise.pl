@@ -6,6 +6,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 use Getopt::Long;
+no warnings 'recursion';
 
 sub logmsg{$|++;print STDERR "@_\n";$|--}
 exit(main());
