@@ -7,14 +7,16 @@ use warnings;
 use Data::Dumper;
 use Getopt::Long;
 no warnings 'recursion';
+use POSIX;
 
 sub logmsg{$|++;print STDERR "@_\n";$|--}
 exit(main());
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help maxdist=s perCluster=i histogram));
+  GetOptions($settings,qw(help maxdist=s perCluster=i oerCluster=i histogram));
   die usage() if($$settings{help});
   $$settings{perCluster}||=2;
+  $$settings{oerCluster}||=LONG_MAX; # max size per cluster
 
   return histogram($settings) if($$settings{histogram});
 
@@ -40,6 +42,8 @@ sub identifyCloseNeighbors{
     $dist{$F[0]}{$F[1]}=$F[2];
     $dist{$F[1]}{$F[0]}=$F[2];
   }
+  #$$settings{oerCluster}||=scalar(keys(%dist))**2; # a large number that can't be reached
+  #die Dumper $settings;
   return (\%neighbor,\%dist) if wantarray;
   return \%neighbor;
 }
@@ -47,15 +51,29 @@ sub identifyCloseNeighbors{
 sub findClusters{
   my($neighbor,$settings)=@_;
   my %neighbor=%$neighbor; # make a copy so that the internal pointer isn't messed up
+  my $defaultMaxDist=$$settings{maxdist}; # back up this value
 
   my @cluster;
   my %seen; # keep track of which nodes have been parsed
   while(my($centerNode,undef)=each(%neighbor)){
     next if($seen{$centerNode}); # %seen is set within findClusterAroundNode()
+    $$settings{maxdist}=$defaultMaxDist; # set this back to normal
     my $cluster=findClusterAroundNode($centerNode,\%neighbor,\%seen,$settings);
     next if(!@$cluster);
     unshift(@$cluster,$centerNode);
+    
+    # if there are too many members in the cluster, make the maxdist more strict or release the cluster back to the wild.
+    while(scalar(@$cluster) > $$settings{oerCluster} && $$settings{maxdist} > 50){
+      $seen{$_}-- for(@$cluster); # unmark the cluster as seen
+      $$settings{maxdist}-=100; 
+      $$settings{maxdist}=5 if($$settings{maxdist}<5);
+      $cluster=findClusterAroundNode($centerNode,\%neighbor,\%seen, $settings);
+      $seen{$_}++ for(@$cluster); # mark it back as seen
+    }
+    # if there are too few members, just don't report it.
     next if(@$cluster<$$settings{perCluster});
+
+    # the cluster passed all checks: output it.
     print join("\t",scalar(@$cluster),@$cluster)."\n";
     push(@cluster,$cluster);
   }
@@ -125,6 +143,7 @@ sub usage{
   Usage: $0 -m maxdist < distances.txt
   -m the maximum distance between two nodes in a cluster.
   -p the minimum number per cluster, before reporting it (default: 2)
+  -o the maximum per cluster (default: no maximum)
   --help this help menu
   --histogram to display a histogram and then exit
   "

@@ -27,12 +27,13 @@ sub main{
   while(my $aln=$in->next_aln){
     my @seq=$aln->each_seq;
     for(@seq){
-      logmsg $_->id;
+      #logmsg $_->id;
       $seq{$_->id}=$_->seq;
     }
   }
   my @seqid=keys(%seq);
   my $numSeq=@seqid;
+  logmsg "Loaded $numSeq sequences for comparison";
 
   # find all distances
   my $printQueue=Thread::Queue->new;
