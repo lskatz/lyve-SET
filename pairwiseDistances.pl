@@ -23,7 +23,7 @@ sub main{
 
   logmsg "Reading the aln";
   my %seq;
-  my $in=Bio::AlignIO->new(-file=>$alignment);
+  my $in=Bio::AlignIO->new(-file=>$alignment,-idlength=>30);
   while(my $aln=$in->next_aln){
     my @seq=$aln->each_seq;
     for(@seq){

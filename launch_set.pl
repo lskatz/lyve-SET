@@ -115,7 +115,9 @@ sub variantCalls{
       logmsg "Found $vcfdir/$b.vcf. Skipping";
       next;
     }
-    my $j=$sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}");
+    my $command="$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}";
+    logmsg "COMMAND  $command";
+    my $j=$sge->pleaseExecute($command);
     push(@jobid,$j);
   }
   # terminate called after throwing an instance of 'std::out_of_range'
