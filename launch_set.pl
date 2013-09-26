@@ -166,8 +166,9 @@ sub msaToPhylogeny{
   }
 
   # phyml
+  my $phyml=`(which PhyML || which phyml_linux_64 ) 2>/dev/null`; chomp($phyml);
   $sge->set("jobname","SET_phyml");
-  $sge->pleaseExecute("PhyML -i $msadir/out.aln.fas.phy -b -4 -m GTR -s BEST --quiet");
+  $sge->pleaseExecute("$phyml -i $msadir/out.aln.fas.phy -b -4 -m GTR -s BEST --quiet");
   $sge->wrapItUp();
   return 1;
 }
