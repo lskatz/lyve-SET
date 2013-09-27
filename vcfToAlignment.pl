@@ -10,7 +10,7 @@ use threads;
 use Thread::Queue;
 
 my $time=time;
-sub logmsg{my $duration=time-$time; $|++;print "$duration\t@_\n";$|--;}
+sub logmsg{my $duration=time-$time; $|++;print STDERR "$duration\t@_\n";$|--;}
 exit(main());
 
 sub main{
@@ -41,26 +41,12 @@ sub main{
   logmsg "Putting all bases into a hash of arrays";
   my $refBase=findReferenceBases($reference,$settings);
 
-  logmsg "Ok! Done getting depths and reference sequence information. Converting vcf to fasta alignment now";
-  my ($fastaStr,$pos)=vcfToFasta(\@VCF,\@BAM,$refBase,\%depth,$settings);
-
-  # print fasta to a file
-  open(FASTA,">",$$settings{outfile}) or die "Cannot open file for writing: $$settings{outfile}: $!";
-  print FASTA $fastaStr; 
-  close FASTA;
-  print "Alignment is in $$settings{outfile}\n";
-
-  # print which positions for each nt in the alignment to a file
-  open(POS,">","$$settings{outfile}.pos.txt") or die "Cannot open file for writing: $$settings{outfile}.pos.txt:$!";
-  print POS join("\t",@$pos)."\n";
-  close POS;
-  print "List of variant positions is in $$settings{outfile}.pos.txt\n";
-
+  printFasta(\@VCF,\@BAM,$refBase,\%depth,$settings);
   return 0;
 }
 
-sub vcfToFasta{
-  my($VCF,$BAM,$refBase,$depth,$settings)=@_;
+sub printFasta{
+  my($VCF,$BAM,$refBase,$depthHash,$settings)=@_;
 
   # find all bad positions
   my (%badPos);
@@ -73,79 +59,59 @@ sub vcfToFasta{
     close BAD;
   }
 
-  # find all positions that the VCFs encompass
-  # filter out all bad positions, defined by badPosition
-  my (%pos,@genome);
+  # print each fasta
+  my @contig=keys(%$refBase);
   for my $vcf(@$VCF){
-    open(VCF,"<",$vcf) or die "Could not open $vcf for reading:$!";
-    my $genome=basename($vcf,qw(.vcf));
-    push(@genome,$genome);
-    while(<VCF>){
-      next if(/^\s*$/ || /^#/);
-      chomp;
-      my @F=split /\t/;
-      my $posKey=join("_",@F[0..1]);
-      die if(!$posKey);
-      next if($badPos{$posKey});
-      my $alt=$F[4];
-      $pos{$posKey}{$genome}=$alt;
-    }
-    close VCF;
-  }
-  
-  ## sort the positions on two fields
-  my @pos=sort({
-    my ($cB,$posB)=split(/_/,$b);
-    my ($cA,$posA)=split(/_/,$a);
-    $cA cmp $cB || 
-    $posA <=>$posB;
-  } keys(%pos));
-
-  # for every possible position, see what each genome's variant call is
-  for my $genome(@genome){
+    # find the correct bam file to check out depths
+    my $genome=basename($vcf,'.vcf');
     my @bam=grep(/$genome\b/,@$BAM);
-    die "ERROR: there are many bams that fit the description $genome: ".join(" ",@bam) if(@bam>1);
-    my $bam=$bam[0];
-    $$depth{$genome}=$$depth{$bam} if(!$$depth{$genome});
-    my %genomeDepth=%{$$depth{$genome}};
-    for my $posKey(@pos){
-      next if($pos{$posKey}{$genome} || $badPos{$posKey});
-      my($rseq,$pos)=split(/_/,$posKey);
-      if($genomeDepth{$posKey} && $genomeDepth{$posKey} >= $$settings{coverage}){
-        $pos{$posKey}{$genome}=$$refBase{$rseq}[$pos];
-      } else {
-        $pos{$posKey}{$genome}="N";
+    die "ERROR: more than one bam file matches the vcf name $vcf:\n".Dumper(@bam) if(@bam>1);
+    my $bam=shift(@bam);
+    my $depth=$$depthHash{$bam};
 
-        # Better yet, don't delete and allow for the complete picture
-        #$badPos{$posKey}=1;
-        #delete($pos{$posKey}); 
+    # read the vcf and make base calls
+    logmsg "Printing $vcf...";
+    print ">$vcf\n";
+    my $vcfHash=readVcf($vcf,$settings);
+    # TODO get the depth here, so that each assembly is one "unit," making parallelization easier
+    for my $contig(@contig){
+      my $currentPos=1;
+      my @unsortedPos=keys(%{$$vcfHash{$contig}});
+      for my $pos(sort{$a<=>$b} @unsortedPos){
+        # fill in the sequence with reference bases until we get to the variant call
+        for my $i ($currentPos .. $pos-1){
+          my $posKey=$contig.'_'.$i;
+          if($badPos{$posKey} || !$$depth{$posKey} || $$depth{$posKey}<$$settings{coverage}){
+            print 'N'; next;
+          }
+          print $$refBase{$contig}[$i];
+        }
+
+        # print the alternate base, if it is above the right coverage level
+        $$depth{$contig.'_'.$pos}||=0;
+        if($$depth{$contig.'_'.$pos}<$$settings{coverage}){
+          print 'N';
+        } else {
+          print $$vcfHash{$contig}{$pos};
+        }
+
+        # reset the position to the one after the alternate
+        $currentPos=$pos+1;
+      }
+
+      # Use the reference genome to fill in any remaining positions after the last variant
+      for my $i ($currentPos .. scalar(@{$$refBase{$contig}})-1){
+        my $posKey=$contig.'_'.$i;
+        if($badPos{$posKey} || !$$depth{$posKey} || $$depth{$posKey}<$$settings{coverage}){
+          print 'N'; next;
+        }
+        print $$refBase{$contig}[$i];
       }
     }
+    print "\n";
   }
 
-  # now that we have base calls for each genome at each site, make a fasta
-  my $allowedFlanking=$$settings{allowedFlanking};
-  my ($fasta,@legitPos);
-  my $numPositions=@pos;
-  for my $genome(@genome){
-    my ($prevContig,$prevPos);
-    $fasta.=">$genome\n";
-    for(my $i=0;$i<$numPositions;$i++){
-      my $posKey=$pos[$i];
-      next if($badPos{$posKey});
-
-      # do not accept positions that are too close together
-      my($contig,$position)=split /_/,$posKey;
-      next if($prevPos && ($contig eq $prevContig) && ($position-$allowedFlanking < $prevPos));
-
-      $fasta.=$pos{$posKey}{$genome};
-      push(@legitPos,$posKey);
-      $prevContig=$contig;
-      $prevPos=$position;
-    }
-    $fasta.="\n";
-  }
-  return ($fasta,\@legitPos);
+  return 1;
 }
 
 sub depths{
@@ -175,7 +141,7 @@ sub depths{
 sub covDepth{
   my($bam,$settings)=@_;
   my $depthFile="$bam.depth";
-  print "Finding depth for $bam\n";
+  logmsg "Finding depth for $bam";
   my %depth;
   system("samtools depth '$bam' > '$depthFile'") if(!-e $depthFile);
   die if $?;
@@ -195,6 +161,7 @@ sub findReferenceBases{
   my $in=Bio::SeqIO->new(-file=>$reference);
   while(my $seq=$in->next_seq){
     logmsg $seq->id;
+    # $$base{$seq->id}=[undef,split(//,$seq->seq)];
     my @seq=split(//,$seq->seq);
     unshift(@seq,undef);
     $$base{$seq->id}=\@seq;
@@ -202,9 +169,22 @@ sub findReferenceBases{
   return $base;
 }
 
+sub readVcf{
+  my($vcf,$settings)=@_;
+  my $vcfHash={};
+  open(VCF,"<",$vcf) or die "ERROR: could not open vcf file $vcf:$!";
+  while(<VCF>){
+    next if(/^#/);
+    chomp;
+    my($contig,$pos,undef,undef,$alt)=split /\t/;
+    $$vcfHash{$contig}{$pos}=$alt;
+  }
+  return $vcfHash;
+}
+
 sub usage{
   "Creates an alignment of SNPs, given a set of VCFs
-  usage: $0 *.bam *.vcf -o alignment.fasta -r reference.fasta -b bad.txt
+  usage: $0 *.bam *.vcf -r reference.fasta -b bad.txt > alignment.fasta
     -b bad.txt: all positions that should not be used, in format of contig_pos
     -a allowed flanking in bp (default: 0)
       nucleotides downstream of another snp this many bp away will not be accepted
