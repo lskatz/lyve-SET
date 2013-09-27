@@ -42,6 +42,7 @@ sub main{
     for(my $i=0;$i<$numOtherSeq;$i++){
       my $sequence=$seq[$i];
       my $nt=substr($sequence,$j,1); 
+      die "ERROR: Sequence $i does not have a nucleotide at position $j! Is the MSA flush?" if(!$nt);
       $informative=1 if($nt ne substr($refSeq,$j,1)); 
       next POSITION if($nt=~/[nN\-]/); 
     } 
