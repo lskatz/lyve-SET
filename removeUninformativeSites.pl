@@ -14,8 +14,8 @@ sub main{
   my $settings={};
   GetOptions($settings,qw(help verbose ambiguities-allowed gaps-allowed));
   die usage() if($$settings{help});
-  $$settings{"--ambiguities-allowed"} ||=0;
-  $$settings{"--gaps-allowed"} ||=0;
+  $$settings{"ambiguities-allowed"} ||=0;
+  $$settings{"gaps-allowed"} ||=0;
 
   ## read in the fasta file into @seq and %seq, and keep the deflines
   my($length,$defline,@defline,@seq,%seq);
@@ -34,8 +34,8 @@ sub main{
 
   ## read informative positions into @pos
   # compare each sequence to the reference sequence (the first sequence)
-  my $removeAmbiguities=!$$settings{"--ambiguities-allowed"};
-  my $removeGaps=!$$settings{"--gaps-allowed"};
+  my $removeAmbiguities=!$$settings{"ambiguities-allowed"};
+  my $removeGaps=!$$settings{"gaps-allowed"};
   my $refSeq=shift(@seq); 
   my $refId=shift(@defline); 
   my (%aln,@pos);
