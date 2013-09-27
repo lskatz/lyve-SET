@@ -34,7 +34,7 @@ if [ ! -e "$prefix.cleaned.fastq" ]; then
   if [ "$?" -gt 0 ]; then exit 1; fi;
   run_assembly_removeDuplicateReads.pl "$prefix.trimmed.fastq" > "$prefix.nodupes.fastq";
   if [ "$?" -gt 0 ]; then exit 1; fi;
-  run_assembly_trimClean.pl -i "$prefix.nodupes.fastq" -o "$prefix.cleaned.fastq" --min_length 36
+  run_assembly_trimClean.pl -n $numCpus -i "$prefix.nodupes.fastq" -o "$prefix.cleaned.fastq" --min_length 36
   if [ "$?" -gt 0 ]; then exit 1; fi;
   rm -v "$prefix.nodupes.fastq" "$prefix.trimmed.fastq"
 fi;
@@ -51,8 +51,16 @@ if [ ! -e "$out.depth" ]; then
   tmpOut="$out.$RANDOM.tmp";
   echo "$out not found. I'm really doing the mapping now!"
   echo "  Outfile: $tmpOut"
-  smalt map -r -1 -f samsoft -n $numCpus $ref "$prefix.cleaned.fastq" | samtools view -bS -T $ref - > $tmpOut;
+  # deshuffle the reads
+  echo "Deshuffling to $prefix.1.fastq and $prefix.2.fastq";
+  run_assembly_shuffleReads.pl -d "$prefix.cleaned.fastq" 1>"$prefix.1.fastq" 2>"$prefix.2.fastq"
+  if [ "$?" -gt 0 ]; then echo "Problem with deshuffling reads! I am assuming paired end reads."; exit 1; fi;
+
+  # mapping
+  smalt map -r -1 -f samsoft -n $numCpus $ref "$prefix.1.fastq" "$prefix.2.fastq" | samtools view -bS -T $ref - > $tmpOut;
   if [ "$?" -gt 0 ]; then exit 1; fi;
+  # remove the deshuffled reads
+  rm -v "$prefix.1.fastq" "$prefix.2.fastq"
 
   echo "Transforming the output file with samtools"
   # sort, index, depth
