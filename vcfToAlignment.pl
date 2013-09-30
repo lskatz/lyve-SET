@@ -189,5 +189,6 @@ sub usage{
     -a allowed flanking in bp (default: 0)
       nucleotides downstream of another snp this many bp away will not be accepted
     -n numcpus (default: 1)
+    -r reference.fasta The reference file that all reads are already mapped against
   "
 }
