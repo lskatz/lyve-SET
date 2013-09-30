@@ -4,6 +4,7 @@ bamDir=$1
 vcfDir=$2
 ref=$3
 out=$4
+numCpus=8;
 
 if [ "$out" = "" ]; then
   echo usage: $0 bam/ vcf/ ref.fasta out.aln.fas
@@ -19,7 +20,7 @@ sort $vcfDir/*.badsites.txt | uniq > $bad
 if [ $? -gt 0 ]; then exit 1; fi;
 
 echo "vcfToAlignment.pl"
-vcfToAlignment.pl $bamDir/*.sorted.bam $vcfDir/*.vcf -o $out -r $ref -b $bad -a 0 -n 8
+vcfToAlignment.pl $bamDir/*.sorted.bam $vcfDir/*.vcf -o $out -r $ref -b $bad -a 0 -n $numCpus
 if [ $? -gt 0 ]; then exit 1; fi;
 
 echo "convertAlignment.pl"
