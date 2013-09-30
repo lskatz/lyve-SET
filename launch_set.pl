@@ -141,7 +141,7 @@ sub variantsToMSA{
   # convert VCFs to an MSA (long step)
   $sge->set("jobname","variantsToMSA");
   $sge->set("numcpus",$$settings{numcpus});
-  $sge->pleaseExecute_andWait("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o -r $ref -b $bad -a $$settings{allowedFlanking} > $msadir/out.aln.fas");
+  $sge->pleaseExecute_andWait("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o -r $ref -b $bad -a $$settings{allowedFlanking} | removeUninformativeSites.pl --ambiguities-allowed --gaps-allowed > $msadir/out.aln.fas");
   # convert fasta to phylip and remove uninformative sites
   $sge->set("jobname","msaToPhylip");
   $sge->pleaseExecute_andWait("convertAlignment.pl -i $msadir/out.aln.fas -o $msadir/out.aln.fas.phy -f phylip -r");
