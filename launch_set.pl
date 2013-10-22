@@ -96,7 +96,7 @@ sub mapReads{
       logmsg "Mapping to create $bamPrefix.sorted.bam";
     }
     $sge->set("jobname","map$b");
-    $sge->pleaseExecute("$scriptsdir/launch_smalt.sh $ref $fastq $bamPrefix.sorted.bam $tmpdir");
+    $sge->pleaseExecute("$scriptsdir/launch_smalt.sh $ref $fastq $bamPrefix.sorted.bam $tmpdir",{qsubxopts=>"-q long.q");
   }
   logmsg "All mapping jobs have been submitted. Waiting on them to finish.";
   $sge->wrapItUp();
@@ -115,9 +115,7 @@ sub variantCalls{
       logmsg "Found $vcfdir/$b.vcf. Skipping";
       next;
     }
-    my $command="$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}";
-    logmsg "COMMAND  $command";
-    my $j=$sge->pleaseExecute($command);
+    my $j=$sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}");
     push(@jobid,$j);
   }
   # terminate called after throwing an instance of 'std::out_of_range'
@@ -141,7 +139,7 @@ sub variantsToMSA{
   # convert VCFs to an MSA (long step)
   $sge->set("jobname","variantsToMSA");
   $sge->set("numcpus",$$settings{numcpus});
-  $sge->pleaseExecute_andWait("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o -r $ref -b $bad -a $$settings{allowedFlanking} | removeUninformativeSites.pl --ambiguities-allowed --gaps-allowed > $msadir/out.aln.fas");
+  $sge->pleaseExecute_andWait("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o $msadir/out.aln.fas -r $ref -b $bad -a $$settings{allowedFlanking}");
   # convert fasta to phylip and remove uninformative sites
   $sge->set("jobname","msaToPhylip");
   $sge->pleaseExecute_andWait("convertAlignment.pl -i $msadir/out.aln.fas -o $msadir/out.aln.fas.phy -f phylip -r");
@@ -166,9 +164,8 @@ sub msaToPhylogeny{
   }
 
   # phyml
-  my $phyml=`(which PhyML || which phyml_linux_64 ) 2>/dev/null`; chomp($phyml);
   $sge->set("jobname","SET_phyml");
-  $sge->pleaseExecute("$phyml -i $msadir/out.aln.fas.phy -b -4 -m GTR -s BEST --quiet");
+  $sge->pleaseExecute("PhyML -i $msadir/out.aln.fas.phy -b -4 -m GTR -s BEST --quiet");
   $sge->wrapItUp();
   return 1;
 }
