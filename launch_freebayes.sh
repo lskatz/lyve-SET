@@ -26,6 +26,7 @@ if [ "$minCoverage" = "" ]; then minCoverage=10; fi;
 
 # for filtering, for later
 new_vcf="$out_vcf".tmp
+unfiltered_vcf="$out_vcf".unfiltered
 bad=$out_vcf".badsites.txt"
 
 # freebayes
@@ -35,7 +36,7 @@ echo "$bam => $out_vcf"
 freebayes       \
                 `# input and output`\
                 --bam $bam \
-                --vcf $out_vcf \
+                --vcf $unfiltered_vcf \
                 --fasta-reference $ref \
                 \
                 `# reporting` \
@@ -62,7 +63,8 @@ freebayes       \
 if [ $? -gt 0 ]; then exit 1; fi;
 
 echo "Filtering FreeBayes calls"
-filterVcf.pl $out_vcf --noindels -d 10 -o $new_vcf -b $bad
+filterVcf.pl $unfiltered_vcf --noindels -d $minCoverage -o $new_vcf -b $bad
 if [ "$?" -gt 0 ]; then exit 1; fi;
 mv -v $new_vcf $out_vcf
+if [ "$?" -gt 0 ]; then exit 1; fi;
 
