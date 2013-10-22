@@ -12,7 +12,6 @@ use File::Basename;
 use File::Spec;
 use threads;
 use Thread::Queue;
-#use Schedule::SGE;
 use Schedule::SGELK;
 
 sub logmsg {local $0=basename $0;my $FH = *STDOUT; print $FH "$0: ".(caller(1))[3].": @_\n";}
@@ -24,7 +23,7 @@ exit(main());
 
 sub main{
   my $settings={trees=>1};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees!));
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees! qsubxopts=s));
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
@@ -32,6 +31,7 @@ sub main{
   $$settings{keep}||=0;
   $$settings{min_alt_frac}||=0.75;
   $$settings{min_coverage}||=10;
+  $$settings{qsubxopts}||="";
 
   logmsg "Checking to make sure all directories are in place";
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir)){
@@ -42,7 +42,7 @@ sub main{
     $$settings{$param}=File::Spec->rel2abs($$settings{$param});
   }
   # SGE params
-  for (qw(workingdir numnodes numcpus keep)){
+  for (qw(workingdir numnodes numcpus keep qsubxopts)){
     $sge->set($_,$$settings{$_});
   }
 
@@ -95,8 +95,7 @@ sub mapReads{
     }else{
       logmsg "Mapping to create $bamPrefix.sorted.bam";
     }
-    $sge->set("jobname","map$b");
-    $sge->pleaseExecute("$scriptsdir/launch_smalt.sh $ref $fastq $bamPrefix.sorted.bam $tmpdir",{qsubxopts=>"-q long.q");
+    $sge->pleaseExecute("$scriptsdir/launch_smalt.sh $ref $fastq $bamPrefix.sorted.bam $tmpdir $$settings{numcpus}",{jobname=>"map$b"});
   }
   logmsg "All mapping jobs have been submitted. Waiting on them to finish.";
   $sge->wrapItUp();
@@ -183,5 +182,6 @@ sub usage{
     -w working directory where qsub commands can be stored. Default: CWD
     -a allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
     --notrees to not make phylogenies
+    -q '-q long.q' extra options to pass to qsub. This is not sanitized.
   "
 }

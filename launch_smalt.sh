@@ -8,13 +8,16 @@ ref=$1
 query=$2
 out=$3
 tempdir=$4
+numCpus=$5;
 
 if [ "$tempdir" = "" ]; then
   tempdir="tmp"
   echo "No tempdir was given. Setting it as $tempdir";
 fi;
 
-numCpus=8
+if [ "$numCpus" = "" ]; then
+  numCpus=1
+fi
 
 export ref; # for bioperl, below
 b=`basename $out .bam`;
