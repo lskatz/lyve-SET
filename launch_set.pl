@@ -23,7 +23,7 @@ exit(main());
 
 sub main{
   my $settings={trees=>1};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees! qsubxopts=s));
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean!));
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
@@ -95,7 +95,8 @@ sub mapReads{
     }else{
       logmsg "Mapping to create $bamPrefix.sorted.bam";
     }
-    $sge->pleaseExecute("$scriptsdir/launch_smalt.sh $ref $fastq $bamPrefix.sorted.bam $tmpdir $$settings{numcpus}",{jobname=>"map$b"});
+    my $clean=($$settings{clean})?"--clean":""; # the clean parameter or not
+    $sge->pleaseExecute("$scriptsdir/launch_smalt.pl -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} $clean",{jobname=>"map$b"});
   }
   logmsg "All mapping jobs have been submitted. Waiting on them to finish.";
   $sge->wrapItUp();
@@ -183,5 +184,6 @@ sub usage{
     -a allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
     --notrees to not make phylogenies
     -q '-q long.q' extra options to pass to qsub. This is not sanitized.
+    --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with)
   "
 }
