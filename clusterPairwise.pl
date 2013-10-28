@@ -21,8 +21,8 @@ sub main{
   return histogram($settings) if($$settings{histogram});
 
   $$settings{maxdist}||=die "ERROR: need a maximum distance\n".usage();
-  my $neighbor=identifyCloseNeighbors($settings);
-  my $cluster=findClusters($neighbor,$settings);
+  my ($neighbor,$dist)=identifyCloseNeighbors($settings);
+  my $cluster=findClusters($neighbor,$dist,$settings);
   logmsg "Found ".scalar(@$cluster)." clusters";
   return 0;
 }
@@ -49,7 +49,7 @@ sub identifyCloseNeighbors{
 }
 
 sub findClusters{
-  my($neighbor,$settings)=@_;
+  my($neighbor,$pDist,$settings)=@_;
   my %neighbor=%$neighbor; # make a copy so that the internal pointer isn't messed up
   my $defaultMaxDist=$$settings{maxdist}; # back up this value
 
@@ -74,7 +74,8 @@ sub findClusters{
     next if(@$cluster<$$settings{perCluster});
 
     # the cluster passed all checks: output it.
-    print join("\t",scalar(@$cluster),@$cluster)."\n";
+    my $avgPDist=distances($cluster,$pDist,$settings);
+    print join("\t",scalar(@$cluster),$avgPDist,@$cluster)."\n";
     push(@cluster,$cluster);
   }
   return \@cluster;
@@ -133,6 +134,56 @@ sub histogram{
   }
   return 0;
 }
+
+sub distances{
+  my($cluster,$pdist,$settings)=@_;
+  my $max=0; my $min=1e999;
+  my @data;
+  my $num=@$cluster;
+  for(my $i=0;$i<$num;$i++){
+    my $first=$$cluster[$i];
+    for(my $j=$i+1;$j<$num;$j++){
+      my $second=$$cluster[$j];
+      my $pd=$$pdist{$first}{$second} || $$settings{maxdist};
+      push(@data,$pd);
+
+      $max=$pd if($max < $pd);
+      $min=$pd if($min > $pd);
+    }
+  }
+  my $avg=int(average(\@data));
+  my $stdev=int(stdev(\@data));
+  my $plusminus="+/-";
+  return "$avg $plusminus $stdev [$min,$max]";
+}
+
+sub average{
+        my($data) = @_;
+        if (not @$data) {
+                die("Empty array\n");
+        }
+        my $total = 0;
+        foreach (@$data) {
+                $total += $_;
+        }
+        my $average = $total / @$data;
+        return $average;
+}
+
+sub stdev{
+        my($data) = @_;
+        if(@$data == 1){
+                return 0;
+        }
+        my $average = &average($data);
+        my $sqtotal = 0;
+        foreach(@$data) {
+                $sqtotal += ($average-$_) ** 2;
+        }
+        my $std = ($sqtotal / (@$data-1)) ** 0.5;
+        return $std;
+}
+
 
 
 ## histogram
