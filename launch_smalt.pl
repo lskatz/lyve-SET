@@ -28,6 +28,7 @@ sub main{
   my $bam=$$settings{bam};
   my $reference=$$settings{reference};
 
+  logmsg "Cleaning was disabled. I will not clean the reads before mapping" if(!$$settings{clean});
   $fastq=cleanReads($fastq,$settings) if($$settings{clean});
   mapReads($fastq,$bam,$reference,$settings);
 

@@ -22,7 +22,7 @@ my $sge=Schedule::SGELK->new(-verbose=>1,-numnodes=>5,-numcpus=>8);
 exit(main());
 
 sub main{
-  my $settings={trees=>1};
+  my $settings={trees=>1,clean=>1};
   GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean!));
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
@@ -95,7 +95,7 @@ sub mapReads{
     }else{
       logmsg "Mapping to create $bamPrefix.sorted.bam";
     }
-    my $clean=($$settings{clean})?"--clean":""; # the clean parameter or not
+    my $clean=($$settings{clean})?"--clean":"--noclean"; # the clean parameter or not
     $sge->pleaseExecute("$scriptsdir/launch_smalt.pl -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} $clean",{jobname=>"map$b"});
   }
   logmsg "All mapping jobs have been submitted. Waiting on them to finish.";
