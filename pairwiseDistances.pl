@@ -27,7 +27,7 @@ sub main{
   while(my $aln=$in->next_aln){
     my @seq=$aln->each_seq;
     for(@seq){
-      $seq{$_->id}=$_->seq;
+      $seq{$_->id}=lc($_->seq);
     }
   }
   my @seqid=keys(%seq);
@@ -82,7 +82,7 @@ sub pairwiseDistanceWorker{
 
 sub pairwiseDistance{
   my($seq1,$seq2,$settings)=@_;
-  $seq1=lc($seq1); $seq2=lc($seq2);
+  #$seq1=lc($seq1); $seq2=lc($seq2); # I added this when reading the sequences
   my $length=length($seq1);
   my $pdist=0;
   for(my $i=0;$i<$length;$i++){
