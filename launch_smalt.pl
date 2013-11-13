@@ -54,7 +54,10 @@ sub cleanReads{
 
 sub mapReads{
   my($query,$bam,$ref,$settings)=@_;
-  return 1 if(-s "$bam.depth");
+  if(-s "$bam.depth"){
+    logmsg "Found $bam.depth\n  I will not re-map.";
+    return 1;
+  }
 
   my $b=fileparse $query;
   my $prefix="$$settings{tempdir}/$b";

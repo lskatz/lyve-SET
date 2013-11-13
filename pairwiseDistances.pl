@@ -50,9 +50,12 @@ sub main{
 
   # get the status while the threads are still working on it
   while($pwQueue->pending > 0){
-    my $num=$pwQueue->pending;
-    logmsg "$num queries left in the queue";
-    sleep 30;
+    for(0..28){ # leave the last second for the end just in case the queue gets added onto
+      sleep 1;
+      last if($pwQueue->pending == 0);
+      logmsg $pwQueue->pending." queries left in the queue" if($_ == 0);
+    }
+    sleep 1; # just in case something gets added onto the print queue
   }
   logmsg "No more left in the queue";
 
