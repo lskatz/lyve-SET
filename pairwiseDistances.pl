@@ -27,7 +27,6 @@ sub main{
   while(my $aln=$in->next_aln){
     my @seq=$aln->each_seq;
     for(@seq){
-      #logmsg $_->id;
       $seq{$_->id}=$_->seq;
     }
   }
@@ -74,7 +73,8 @@ sub pairwiseDistanceWorker{
     for(my $j=$i+1;$j<$numSeqs;$j++){
       my $seq2=$$seqHash{$seqid[$j]};
       my $dist=pairwiseDistance($seq1,$seq2,$settings);
-      $printQueue->enqueue(join("\t",$seqid[$i],$seqid[$j],$dist)."\n");
+      my($s1,$s2)=sort {$a cmp $b} ($seqid[$i],$seqid[$j]); # to have the pairwise in some order
+      $printQueue->enqueue(join("\t",$s1,$s2,$dist)."\n");
     }
   }
   return 1;
