@@ -22,8 +22,8 @@ my $sge=Schedule::SGELK->new(-verbose=>1,-numnodes=>5,-numcpus=>8);
 exit(main());
 
 sub main{
-  my $settings={trees=>1,clean=>1};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean!));
+  my $settings={trees=>1,clean=>1, msa=>1};
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean! msa!));
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
@@ -54,10 +54,13 @@ sub main{
   mapReads($ref,$$settings{readsdir},$$settings{bamdir},$settings);
   logmsg "Calling variants";
   variantCalls($ref,$$settings{bamdir},$$settings{vcfdir},$settings);
-  logmsg "Creating a core hqSNP MSA";
-  variantsToMSA($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
-  logmsg "MSA => phylogeny";
-  msaToPhylogeny($$settings{msadir},$settings) if($$settings{trees});
+
+  if($$settings{msa}){
+    logmsg "Creating a core hqSNP MSA";
+    variantsToMSA($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
+    logmsg "MSA => phylogeny";
+    msaToPhylogeny($$settings{msadir},$settings) if($$settings{trees});
+  }
 
   logmsg "Done!";
 
@@ -164,8 +167,9 @@ sub msaToPhylogeny{
   }
 
   # phyml
-  $sge->set("jobname","SET_phyml");
-  $sge->pleaseExecute("PhyML -i $msadir/out.aln.fas.phy -b -4 -m GTR -s BEST --quiet");
+  #$sge->set("jobname","SET_phyml");
+  #$sge->pleaseExecute("PhyML -i $msadir/out.aln.fas.phy -b -4 -m GTR -s BEST --quiet");
+  $sge->pleaseExecute("launch_phyml.sh $msadir/out.aln.fas.phy",{jobname=>"SET_phyml"});
   $sge->wrapItUp();
   return 1;
 }
@@ -177,11 +181,12 @@ sub usage{
     -r where fastq and fastq.gz files are located
     -b where to put bams
     -v where to put vcfs
-    -m multiple sequence alignment and tree files (final output)
+    --msadir multiple sequence alignment and tree files (final output)
     -numcpus number of cpus
     -numnodes maximum number of nodes
     -w working directory where qsub commands can be stored. Default: CWD
     -a allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+    --nomsa to not make a multiple sequence alignment
     --notrees to not make phylogenies
     -q '-q long.q' extra options to pass to qsub. This is not sanitized.
     --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with)

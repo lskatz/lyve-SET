@@ -44,7 +44,7 @@ sub cleanReads{
   die if $?;
   system("run_assembly_removeDuplicateReads.pl '$prefix.trimmed.fastq' > '$prefix.nodupes.fastq'");
   die if $?;
-  system("run_assembly_trimClean.pl -n $$settings{numcpus} -i '$prefix.nodupes.fastq' -o '$prefix.cleaned.fastq' --min_length 36");
+  system("run_assembly_trimClean.pl --numcpus $$settings{numcpus} -i '$prefix.nodupes.fastq' -o '$prefix.cleaned.fastq' --min_length 36");
   die if $?;
   system("rm -v '$prefix.nodupes.fastq' '$prefix.trimmed.fastq'");
   die if $?;
