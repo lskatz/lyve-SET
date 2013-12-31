@@ -8,7 +8,6 @@ use File::Basename;
 use Time::HiRes qw/time/;
 use Bio::TreeIO;
 use Statistics::Descriptive;
-use Statistics::Zed;
 
 use threads;
 use Thread::Queue;

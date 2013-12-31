@@ -152,6 +152,7 @@ sub averageGroupDistance{
       push(@distance,$$distance{$$id1[$i]}{$$id2[$j]});
     }
   }
+  return 0 if(!@distance);
   return sum(@distance)/@distance;
 }
 
