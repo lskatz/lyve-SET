@@ -40,14 +40,15 @@ sub cleanReads{
   logmsg "Trimming, removing duplicate reads, and cleaning";
   my $b=fileparse $query;
   my $prefix="$$settings{tempdir}/$b";
-  system("run_assembly_trimLowQualEnds.pl -c 99999 $query > '$prefix.trimmed.fastq'"); 
+  #system("run_assembly_trimLowQualEnds.pl -c 99999 $query > '$prefix.trimmed.fastq'"); 
   die if $?;
-  system("run_assembly_removeDuplicateReads.pl '$prefix.trimmed.fastq' > '$prefix.nodupes.fastq'");
+  #system("run_assembly_removeDuplicateReads.pl '$prefix.trimmed.fastq' > '$prefix.nodupes.fastq'");
+  system("run_assembly_removeDuplicateReads.pl '$query' > '$prefix.nodupes.fastq'");
   die if $?;
   system("run_assembly_trimClean.pl --numcpus $$settings{numcpus} -i '$prefix.nodupes.fastq' -o '$prefix.cleaned.fastq' --min_length 36");
   die if $?;
   system("rm -v '$prefix.nodupes.fastq' '$prefix.trimmed.fastq'");
-  die if $?;
+  #die if $?;
 
   return "$prefix.cleaned.fastq";
 }

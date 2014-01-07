@@ -16,7 +16,7 @@ sub logmsg{$|++;print STDERR "TID".threads->tid." $0: @_\n";$|--;}
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help maximum=i numcpus=i)) or die;
+  GetOptions($settings,qw(help minimum=i maximum=i numcpus=i)) or die;
   die usage() if($$settings{help});
   $$settings{numcpus}||=1;
   my %distance=distances($settings);
@@ -42,7 +42,8 @@ sub printFst{
 
   my @fst;
   my $groupCount=0;
-  for(my $numInGroup=2;$numInGroup<=$maxTaxa;$numInGroup++){
+  my $minTaxa=$$settings{minimum}||2; $minTaxa=2 if($minTaxa < 2);
+  for(my $numInGroup=$minTaxa;$numInGroup<=$maxTaxa;$numInGroup++){
     my @group1;
     my $iter=combinations($id,$numInGroup);
     while(my $group1=$iter->next){
@@ -184,6 +185,7 @@ sub usage{
   "Finds the Fst for all combinations of groups.
   Usage: $0 [options] < pairwise.tsv > Fst.tsv
   -max maximum number of taxa in a group for Fst. Default: half the total number of taxa
+  -min opposite of max (default: 2)
   --numcpus 1 The number of cpus you want to throw at it
   pairwise.tsv is a three-column file with: genome1 genome2 distance
   Output (Fst.tsv) is a two-column file with Fst and comma-separated taxa
