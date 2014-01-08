@@ -17,7 +17,7 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help outfile=s reference=s coverage=i numcpus=i positionsFile=s));
+  GetOptions($settings,qw(help outfile=s reference=s coverage=i numcpus=i positionsFile=s table=s)) or die;
   $$settings{outfile}||="$0.out.fasta";
   $$settings{coverage}||=10;
   $$settings{numcpus}||=1;
@@ -50,8 +50,9 @@ sub main{
   # kick off VCF=>fasta threads
   my $Q=Thread::Queue->new;
   my $printQ=Thread::Queue->new;
+  my $tableQ=Thread::Queue->new; # for holding snp table results (if requested)
   my @thr;
-  $thr[$_]=threads->new(\&vcfToFastaWorker,\@BAM,$posArr,$refBase,$Q,$printQ,$settings) for(0..$$settings{numcpus}-1);
+  $thr[$_]=threads->new(\&vcfToFastaWorker,\@BAM,$posArr,$refBase,$Q,$printQ,$tableQ,$settings) for(0..$$settings{numcpus}-1);
   $Q->enqueue(@VCF);
 
   # create printer worker thread
@@ -69,11 +70,24 @@ sub main{
   $printQ->enqueue(undef);
   $printer->join;
 
+  printSnpTable($posArr,$tableQ,$$settings{table},$settings) if($$settings{table});
+
   return 0;
 }
 
+sub printSnpTable{
+  my($posArr,$tableQ,$file,$settings)=@_;
+  $tableQ->enqueue(undef);
+  open(TSV,">$file") or die "ERROR: Could not open table file $file:$!";
+  print TSV join("\t",@$posArr)."\n";    
+  while(defined(my $row=$tableQ->dequeue)){
+    print TSV $row;
+  }
+  close TSV;
+}
+
 sub vcfToFastaWorker{
-  my($BAM,$posArr,$refBase,$Q,$printQ,$settings)=@_;
+  my($BAM,$posArr,$refBase,$Q,$printQ,$tableQ,$settings)=@_;
 
   while(defined(my $vcf=$Q->dequeue)){
     my $genome=basename($vcf,qw(.unfiltered.vcf .vcf)); # done for each vcf...
@@ -86,8 +100,9 @@ sub vcfToFastaWorker{
     my $coverage=covDepth($bam,$settings);
 
     logmsg "Printing the fasta entry for $vcf";
-    my $fasta=fastaEntry($vcf,$posArr,$coverage,$refBase,$settings);
+    my ($fasta,$tableRow)=fastaEntry($vcf,$posArr,$coverage,$refBase,$settings);
     $printQ->enqueue($fasta);
+    $tableQ->enqueue($tableRow);
   }
 
   return 0;
@@ -98,26 +113,12 @@ sub vcfToFastaWorker{
 sub getVcfPositions{
   my($VCF,$settings)=@_;
   my %pos;
-  my %bad;
   for my $file(@$VCF){
-    my ($vcf,$bad)=readVcf($file,$settings);
+    my $vcf=readVcf($file,$settings);
     while(my($contig,$posHash)=each(%$vcf)){
       for my $pos(keys(%$posHash)){
         $pos{$contig}{$pos}=1;
       }
-    }
-    # Have to keep track of and not delete at this step, because all VCFs need to be read first.
-    while(my($contig,$posHash)=each(%$bad)){
-      for my $pos(keys(%$posHash)){
-        $bad{$contig}{$pos}=1;
-      }
-    }
-  }
-
-  # Find where there are any 'bad' sites and remove them
-  while(my($contig,$posHash)=each(%bad)){
-    for my $pos(keys(%$posHash)){
-      delete($pos{$contig}{$pos}) if($pos{$contig}{$pos});
     }
   }
 
@@ -141,8 +142,7 @@ sub getVcfPositions{
 sub readVcf{
   my($vcf,$settings)=@_;
   my $vcfHash={};
-  my $badHash={};
-  $diskIoStick->down;
+  $diskIoStick->down; # mark that one process is using the disk
   open(VCF,"<",$vcf) or die "ERROR: could not open vcf file $vcf:$!";
   while(<VCF>){
     next if(/^#/);
@@ -150,13 +150,15 @@ sub readVcf{
     my($contig,$pos,undef,$ref,$alt)=split /\t/;
     $$vcfHash{$contig}{$pos}=$alt;
 
+    # Indels will just be an N because it is too difficult to deal with those.
     if($ref eq '*' || $alt eq '*' || length($ref)>1 || length($alt)>1){
-      $$badHash{$contig}{$pos}=1;
+      # lowercase N to mask it later, when trying to recover other bases for 
+      # low coverage. This N is not due to low coverage.
+      $$vcfHash{$contig}{$pos}='n'; 
     }
   }
   close VCF;
-  $diskIoStick->up;
-  return ($vcfHash,$badHash) if wantarray;
+  $diskIoStick->up; # mark that one process is no longer using the disk
   return $vcfHash;
 }
 
@@ -164,22 +166,31 @@ sub fastaEntry{
   my ($vcf,$posArr,$coverage,$refBase,$settings)=@_;
   my $v=readVcf($vcf,$settings); # The tradeoff for using lower memory: reading the vcf file a second time here
   my $fasta="";
+  my $table="";
   # print defline
   $fasta.= ">$vcf\n";
+  $table.="$vcf\t" if($$settings{table});
   for my $posKey(@$posArr){
     my ($contig,$pos)=split(/_/,$posKey);
     my $nt=$$v{$contig}{$pos} || 'N';
 
     # If the base caller didn't say anything about this base, see if there is 
     # enough coverage to call it the reference base.
+    # Do not check lowercase N because those are not due to low coverage.
     if($nt eq 'N'){
       if($$coverage{$posKey} && $$coverage{$posKey} >= $$settings{coverage}){
         $nt=$$refBase{$contig}[$pos];
       }
     }
     $fasta.=$nt;
+
+    if($$settings{table}){
+      $table.="$nt\t";
+    }
   }
   $fasta.="\n";
+  $table.="\n" if($$settings{table});
+  return ($fasta,$table) if wantarray;
   return $fasta;
 }
 
@@ -226,10 +237,11 @@ sub printPositions{
 }
 
 sub usage{
-  "Creates an alignment of SNPs, given a set of VCFs
-  usage: $0 *.bam *.vcf -o alignment.fasta -r reference.fasta
+  "Creates an alignment of SNPs, given a set of VCFs. Output is in fasta format.
+  usage: $0 *.bam *.vcf -r reference.fasta > alignment.fasta
     -n numcpus (default: 1)
     -coverage 10 The minimum coverage allowed to accept the reference base, if the base caller didn't call a position.
     -p positions.txt To output positional information to this file. Each line of the positions file corresponds to the respective position in the fasta alignment file.
+    -t table.txt To output SNP calls to a table
   "
 }
