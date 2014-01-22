@@ -17,10 +17,11 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help outfile=s reference=s coverage=i numcpus=i positionsFile=s table=s)) or die;
+  GetOptions($settings,qw(help outfile=s reference=s coverage=i numcpus=i positionsFile=s table=s minimumDistance=i)) or die;
   $$settings{outfile}||="$0.out.fasta";
   $$settings{coverage}||=10;
   $$settings{numcpus}||=1;
+  $$settings{minimumDistance}||=0;
   die usage($settings) if($$settings{help} || @ARGV<2);
   my $reference=$$settings{reference} or die "ERROR: need reference file\n".usage($settings);
 
@@ -135,8 +136,29 @@ sub getVcfPositions{
     return $contigA cmp $contigB if($contigA ne $contigB);
     return $posA <=> $posB;
   } @pos;
-    
-  return \@sortedPos;
+
+  # return the positions if not removing by min distance
+  return \@sortedPos if(!$$settings{minimumDistance});
+
+  # if there is a min distance specified, remove those SNPs that are too close
+  my @newSortedPos;
+  my $numPos=@sortedPos;
+  my ($currentDistance,$currentContig,$currentPos)=(0,split(/_/,$sortedPos[0]));
+  for(my $i=1;$i<$numPos;$i++){
+    my($contig,$pos)=split(/_/,$sortedPos[$i]);
+    my($prevContig,$prevPos)=split(/_/,$sortedPos[$i-1]);
+    if($contig ne $currentContig){
+      $currentContig=$contig;
+      next;
+    }
+    my $distance=$pos - $prevPos;
+    # keep distantly-related positions
+    if($distance >= $$settings{minimumDistance}){
+      push(@newSortedPos,$sortedPos[$i]);
+    }
+  }
+
+  return \@newSortedPos;
 }
 
 sub readVcf{
@@ -243,5 +265,6 @@ sub usage{
     -coverage 10 The minimum coverage allowed to accept the reference base, if the base caller didn't call a position.
     -p positions.txt To output positional information to this file. Each line of the positions file corresponds to the respective position in the fasta alignment file.
     -t table.txt To output SNP calls to a table
+    -m 0 The minimum distance allowed between two hqSNPs. Those that are too close will be all-together removed from the MSA.
   "
 }
