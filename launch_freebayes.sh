@@ -28,8 +28,10 @@ if [ "$minCoverage" = "" ]; then minCoverage=10; fi;
 new_vcf="$out_vcf".tmp
 b=`basename $out_vcf .vcf`;
 d=`dirname $out_vcf`;
-unfiltered_vcf="$d/$b.unfiltered.vcf"
+unfiltered_vcf="$d/unfiltered/$b.vcf"
 bad=$out_vcf".badsites.txt"
+
+mkdir -p "$d/unfiltered";
 
 # freebayes
 echo "Running Freebayes"
