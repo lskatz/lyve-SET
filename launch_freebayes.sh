@@ -26,7 +26,9 @@ if [ "$minCoverage" = "" ]; then minCoverage=10; fi;
 
 # for filtering, for later
 new_vcf="$out_vcf".tmp
-unfiltered_vcf="$out_vcf".unfiltered
+b=`basename $out_vcf .vcf`;
+d=`dirname $out_vcf`;
+unfiltered_vcf="$d/$b.unfiltered.vcf"
 bad=$out_vcf".badsites.txt"
 
 # freebayes
