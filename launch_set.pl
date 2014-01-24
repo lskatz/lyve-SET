@@ -167,8 +167,6 @@ sub msaToPhylogeny{
   }
 
   # phyml
-  #$sge->set("jobname","SET_phyml");
-  #$sge->pleaseExecute("PhyML -i $msadir/out.aln.fas.phy -b -4 -m GTR -s BEST --quiet");
   $sge->pleaseExecute("launch_phyml.sh $msadir/out.aln.fas.phy",{jobname=>"SET_phyml"});
   $sge->wrapItUp();
   return 1;
