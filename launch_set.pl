@@ -12,7 +12,6 @@ use File::Basename;
 use File::Spec;
 use threads;
 use Thread::Queue;
-#use Schedule::SGE;
 use Schedule::SGELK;
 
 sub logmsg {local $0=basename $0;my $FH = *STDOUT; print $FH "$0: ".(caller(1))[3].": @_\n";}
@@ -23,8 +22,8 @@ my $sge=Schedule::SGELK->new(-verbose=>1,-numnodes=>5,-numcpus=>8);
 exit(main());
 
 sub main{
-  my $settings={trees=>1};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees!));
+  my $settings={trees=>1,clean=>1, msa=>1};
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean! msa!));
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
@@ -32,6 +31,7 @@ sub main{
   $$settings{keep}||=0;
   $$settings{min_alt_frac}||=0.75;
   $$settings{min_coverage}||=10;
+  $$settings{qsubxopts}||="";
 
   logmsg "Checking to make sure all directories are in place";
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir)){
@@ -42,7 +42,7 @@ sub main{
     $$settings{$param}=File::Spec->rel2abs($$settings{$param});
   }
   # SGE params
-  for (qw(workingdir numnodes numcpus keep)){
+  for (qw(workingdir numnodes numcpus keep qsubxopts)){
     $sge->set($_,$$settings{$_});
   }
 
@@ -54,10 +54,13 @@ sub main{
   mapReads($ref,$$settings{readsdir},$$settings{bamdir},$settings);
   logmsg "Calling variants";
   variantCalls($ref,$$settings{bamdir},$$settings{vcfdir},$settings);
-  logmsg "Creating a core hqSNP MSA";
-  variantsToMSA($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
-  logmsg "MSA => phylogeny";
-  msaToPhylogeny($$settings{msadir},$settings) if($$settings{trees});
+
+  if($$settings{msa}){
+    logmsg "Creating a core hqSNP MSA";
+    variantsToMSA($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
+    logmsg "MSA => phylogeny";
+    msaToPhylogeny($$settings{msadir},$settings) if($$settings{trees});
+  }
 
   logmsg "Done!";
 
@@ -95,8 +98,8 @@ sub mapReads{
     }else{
       logmsg "Mapping to create $bamPrefix.sorted.bam";
     }
-    $sge->set("jobname","map$b");
-    $sge->pleaseExecute("$scriptsdir/launch_smalt.sh $ref $fastq $bamPrefix.sorted.bam $tmpdir");
+    my $clean=($$settings{clean})?"--clean":"--noclean"; # the clean parameter or not
+    $sge->pleaseExecute("$scriptsdir/launch_smalt.pl -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} $clean",{jobname=>"map$b"});
   }
   logmsg "All mapping jobs have been submitted. Waiting on them to finish.";
   $sge->wrapItUp();
@@ -115,9 +118,7 @@ sub variantCalls{
       logmsg "Found $vcfdir/$b.vcf. Skipping";
       next;
     }
-    my $command="$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}";
-    logmsg "COMMAND  $command";
-    my $j=$sge->pleaseExecute($command);
+    my $j=$sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}");
     push(@jobid,$j);
   }
   # terminate called after throwing an instance of 'std::out_of_range'
@@ -141,7 +142,11 @@ sub variantsToMSA{
   # convert VCFs to an MSA (long step)
   $sge->set("jobname","variantsToMSA");
   $sge->set("numcpus",$$settings{numcpus});
-  $sge->pleaseExecute_andWait("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o -r $ref -b $bad -a $$settings{allowedFlanking} | removeUninformativeSites.pl --ambiguities-allowed --gaps-allowed > $msadir/out.aln.fas");
+  $sge->pleaseExecute("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o $msadir/out.aln.fas -r $ref -b $bad -a $$settings{allowedFlanking}");
+  # convert VCFs to an MSA using a low-memory script
+  $sge->pleaseExecute("vcfToAlignment_lowmem.pl $vcfdir/unfiltered/*.vcf $bamdir/*.sorted.bam -n $$settings{numcpus} -ref $ref -p $msadir/out_lowmem.aln.fas.pos.txt -t $msadir/out_lowmem.aln.fas.pos.tsv > $msadir/out_lowmem.aln.fas",{numcpus=>$$settings{numcpus},jobname=>"variantsToMSA_lowmem"});
+  $sge->wrapItUp();
+
   # convert fasta to phylip and remove uninformative sites
   $sge->set("jobname","msaToPhylip");
   $sge->pleaseExecute_andWait("convertAlignment.pl -i $msadir/out.aln.fas -o $msadir/out.aln.fas.phy -f phylip -r");
@@ -166,9 +171,7 @@ sub msaToPhylogeny{
   }
 
   # phyml
-  my $phyml=`(which PhyML || which phyml_linux_64 ) 2>/dev/null`; chomp($phyml);
-  $sge->set("jobname","SET_phyml");
-  $sge->pleaseExecute("$phyml -i $msadir/out.aln.fas.phy -b -4 -m GTR -s BEST --quiet");
+  $sge->pleaseExecute("launch_phyml.sh $msadir/out.aln.fas.phy",{jobname=>"SET_phyml"});
   $sge->wrapItUp();
   return 1;
 }
@@ -180,11 +183,14 @@ sub usage{
     -r where fastq and fastq.gz files are located
     -b where to put bams
     -v where to put vcfs
-    -m multiple sequence alignment and tree files (final output)
+    --msadir multiple sequence alignment and tree files (final output)
     -numcpus number of cpus
     -numnodes maximum number of nodes
     -w working directory where qsub commands can be stored. Default: CWD
     -a allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+    --nomsa to not make a multiple sequence alignment
     --notrees to not make phylogenies
+    -q '-q long.q' extra options to pass to qsub. This is not sanitized.
+    --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with)
   "
 }
