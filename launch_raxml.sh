@@ -1,6 +1,7 @@
 #!/bin/sh
 #$ -pe smp 8
 #$ -cwd
+#$ -V
 
 # converts alignment to phylip and then makes a tree out of it
 
