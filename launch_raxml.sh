@@ -1,4 +1,9 @@
 #!/bin/sh
+#$ -V 
+#$ -cwd
+#$ -o raxml.log
+#$ -j y
+#$ -pe smp 8
 
 # converts alignment to phylip and then makes a tree out of it
 
@@ -9,6 +14,6 @@ if [ "$prefix" = "" ]; then
   exit 1;
 fi
 
-raxmlHPC-PTHREADS -f a -s $aln -n $prefix -T 12 -m GTRGAMMA -p $RANDOM -x $RANDOM -N 100
+raxmlHPC-PTHREADS -f a -s $aln -n $prefix -T 8 -m GTRGAMMA -p $RANDOM -x $RANDOM -N 100
 if [ $? -gt 0 ]; then exit 1; fi;
 
