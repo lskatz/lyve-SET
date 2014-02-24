@@ -77,15 +77,23 @@ sub mapReads{
   my $tmpOut="$bam.$RANDOM.tmp";
   logmsg "$bam not found. I'm really doing the mapping now!\n  Outfile: $tmpOut";
 
-  # deshuffle the reads
-  logmsg "Deshuffling to $prefix.1.fastq and $prefix.2.fastq";
-  system("run_assembly_shuffleReads.pl -d '$query' 1>'$prefix.1.fastq' 2>'$prefix.2.fastq'");
-  die "Problem with deshuffling reads! I am assuming paired end reads." if $?;
+  # PE reads or not?  Mapping differently for different types.
+  if(is_fastqPE($query)){
+    # deshuffle the reads
+    logmsg "Deshuffling to $prefix.1.fastq and $prefix.2.fastq";
+    system("run_assembly_shuffleReads.pl -d '$query' 1>'$prefix.1.fastq' 2>'$prefix.2.fastq'");
+    die "Problem with deshuffling reads! I am assuming paired end reads." if $?;
 
-  # mapping
-  system("smalt map -r -1 -f samsoft -n $$settings{numcpus} $ref '$prefix.1.fastq' '$prefix.2.fastq' | samtools view -bS -T $ref - > $tmpOut");
-  die if $?;
-  system("rm -v '$prefix.1.fastq' '$prefix.2.fastq'"); die if $?;
+    # mapping
+    system("smalt map -r -1 -f samsoft -n $$settings{numcpus} $ref '$prefix.1.fastq' '$prefix.2.fastq' | samtools view -bS -T $ref - > $tmpOut");
+    die if $?;
+    system("rm -v '$prefix.1.fastq' '$prefix.2.fastq'"); die if $?;
+  } else {
+    system("gunzip -c '$query' > $prefix.SE.fastq");
+    system("smalt map -r -1 -f samsoft -n $$settings{numcpus} $ref '$prefix.SE.fastq' | samtools view -bS -T $ref - > $tmpOut");
+    die if $?;
+    system("rm -v '$prefix.SE.fastq'"); die if $?;
+  }
 
   logmsg "Transforming the output file with samtools";
   my $sPrefix="$tmpOut.sorted";
@@ -128,6 +136,136 @@ sub mapReads{
 
   return 1;
 }
+
+# taken from AKUtils
+# See whether a fastq file is paired end or not. It must be in a velvet-style shuffled format.
+# In other words, the left and right sides of a pair follow each other in the file.
+# params: fastq file and settings
+# fastq file can be gzip'd
+# settings:  checkFirst is an integer to check the first X deflines
+# TODO just extract IDs and send them to the other _sub()
+sub is_fastqPE($;$){
+  my($fastq,$settings)=@_;
+
+  # if checkFirst is undef or 0, this will cause it to check at least the first 20 entries.
+  $$settings{checkFirst}||=20;
+  $$settings{checkFirst}=20 if($$settings{checkFirst}<2);
+
+  # it is paired end if it validates with any naming system
+  my $is_pairedEnd=_is_fastqPESra($fastq,$settings) || _is_fastqPECasava18($fastq,$settings) || _is_fastqPECasava17($fastq,$settings);
+
+  return $is_pairedEnd;
+}
+
+sub _is_fastqPESra{
+  my($fastq,$settings)=@_;
+  my $numEntriesToCheck=$$settings{checkFirst}||20;
+
+  my $numEntries=0;
+  my $fp;
+  if($fastq=~/\.gz$/){
+    open($fp,"gunzip -c '$fastq' |") or die "Could not open $fastq for reading: $!";
+  }else{
+    open($fp,"<",$fastq) or die "Could not open $fastq for reading: $!";
+  }
+  my $discard;
+  while(<$fp>){
+    chomp;
+    s/^@//;
+    my($genome,$info1,$info2)=split(/\s+/);
+    if(!$info2){
+      close $fp;
+      return 0;
+    }
+    my($instrument,$flowcellid,$lane,$x,$y,$X,$Y)=split(/:/,$info1);
+    $discard=<$fp> for(1..3); # discard the sequence and quality of the read for these purposes
+    my $secondId=<$fp>;
+    my($genome2,$info3,$info4)=split(/\s+/,$secondId);
+    my($instrument2,$flowcellid2,$lane2,$x2,$y2,$X2,$Y2)=split(/:/,$info3);
+    $_||="" for($X,$Y,$X2,$Y2); # these variables might not be present
+    if($instrument ne $instrument2 || $flowcellid ne $flowcellid2 || $lane ne $lane2 || $x ne $x2 || $y ne $y2 || $X ne $X2 || $Y ne $Y2){
+      close $fp;
+      return 0;
+    }
+    $discard=<$fp> for(1..3);
+    $numEntries+=2;
+    last if($numEntries > $numEntriesToCheck);
+  }
+  return 1;
+}
+
+sub _is_fastqPECasava18{
+  my($fastq,$settings)=@_;
+  my $numEntriesToCheck=$$settings{checkFirst}||20;
+
+  my $numEntries=0;
+  my $fp;
+  if($fastq=~/\.gz$/){
+    open($fp,"gunzip -c '$fastq' |") or die "Could not open $fastq for reading: $!";
+  }else{
+    open($fp,"<",$fastq) or die "Could not open $fastq for reading: $!";
+  }
+  while(<$fp>){
+    chomp;
+    s/^@//;
+    my($instrument,$runid,$flowcellid,$lane,$tile,$x,$yandmember,$is_failedRead,$controlBits,$indexSequence)=split(/:/,$_);
+    my $discard;
+    $discard=<$fp> for(1..3); # discard the sequence and quality of the read for these purposes
+    my($y,$member)=split(/\s+/,$yandmember);
+
+    # if all information is the same, except the member (1 to 2), then it is still paired until this point.
+    my $secondId=<$fp>;
+    chomp $secondId;
+    $secondId=~s/^@//;
+    my($inst2,$runid2,$fcid2,$lane2,$tile2,$x2,$yandmember2,$is_failedRead2,$controlBits2,$indexSequence2)=split(/:/,$secondId);
+    $discard=<$fp> for(1..3); # discard the sequence and quality of the read for these purposes
+    my($y2,$member2)=split(/\s+/,$yandmember2);
+
+    if($instrument ne $inst2 || $runid ne $runid2 || $flowcellid ne $fcid2 || $tile ne $tile2 || $member!=1 || $member2!=2){
+      #logmsg "Failed!\n$instrument,$runid,$flowcellid,$lane,$tile,$x,$yandmember,$is_failedRead,$controlBits,$indexSequence\n$inst2,$runid2,$fcid2,$lane2,$tile2,$x2,$yandmember2,$is_failedRead2,$controlBits2,$indexSequence2\n";
+      close $fp;
+      return 0;
+    }
+
+    $numEntries+=2;
+    last if($numEntries>$numEntriesToCheck);
+  }
+
+  close $fp;
+
+  return 1;
+}
+
+sub _is_fastqPECasava17{
+  my($fastq,$settings)=@_;
+  # 20 reads is probably enough to make sure that it's shuffled (1/2^20 chance I'm wrong)
+  my $numEntriesToCheck=$$settings{checkFirst}||20;
+  my $numEntries=0;
+  my $fp;
+  if($fastq=~/\.gz$/){
+    open($fp,"gunzip -c '$fastq' |") or die "Could not open $fastq for reading: $!";
+  }else{
+    open($fp,"<",$fastq) or die "Could not open $fastq for reading: $!";
+  }
+  while(my $read1Id=<$fp>){
+    my $discard;
+    $discard=<$fp> for(1..3);
+    my $read2Id=<$fp>;
+    $discard=<$fp> for(1..3);
+
+    if($read1Id!~/\/1$/ || $read2Id!~/\/2$/){
+      close $fp;
+      return 0;
+    }
+
+    $numEntries+=2;
+    last if($numEntries>=$numEntriesToCheck);
+  }
+  close $fp;
+
+  return 1;
+}
+
 
 sub usage{
   "Maps a read set against a reference genome using smalt. Output file will be file.bam and file.bam.depth
