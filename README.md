@@ -18,7 +18,7 @@ Requirements
 
 Installation
 ------------
-  git clone --recursive https://github.com/lskatz/lyve-SET.git
+    $ git clone --recursive https://github.com/lskatz/lyve-SET.git
 
 Usage
 -----
