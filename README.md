@@ -18,7 +18,11 @@ Requirements
 
 Installation
 ------------
+    
+    $ mkdir ~/bin
+    $ cd ~/bin
     $ git clone --recursive https://github.com/lskatz/lyve-SET.git
+    $ export PATH=$PATH:~/bin/lyve-SET # you might also put this line into your .bash_profile or other login script
 
 Usage
 -----
