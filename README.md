@@ -22,17 +22,17 @@ Installation
 
 Usage
 -----
-  Usage: launch_set.pl -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/]
-    Where parameters with a / are directories
-    -r where fastq and fastq.gz files are located
-    -b where to put bams
-    -v where to put vcfs
-    --msadir multiple sequence alignment and tree files (final output)
-    -numcpus number of cpus
-    -numnodes maximum number of nodes
-    -w working directory where qsub commands can be stored. Default: CWD
-    -a allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
-    --nomsa to not make a multiple sequence alignment
-    --notrees to not make phylogenies
-    -q '-q long.q' extra options to pass to qsub. This is not sanitized.
-    --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with)
+    Usage: launch_set.pl -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/]
+      Where parameters with a / are directories
+      -r where fastq and fastq.gz files are located
+      -b where to put bams
+      -v where to put vcfs
+      --msadir multiple sequence alignment and tree files (final output)
+      -numcpus number of cpus
+      -numnodes maximum number of nodes
+      -w working directory where qsub commands can be stored. Default: CWD
+      -a allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+      --nomsa to not make a multiple sequence alignment
+      --notrees to not make phylogenies
+      -q '-q long.q' extra options to pass to qsub. This is not sanitized.
+      --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with)
