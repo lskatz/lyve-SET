@@ -79,6 +79,8 @@ sub indexReference{
   }
   system("smalt index -k 5 -s 3 $ref $ref 2>&1");
   die if $?;
+  system("snap index $ref $ref.snap -s 16");
+  logmsg "WARNING: snap did not index the reference genome" if $?;
   return $ref;
 }
 
