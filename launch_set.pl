@@ -82,7 +82,7 @@ sub indexReference{
   if($$settings{mapper} eq 'smalt'){
     system("smalt index -k 5 -s 3 $ref $ref 2>&1");
     die if $?;
-  elsif($$settings{mapper} eq 'snap'){
+  } elsif($$settings{mapper} eq 'snap'){
     system("snap index $ref $ref.snap -s 16");
     die if $?;
   }
