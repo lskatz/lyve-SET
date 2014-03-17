@@ -22,8 +22,8 @@ my $sge=Schedule::SGELK->new(-verbose=>1,-numnodes=>5,-numcpus=>8);
 exit(main());
 
 sub main{
-  my $settings={trees=>1,clean=>1, msa=>1};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean! msa!));
+  my $settings={trees=>1,clean=>1, msa=>1, mapper=>"smalt"};
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean! msa! mapper=s));
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
@@ -32,6 +32,7 @@ sub main{
   $$settings{min_alt_frac}||=0.75;
   $$settings{min_coverage}||=10;
   $$settings{qsubxopts}||="";
+  $$settings{mapper}=lc($$settings{mapper});
 
   logmsg "Checking to make sure all directories are in place";
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir)){
@@ -101,7 +102,14 @@ sub mapReads{
       logmsg "Mapping to create $bamPrefix.sorted.bam";
     }
     my $clean=($$settings{clean})?"--clean":"--noclean"; # the clean parameter or not
-    $sge->pleaseExecute("$scriptsdir/launch_smalt.pl -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} $clean",{jobname=>"map$b"});
+
+    if($$settings{mapper} eq 'smalt'){
+      $sge->pleaseExecute("$scriptsdir/launch_smalt.pl -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} $clean",{jobname=>"smalt$b"});
+    } elsif($$settings{mapper} eq 'snap'){
+      $sge->pleaseExecute("$scriptsdir/launch_snap.pl -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} $clean",{jobname=>"snap$b"});
+    } else {
+      die "ERROR: I do not understand the mapper $$settings{mapper}";
+    }
   }
   logmsg "All mapping jobs have been submitted. Waiting on them to finish.";
   $sge->wrapItUp();
@@ -194,5 +202,6 @@ sub usage{
     --notrees to not make phylogenies
     -q '-q long.q' extra options to pass to qsub. This is not sanitized.
     --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with)
+    --mapper smalt Choose the mapper you want to use. Choices: smalt (default), snap
   "
 }
