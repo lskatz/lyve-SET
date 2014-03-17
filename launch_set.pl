@@ -78,10 +78,14 @@ sub indexReference{
     my $defline=$seq->id." ".$seq->desc;
     die "Dashes are not allowed in the defline\n Offending defline: $defline" if($defline=~/\-/);
   }
-  system("smalt index -k 5 -s 3 $ref $ref 2>&1");
-  die if $?;
-  system("snap index $ref $ref.snap -s 16");
-  logmsg "WARNING: snap did not index the reference genome" if $?;
+
+  if($$settings{mapper} eq 'smalt'){
+    system("smalt index -k 5 -s 3 $ref $ref 2>&1");
+    die if $?;
+  elsif($$settings{mapper} eq 'snap'){
+    system("snap index $ref $ref.snap -s 16");
+    die if $?;
+  }
   return $ref;
 }
 
