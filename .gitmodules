@@ -1,4 +1,9 @@
 [submodule "lib/Schedule"]
 	path = lib/Schedule
+<<<<<<< HEAD
 	#url = /scicomphome/gzu2/src/lib/Schedule
   url = https://github.com/lskatz/Schedule--SGELK.git
+=======
+#	url = /scicomphome/gzu2/src/lib/Schedule
+	url = https://github.com/lskatz/Schedule--SGELK.git
+>>>>>>> 86e6e4bf2123247a2549c5c8412152af097b5ce6
