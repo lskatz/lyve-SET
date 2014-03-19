@@ -261,8 +261,9 @@ sub printPositions{
 sub usage{
   "Creates an alignment of SNPs, given a set of VCFs. Output is in fasta format.
   usage: $0 *.bam *.vcf -r reference.fasta > alignment.fasta
+    Note: multiple nucleotide polymorphic sites and indels are changed to 'n'. Use filterVcf.pl to help retain some of these positions.
     -n numcpus (default: 1)
-    -coverage 10 The minimum coverage allowed to accept the reference base, if the base caller didn't call a position.
+    -coverage 10 The minimum coverage allowed to accept the snp. Or, the reference base, if the base caller didn't call a position.
     -p positions.txt To output positional information to this file. Each line of the positions file corresponds to the respective position in the fasta alignment file.
     -t table.txt To output SNP calls to a table
     -m 0 The minimum distance allowed between two hqSNPs. Those that are too close will be all-together removed from the MSA.
