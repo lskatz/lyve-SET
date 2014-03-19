@@ -209,6 +209,7 @@ sub findReferenceBases{
 sub usage{
   "Creates an alignment of SNPs, given a set of VCFs
   usage: $0 *.bam *.vcf -o alignment.fasta -r reference.fasta -b bad.txt
+    NOTE: indels and multiple nucleotide polymorphisms will cause an error in this scripts. Use filterVcf.pl to help alleviate this problem.
     -b bad.txt: all positions that should not be used, in format of contig_pos
     -a allowed flanking in bp (default: 0)
       nucleotides downstream of another snp this many bp away will not be accepted
