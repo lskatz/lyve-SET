@@ -138,6 +138,10 @@ sub vcfToFasta{
       my($contig,$position)=split /_/,$posKey;
       next if($prevPos && ($contig eq $prevContig) && ($position-$allowedFlanking < $prevPos));
 
+      # some error checking
+      die "ERROR: there is no position in the position index with $posKey" if(!defined $pos{$posKey});
+      die "ERROR: the genome '$genome' is not found under position $posKey" if(!defined $pos{$posKey}{$genome});
+
       $fasta.=$pos{$posKey}{$genome};
       push(@legitPos,$posKey);
       $prevContig=$contig;
