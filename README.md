@@ -24,6 +24,10 @@ Installation
     $ git clone --recursive https://github.com/lskatz/lyve-SET.git
     $ export PATH=$PATH:~/bin/lyve-SET # you might also put this line into your .bash_profile or other login script
 
+TO UPDATE, in case any updates or fixes are made, run this command at any time from the base lyve-SET directory.
+
+    $ git pull -u --recurse-submodules=yes
+
 Usage
 -----
     Usage: launch_set.pl -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/]
