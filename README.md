@@ -40,3 +40,11 @@ Usage
       --notrees to not make phylogenies
       -q '-q long.q' extra options to pass to qsub. This is not sanitized.
       --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with)
+Lyve-SET is modular and so the individual scripts can be run too.  For example, you can run launch\_smalt.pl or launch\_snap.pl to run mapping alone; however, indexing the reference fasta takes place in launch_set.pl.  To get usage help on any of these scripts, run the script with no options.
+
+Citing lyve-SET
+-----
+To cite lyve-SET, please reference this site and cite the Haiti Anniversary paper. Lyve-SET also makes use of the tools shown above in the prerequisites.  If you feel like your study relied heavily on any of those tools, please don't forget to cite them!
+    
+    https://github.com/lskatz/lyve-SET
+    Katz LS, Petkau A, Beaulaurier J, Tyler S, Antonova ES, Turnsek MA, Guo Y, Wang S, Paxinos EE, Orata F, Gladney LM, Stroika S, Folster JP, Rowe L, Freeman MM, Knox N, Frace M, Boncy J, Graham M, Hammer BK, Boucher Y, Bashir A, Hanage WP, Van Domselaar G, Tarr CL. 2013. Evolutionary dynamics of Vibrio cholerae O1 following a single-source introduction to Haiti. mBio 4(4):e00398-13. doi:10.1128/mBio.00398-13.
