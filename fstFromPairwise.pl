@@ -7,25 +7,39 @@ use Algorithm::Combinatorics qw(combinations);
 use List::Util qw/sum/;
 use File::Basename;
 use Time::HiRes qw/time/;
+use Math::Random::MT; # for precision 64 bit numbers
 
 use threads;
 use Thread::Queue;
 
 $0=basename $0;
 sub logmsg{$|++;print STDERR "TID".threads->tid." $0: @_\n";$|--;}
+
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help minimum=i maximum=i numcpus=i)) or die usage();
+  GetOptions($settings,qw(help minimum=i maximum=i numcpus=i sample=s buffer=i)) or die usage();
   die usage() if($$settings{help});
   $$settings{numcpus}||=1;
+  $$settings{sample}||=1; # sampling frequency goes from 0 to 1
+  $$settings{minimum}||=2;
+  $$settings{minimum}=2 if($$settings{minimum} < 2);
+  $$settings{buffer}||=99999;
+  $$settings{buffer}=1 if($$settings{buffer} < 1);
+
+  logmsg "Sampling frequency is $$settings{sample}; Buffer is $$settings{buffer}.";
+
+  die "ERROR: sample must be between 0 and 1. It was set as $$settings{sample}\n".usage() if($$settings{sample} < 0 || $$settings{sample} > 1);
+
+  logmsg "Finding distances";
   my %distance=distances($settings);
   my @id=keys(%distance);
   my $numTaxa=@id;
   my $maxTaxa=$$settings{maximum} || int($numTaxa/2); # only need to sample up to half because you really probably want half vs half when considering Fst
-  $maxTaxa=10 if($maxTaxa > 10);
+  logmsg "Warning: you have more than 10 as your max. This can produce many results and take a long time." if($maxTaxa > 10);
   #logmsg "Up to $maxTaxa taxa will be counted in groups: there will be ".numCombinations($maxTaxa,$settings)." combinations";
 
+  logmsg "Calculating fixation indices";
   printFst(\@id,\%distance,$maxTaxa,$settings);
   return 0;
 }
@@ -42,17 +56,19 @@ sub printFst{
 
   my @fst;
   my $groupCount=0;
-  my $minTaxa=$$settings{minimum}||2; $minTaxa=2 if($minTaxa < 2);
+  my $minTaxa=$$settings{minimum};
+  my $buffer=$$settings{buffer};
   for(my $numInGroup=$minTaxa;$numInGroup<=$maxTaxa;$numInGroup++){
     my @group1;
     my $iter=combinations($id,$numInGroup);
     while(my $group1=$iter->next){
       $groupCount++;
       push(@group1,$group1);
-      if(@group1>99999){
-        logmsg "Enqueuing 99999 combinations of size $numInGroup";
+      if(@group1>$buffer){
+        logmsg "Enqueuing $buffer combinations of size $numInGroup";
         $Q->enqueue(@group1);
         @group1=();
+        sleep 1 if($Q->pending > ($buffer * $buffer));
       }
     }
     $Q->enqueue(@group1);
@@ -69,12 +85,18 @@ sub printFst{
 sub distances{
   my($settings)=@_;
   my %distance;
+  my $i=0;
   while(<STDIN>){
     chomp;
     my($id1,$id2,$dist)=split /\t/;
     $distance{$id1}{$id2}=$dist;
     $distance{$id2}{$id1}=$dist;
+
+    if(++$i % 10000 == 0){
+      logmsg "Finished with $i distances";
+    }
   }
+  logmsg "Finished loading all $i distances from the pairwise comparison file";
   return %distance;
 }
 
@@ -85,13 +107,22 @@ sub fstWorker{
   my %distance=%$distance; 
   my @groupId=@$groupId;
 
+  my $numGen=Math::Random::MT->new; # for 64-bit numbers
+  my($skipCount,$processCount);
   my @buffer;
   while(defined(my $group1=$Q->dequeue)){
+    #if($numGen->rand >= $$settings{sample}){ # for random sampling
+    #  $skipCount++;
+    #  next;
+    #} else {
+    #  logmsg "!";
+    #  $processCount++;
+    #}
     my $group2=theExcludedGroup($group1,\@groupId,$settings);
     my $fst=fst($group1,$group2,\%distance,$settings);
 
     push(@buffer,join("\t",$fst,join(",",@$group1))."\n");
-    if(@buffer > 999){
+    if(@buffer > 9){ # keep a small buffer
       $printQ->enqueue(@buffer);
       @buffer=();
     }
@@ -103,6 +134,7 @@ sub fstWorker{
 
 sub printer{
   my($Q,$numcpus,$settings)=@_;
+  my $numPrinted=0;
   my $numSignals=0; # number of threads that kill the printer
   while(1){
     my $thing=$Q->dequeue;
@@ -113,6 +145,7 @@ sub printer{
       next;
     }
     print $thing;
+    $numPrinted++;
   }
 }
 
@@ -187,6 +220,8 @@ sub usage{
   -max maximum number of taxa in a group for Fst. Default: half the total number of taxa
   -min opposite of max (default: 2)
   --numcpus 1 The number of cpus you want to throw at it
+  --sample 1 The sampling frequency where 1 is to get 100% of all applicable Fst measurements.
+  --buffer 99999 The number of combinations to hold before performing calculations. With small sampling frequency, you can reduce this number to see more results in real time. Otherwise this will help speed up the script at the cost of some RAM.
   pairwise.tsv is a three-column file with: genome1 genome2 distance
   Output (Fst.tsv) is a two-column file with Fst and comma-separated taxa
   "
