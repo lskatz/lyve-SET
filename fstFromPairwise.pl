@@ -16,7 +16,7 @@ sub logmsg{$|++;print STDERR "TID".threads->tid." $0: @_\n";$|--;}
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help minimum=i maximum=i numcpus=i)) or die;
+  GetOptions($settings,qw(help minimum=i maximum=i numcpus=i)) or die usage();
   die usage() if($$settings{help});
   $$settings{numcpus}||=1;
   my %distance=distances($settings);
