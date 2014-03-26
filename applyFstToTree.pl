@@ -18,7 +18,7 @@ exit main();
 sub main{
   my $settings={};
   GetOptions($settings,qw(tree=s help probability format=s)) or die;
-  die usage() if($$settings{help});
+  die usage() if($$settings{help} || !@ARGV);
   $$settings{format}||="newick";
   
   my $fst=readFst(\@ARGV,$settings);
