@@ -4,7 +4,7 @@ use warnings;
 use Data::Dumper;
 use Getopt::Long;
 use Algorithm::Combinatorics qw(combinations);
-use List::Util qw/sum/;
+use List::Util qw/sum min max/;
 use File::Basename;
 use Time::HiRes qw/time/;
 use Math::Random::MT; # for precision 64 bit numbers
@@ -13,7 +13,7 @@ use threads;
 use Thread::Queue;
 
 $0=basename $0;
-sub logmsg{$|++;print STDERR "TID".threads->tid." $0: @_\n";$|--;}
+sub logmsg{$|++;print STDERR "TID".threads->tid." $0:".(caller(1))[3].": @_\n";$|--;}
 
 exit main();
 sub main{
@@ -42,7 +42,7 @@ sub main{
   my $numTaxa=@id;
   my $maxTaxa=$$settings{maximum} || int($numTaxa/2); # only need to sample up to half because you really probably want half vs half when considering Fst
   logmsg "Warning: you have more than 10 as your max. This can produce many results and take a long time." if($maxTaxa > 10);
-  #logmsg "Up to $maxTaxa taxa will be counted in groups: there will be ".numCombinations($maxTaxa,$settings)." combinations";
+  #logmsg "Up to $maxTaxa taxa will be counted in groups: there will be ".sumCombinations($$settings{minimum},$maxTaxa,$numTaxa,$settings)." combinations"; die;
 
   logmsg "Calculating fixation indices";
   printFst(\@id,\%distance,$maxTaxa,$settings);
@@ -116,11 +116,12 @@ sub fstWorker{
   my($skipCount,$processCount);
   my @buffer;
   while(defined(my $group1=$Q->dequeue)){
-    my $group2=theExcludedGroup($group1,\@groupId,$settings);
+    #my $group2=theExcludedGroup($group1,\@groupId,$settings);
+    my $group2=group2($group1,\@groupId,$settings);
     my $fst=fst($group1,$group2,\%distance,$settings);
 
-    push(@buffer,join("\t",$fst,join(",",@$group1))."\n");
-    if(@buffer > 9){ # keep a small buffer
+    push(@buffer,join("\t",$fst,join(",",@$group1),join(",",@$group2))."\n");
+    if(@buffer > 9){ # keep a small buffer before sending it for writing
       $printQ->enqueue(@buffer);
       @buffer=();
     }
@@ -147,8 +148,32 @@ sub printer{
   }
 }
 
+# Return a group with the same number of elements as group1.
+# Will be randomized but will not have repeat elements nor will it intersect with group1.
+sub group2{
+  my($inGroup,$totalGroup,$settings)=@_;
+  my %inGroup; 
+  $inGroup{$_}=1 for(@$inGroup); # index
+  my @outGroup;
+  my $ingroupNum=@$inGroup;
+  my $indexFromTotal=@$totalGroup-1;
+  my $j=0;
+  for(my $i=0;$i<=$indexFromTotal;$i++){
+    my $randEl=$$totalGroup[rand($indexFromTotal)];
+    if(!$inGroup{$randEl}){
+      push(@outGroup,$randEl);
+      last if(++$j >= $ingroupNum);
+      $inGroup{$randEl}=1; # this will make it be random without replacement
+    } else {
+      #logmsg "WARNING ($i): $randEl is in inGroup:".Dumper $inGroup;
+    }
+  }
+  return \@outGroup;
+}
+
 sub theExcludedGroup{
   my($inGroup,$totalGroup,$settings)=@_;
+  die "Deprecated";
   my @outGroup;
   my @inGroup=@$inGroup; # instead of constantly dereferencing it
   for my $id (@$totalGroup){
@@ -188,18 +213,24 @@ sub averageGroupDistance{
   return sum(@distance)/@distance;
 }
 
-sub numCombinations{
-  my($totalNum,$settings)=@_;
-  return 0 if($totalNum<2);
+sub sumCombinations{
+  my($min,$max,$total,$settings)=@_;
   my $sum=0;
-  # iterate from 2 to the total number that can be chosen from
-  for my $subNum(2..$totalNum){
-    # iterate from 2 to the specific subpopulation
-    for my $choose(2..$subNum){
-      $sum+=factorial($subNum)/(factorial($choose) * factorial($subNum - $choose));
-    }
+  for(min($min,$max) .. max($min,$max)){
+    $sum+=combinations($_,$total,$settings);
+    logmsg $sum;
   }
   return $sum;
+}
+
+# returns N choose K
+sub numCombinations{
+  my($N,$K,$settings)=@_;
+  my $nk=abs($N-$K);
+  my $numCombinations=factorial($N)/factorial($nk)/factorial($K);
+  logmsg join(", ",$N,$K,$nk);
+  logmsg join(", ",factorial($N),factorial($K - $N),factorial($K));
+  return $numCombinations;
 }
 
 sub factorial{
