@@ -134,8 +134,7 @@ sub applyFst{
 
       # find Fst
       my @group1=map($_->id,@d);
-      warn "NEED TO PUT \%GROUP2 HERE INSTEAD OF \@ID TO GET BETTER SAMPLING\n";
-      my($avg,$stdev)=fstDistribution(\@group1,\@ID,$pairwise,{reps=>100});
+      my($avg,$stdev)=fstDistribution(\@group1,$group2{$numDesc},$pairwise,{reps=>100});
       my $identifier=sprintf("%0.2f",$avg);
 
       # transform the Fst to p-value if background distribution is set
@@ -222,7 +221,7 @@ sub defineGroup2s{
       my $numDesc=@d;
       next if(!$numDesc || $numDesc < 2 || !@d);
 
-      # TODO define the within distance in the last element
+      # Define the within distance in the last element
       my $dist=averageGroupDistance(\@d,\@d,$pairwise,1,$settings);
       push(@d,$dist);
       push(@{$group{$numDesc}},\@d);
@@ -240,11 +239,23 @@ sub fstDistribution{
   my $stat=Statistics::Descriptive::Full->new;
 
   my @fst;
+  my $within1=averageGroupDistance($group1,$group1,$distance,1,$settings);
   for(my $i=0;$i<$$settings{reps};$i++){
-    my $group2=group2($group1,$allTaxa);
-    my $fst=fst($group1,$group2,$distance);
+    last if(@$allTaxa < 2); # no point in making fst if there is no other group
+    my @group2=@{ $$allTaxa[rand(@$allTaxa - 2)] };
+    if(join("",@$group1) eq join("",@group2)){
+      $i--;
+      next;
+    }
+    my $within2=pop(@group2);
+    my $between=averageGroupDistance($group1,\@group2,$distance,0,$settings);
+    my $within=($within1+$within2)/2;
+    my $fst=($between - $within)/$between;
+    #die Dumper ["($within1 $within2)=>$within $between => $fst",$group1,\@group2] if(@group2 < 30);
+    #my $fst=fst($group1,\@group2,$distance);
     push(@fst,$fst);
   }
+  return(0.01,0) if(@fst < 2);
   $stat->add_data(@fst);
   return($stat->mean,$stat->standard_deviation);
 }
