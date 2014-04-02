@@ -134,7 +134,14 @@ sub applyFst{
 
       # find Fst
       my @group1=map($_->id,@d);
-      my($avg,$stdev)=fstDistribution(\@group1,$group2{$numDesc},$pairwise,{reps=>100});
+      # min/max allowed in a group that group1 is randomly compared against. 5% down/5% up
+      my($minNum,$maxNum)=(int($numDesc/10*9.5),int($numDesc/9.5*10));
+      # create a sample set of all these groups
+      my @clades;
+      for($i=$minNum;$i<$maxNum;$i++){
+        push(@clades,@{ $group2{$i} }) if(defined($group2{$i}));
+      }
+      my($avg,$stdev)=fstDistribution(\@group1,\@clades,$pairwise,{reps=>100});
       my $identifier=sprintf("%0.2f",$avg);
 
       # transform the Fst to p-value if background distribution is set
@@ -145,10 +152,14 @@ sub applyFst{
       }
 
       # apply the Fst with that key
+      my $bootstrap=$node->bootstrap || $node->id;
+         $bootstrap=0 if(!$bootstrap);
       $node->bootstrap($identifier);
       $node->id($identifier);
 
-      print join("\t",$avg,join(",",@group1))."\n" if($avg > 0.7);
+      # The Fst is potentially significant if greater than 50%.
+      # Otherwise leave it up to the user to sort or filter these results by using stdout.
+      print join("\t",sprintf("%0.4f",$avg),$bootstrap,join(",",@group1))."\n" if($avg > 0.5);
 
       if(++$i % 100 ==0){
         logmsg "Finished with $i ancestor nodes";
@@ -242,7 +253,7 @@ sub fstDistribution{
   my $within1=averageGroupDistance($group1,$group1,$distance,1,$settings);
   for(my $i=0;$i<$$settings{reps};$i++){
     last if(@$allTaxa < 2); # no point in making fst if there is no other group
-    my @group2=@{ $$allTaxa[rand(@$allTaxa - 2)] };
+    my @group2=@{ $$allTaxa[rand(@$allTaxa - 1)] };
     if(join("",@$group1) eq join("",@group2)){
       $i--;
       next;
