@@ -126,9 +126,12 @@ sub applyFst{
       my $numDesc=@d;
 
       # If the bootstrap is low then don't bother doing fst on this node -- it's not supported!
-      if(defined($node->bootstrap) && $node->bootstrap < 0.7){
-        logmsg "Skipping ".$node->bootstrap." due to the low bootstrap values";
+      my $bootstrap=$node->bootstrap || $node->id;
+         $bootstrap=0 if(!$bootstrap);
+      if($bootstrap < 0.7){
+        logmsg "Skipping node '$bootstrap' due to the low bootstrap values";
         $node->bootstrap(0.01); # give it a really low fst
+        $node->id(0.01);        # give it a really low fst
         next;
       }
 
@@ -152,8 +155,6 @@ sub applyFst{
       }
 
       # apply the Fst with that key
-      my $bootstrap=$node->bootstrap || $node->id;
-         $bootstrap=0 if(!$bootstrap);
       $node->bootstrap($identifier);
       $node->id($identifier);
 
