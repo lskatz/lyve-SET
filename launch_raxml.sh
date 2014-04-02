@@ -2,6 +2,7 @@
 #$ -pe smp 8
 #$ -cwd
 #$ -V
+#$ -o launch_raxml.sh.out -j y
 # converts alignment to phylip and then makes a tree out of it
 
 aln=$1
