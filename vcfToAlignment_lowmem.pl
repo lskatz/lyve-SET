@@ -237,6 +237,7 @@ sub findReferenceBases{
   my $base={};
   my $in=Bio::SeqIO->new(-file=>$reference);
   while(my $seq=$in->next_seq){
+    die "ERROR: the reference sequence contig has an underscore in it. You must map and call snps from contigs without underscores or else there will be internal problems in this script. Problem was with contig ".$seq->id if($seq->id =~/_/);
     logmsg $seq->id;
     my @seq=split(//,$seq->seq);
     unshift(@seq,undef);
