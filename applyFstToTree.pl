@@ -12,16 +12,19 @@ use FindBin;
 use Statistics::Descriptive;
 
 use lib "$FindBin::Bin/lib";
-#use Statistics::Zed;
+use Statistics::Data;
+use Statistics::Zed;
 
+my $zed=Statistics::Zed->new(tails=>1,precision_p=>4,precision_s=>4);
 $0=fileparse $0;
 sub logmsg{print STDERR (caller(1))[3].": @_\n";}
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(tree=s pairwise=s outprefix=s fst=s help numcpus=i)) or die $!;
+  GetOptions($settings,qw(tree=s pairwise=s outprefix=s fst=s help numcpus=i reps)) or die $!;
   die usage() if($$settings{help});
   $$settings{numcpus}||=1;
+  $$settings{reps}||=100;
   
   # required parameters
   for(qw(tree pairwise outprefix)){
@@ -40,7 +43,8 @@ sub main{
   logmsg "Reading the pairwise file";
   my $pairwise=readPairwise($$settings{pairwise},$settings);
   logmsg "Reading the tree and using the pairwise distances to calculate Fst on the tree";
-  my ($fstTreeArr,$pvalueTreeArr)=applyFst($$settings{tree},$pairwise,$fstAvg,$fstStdev,$settings);
+  my $fstTreeArr=applyFst($$settings{tree},$pairwise,$fstAvg,$fstStdev,$settings);
+  my $pvalueTreeArr=applyFst($$settings{tree},$pairwise,$fstAvg,$fstStdev,{%$settings,transform=>1});
 
   outputTrees([$fstTreeArr,$pvalueTreeArr],$$settings{outprefix},$settings);
 
@@ -98,9 +102,16 @@ sub countAncNodes{
 
 sub applyFst{
   my($infile,$pairwise,$fstAvg,$fstStdev,$settings)=@_;
-  my (@fstTree,@pvalueTree);
+  $$settings{transform}||=0;
+  my (@fstTree);
   my $i=0;
   my @ID=keys(%$pairwise); # all taxa
+
+  if($$settings{transform}){
+    logmsg "Making a tree by calculating new Fst values and transforming them to p-values";
+  } else {
+    logmsg "Making a tree with Fst";
+  }
 
   logmsg "Counting nodes in the tree before analyzing...";
   my $numAncestorNodes=countAncNodes($infile,$settings);
@@ -125,13 +136,14 @@ sub applyFst{
       @d=sort{$a->id cmp $b->id} @d;
       my $numDesc=@d;
 
-      # If the bootstrap is low then don't bother doing fst on this node -- it's not supported!
+      # The bootstrap is the boostrap if it exists, or it is the node identifier because of Newick weirdness.
       my $bootstrap=$node->bootstrap || $node->id;
          $bootstrap=0 if(!$bootstrap);
-      if($bootstrap < 0.7){
+      # If the bootstrap is low then don't bother doing fst on this node -- it's not supported!
+      if(0 && $bootstrap < 70){
         logmsg "Skipping node '$bootstrap' due to the low bootstrap values";
-        $node->bootstrap(0.01); # give it a really low fst
-        $node->id(0.01);        # give it a really low fst
+        $node->bootstrap(1); # give it a really low fst
+        $node->id(1);        # give it a really low fst
         next;
       }
 
@@ -144,23 +156,23 @@ sub applyFst{
       for($i=$minNum;$i<$maxNum;$i++){
         push(@clades,@{ $group2{$i} }) if(defined($group2{$i}));
       }
-      my($avg,$stdev)=fstDistribution(\@group1,\@clades,$pairwise,{reps=>100});
+      my($avg,$stdev)=fstDistribution(\@group1,\@clades,$pairwise,$settings);
       my $identifier=sprintf("%0.2f",$avg);
 
       # transform the Fst to p-value if background distribution is set
       if(defined($fstAvg) && defined($fstStdev)){
-        my $z=(($avg) - ($fstAvg))/sqrt(($fstStdev*$fstStdev)/100);
-        #my $p=$zed->p_value($z);
-        #$identifier=$p;
+        my $z=(($avg) - ($fstAvg))/$fstStdev;
+        my $p=$zed->z2p($z,tails=>1);
+        $identifier=$p;
+        #logmsg "$z=(($avg) - ($fstAvg))/$fstStdev  p=$p";die;
       }
 
       # apply the Fst with that key
       $node->bootstrap($identifier);
       $node->id($identifier);
 
-      # The Fst is potentially significant if greater than 50%.
-      # Otherwise leave it up to the user to sort or filter these results by using stdout.
-      print join("\t",sprintf("%0.4f",$avg),$bootstrap,join(",",@group1))."\n" if($avg > 0.5);
+      # Leave it up to the user to sort or filter these results by using stdout.
+      #print join("\t",sprintf("%0.4f",$avg),$bootstrap,join(",",@group1))."\n";
 
       if(++$i % 100 ==0){
         logmsg "Finished with $i ancestor nodes";
@@ -168,7 +180,7 @@ sub applyFst{
     }
     push(@fstTree,$treeIn);
   }
-  return (\@fstTree,\@pvalueTree);
+  return \@fstTree;
 }
 
 sub outputTrees{
@@ -178,8 +190,9 @@ sub outputTrees{
   my $pOut=  new Bio::TreeIO(-file=>">$prefix.pvalue.dnd");
   for(my $i=0;$i<$numTrees;$i++){
     my $fstTree=$$treeArr[0][$i];
-    my $pvalueTree=$$treeArr[1][$i] || $$treeArr[0][$i];
     $fstOut->write_tree($fstTree);
+
+    my $pvalueTree=$$treeArr[1][$i] || next;
     $pOut->write_tree($pvalueTree);
   }
   $fstOut->close;
@@ -246,7 +259,6 @@ sub defineGroup2s{
 
 sub fstDistribution{
   my($group1,$allTaxa,$distance,$settings)=@_;
-  $$settings{reps}||=100;
   die "ERROR: reps can't be less than 1" if($$settings{reps}<1);
   my $stat=Statistics::Descriptive::Full->new;
 
@@ -266,6 +278,7 @@ sub fstDistribution{
     #die Dumper ["($within1 $within2)=>$within $between => $fst",$group1,\@group2] if(@group2 < 30);
     #my $fst=fst($group1,\@group2,$distance);
     push(@fst,$fst);
+    print join("\t",sprintf("%0.4f",$fst),join(",",@$group1),join(",",@group2))."\n";
   }
   return(0.01,0) if(@fst < 2);
   $stat->add_data(@fst);
@@ -317,7 +330,9 @@ sub usage{
   -o prefix The output prefix. Prefix can have a directory name encoded in it also, e.g. 'tmp/prefix'
     Output files are: prefix.fst.dnd, prefix.pvalue.dnd
   OPTIONAL
-  -f fst.tsv A background fixation index file, generated from fstFromPairwise.pl
+  -f fst.tsv A background fixation index file whose first column is Fst. This script outputs Fst in stdout and so you can run this script first to get that background and then run it again with known Fst values.
   --numcpus 1 The number of cpus to use
+  --reps 100 The number of repetitions for each node
+  Example: $0 -t in.dnd -p pairwise.tsv -o prefix > fstgroups.tsv; $0 -t in.dnd -p pairwise.tsv -o prefix -f fstgroups.tsv > /dev/null
   "
 }

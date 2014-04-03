@@ -1,4 +1,5 @@
 #!/usr/bin/env perl
+# TODO get groups that are phylogenetically relevant
 use strict;
 use warnings;
 use Data::Dumper;
