@@ -21,10 +21,11 @@ sub logmsg{print STDERR (caller(1))[3].": @_\n";}
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(tree=s pairwise=s outprefix=s fst=s help numcpus=i reps)) or die $!;
+  GetOptions($settings,qw(tree=s pairwise=s outprefix=s fst=s help numcpus=i reps=i outputType=s)) or die $!;
   die usage() if($$settings{help});
   $$settings{numcpus}||=1;
   $$settings{reps}||=100;
+  $$settings{outputType}||="samples";
   
   # required parameters
   for(qw(tree pairwise outprefix)){
@@ -43,10 +44,12 @@ sub main{
   logmsg "Reading the pairwise file";
   my $pairwise=readPairwise($$settings{pairwise},$settings);
   logmsg "Reading the tree and using the pairwise distances to calculate Fst on the tree";
-  my $fstTreeArr=applyFst($$settings{tree},$pairwise,$fstAvg,$fstStdev,$settings);
-  my $pvalueTreeArr=applyFst($$settings{tree},$pairwise,$fstAvg,$fstStdev,{%$settings,transform=>1});
+  print join("\t",qw(Fst num1 num2 group1 group2))."\n"; # headers for stdout
+  my ($fstTreeArr,$fstSample)=applyFst($$settings{tree},$pairwise,$fstAvg,$fstStdev,$settings);
+  #my $pvalueTreeArr=applyFst($$settings{tree},$pairwise,$fstAvg,$fstStdev,{%$settings,transform=>1});
 
-  outputTrees([$fstTreeArr,$pvalueTreeArr],$$settings{outprefix},$settings);
+  outputTrees([$fstTreeArr],$$settings{outprefix},$settings);
+  outputStatisticsThresholds($fstSample,$$settings{outprefix},$settings);
 
   return 0;
 }
@@ -122,6 +125,7 @@ sub applyFst{
 
   logmsg "Calculating Fst for each high-confidence node";
   my $in=new Bio::TreeIO(-file=>$infile);
+  my %fstSample;
   while(my $treeIn=$in->next_tree){
     for my $node($treeIn->get_nodes){
       next if($node->is_Leaf);
@@ -140,63 +144,81 @@ sub applyFst{
       my $bootstrap=$node->bootstrap || $node->id;
          $bootstrap=0 if(!$bootstrap);
       # If the bootstrap is low then don't bother doing fst on this node -- it's not supported!
-      if(0 && $bootstrap < 70){
-        logmsg "Skipping node '$bootstrap' due to the low bootstrap values";
-        $node->bootstrap(1); # give it a really low fst
-        $node->id(1);        # give it a really low fst
-        next;
-      }
+      #if($bootstrap < 70){
+      #  logmsg "Skipping node '$bootstrap' due to the low bootstrap values";
+      #  $node->bootstrap(1); # give it a really low fst
+      #  $node->id(1);        # give it a really low fst
+      #  next;
+      #}
 
       # find Fst
       my @group1=map($_->id,@d);
       # min/max allowed in a group that group1 is randomly compared against. 5% down/5% up
-      my($minNum,$maxNum)=(int($numDesc/10*9.5),int($numDesc/9.5*10));
+      my($minNum,$maxNum)=(int($numDesc * 0.95),int($numDesc / 0.95));
       # create a sample set of all these groups
       my @clades;
       for($i=$minNum;$i<$maxNum;$i++){
         push(@clades,@{ $group2{$i} }) if(defined($group2{$i}));
       }
-      my($avg,$stdev)=fstDistribution(\@group1,\@clades,$pairwise,$settings);
+      my($avg,$stdev,$rawData)=fstDistribution(\@group1,\@clades,$pairwise,$settings);
+      push(@{ $fstSample{$numDesc} },@$rawData);
       my $identifier=sprintf("%0.2f",$avg);
 
       # transform the Fst to p-value if background distribution is set
-      if(defined($fstAvg) && defined($fstStdev)){
-        my $z=(($avg) - ($fstAvg))/$fstStdev;
-        my $p=$zed->z2p($z,tails=>1);
-        $identifier=$p;
-        #logmsg "$z=(($avg) - ($fstAvg))/$fstStdev  p=$p";die;
-      }
+      #if(defined($fstAvg) && defined($fstStdev)){
+      #  my $z=(($avg) - ($fstAvg))/$fstStdev;
+      #  my $p=$zed->z2p($z,tails=>1);
+      #  $identifier=$p;
+      #}
 
       # apply the Fst with that key
       $node->bootstrap($identifier);
       $node->id($identifier);
 
-      # Leave it up to the user to sort or filter these results by using stdout.
-      #print join("\t",sprintf("%0.4f",$avg),$bootstrap,join(",",@group1))."\n";
-
       if(++$i % 100 ==0){
         logmsg "Finished with $i ancestor nodes";
       }
+      print join("\t",sprintf("%0.4f",$avg),scalar(@group1),scalar(@group1),join(",",@group1),'-')."\n" if($$settings{outputType} eq 'averages');
     }
     push(@fstTree,$treeIn);
   }
-  return \@fstTree;
+  return (\@fstTree,\%fstSample);
 }
 
 sub outputTrees{
   my($treeArr,$prefix,$settings)=@_;
   my $numTrees=@{$$treeArr[0]};
   my $fstOut=new Bio::TreeIO(-file=>">$prefix.fst.dnd");
-  my $pOut=  new Bio::TreeIO(-file=>">$prefix.pvalue.dnd");
+  #my $pOut=  new Bio::TreeIO(-file=>">$prefix.pvalue.dnd");
   for(my $i=0;$i<$numTrees;$i++){
     my $fstTree=$$treeArr[0][$i];
     $fstOut->write_tree($fstTree);
 
     my $pvalueTree=$$treeArr[1][$i] || next;
-    $pOut->write_tree($pvalueTree);
+    #$pOut->write_tree($pvalueTree);
   }
   $fstOut->close;
-  $pOut->close;
+  #$pOut->close;
+  return 1;
+}
+
+sub outputStatisticsThresholds{
+  my($fstSample,$prefix,$settings)=@_;
+  my $stat=Statistics::Descriptive::Full->new;
+
+  my $out="$prefix.stats.tsv";
+  my ($min,$max)=(min(keys(%$fstSample)),max(keys(%$fstSample)));
+  open(STATS,">",$out) or die "ERROR: could not write to file $out:$!";
+  print STATS join("\t",qw(numInGroup threshold average standardDeviation))."\n";
+  for(my $i=$min;$i<=$max;$i++){
+    next if(!$$fstSample{$i} || @{$$fstSample{$i}} < 2);
+    $stat->add_data(@{$$fstSample{$i}});
+    my ($avg,$stdev)=(sprintf("%0.4f",$stat->mean),sprintf("%0.4f",$stat->standard_deviation));
+    my $threshold=sprintf("%0.4f",$stat->percentile(95));
+    my $threshold2=sprintf("%0.4f",$stat->percentile(75));
+    print STATS join("\t",$i,"$threshold/$threshold2",$avg,$stdev)."\n";
+  }
+  close STATS;
   return 1;
 }
 
@@ -257,17 +279,19 @@ sub defineGroup2s{
   return %group;
 }
 
+# find an average and standard deviation of an Fst of a group1
 sub fstDistribution{
   my($group1,$allTaxa,$distance,$settings)=@_;
   die "ERROR: reps can't be less than 1" if($$settings{reps}<1);
   my $stat=Statistics::Descriptive::Full->new;
+  my $group1Str=join("",@$group1);
 
   my @fst;
+  return(0.01,0,\@fst) if(@$allTaxa < 5);# no point in making fst if there are only a few other groups
   my $within1=averageGroupDistance($group1,$group1,$distance,1,$settings);
   for(my $i=0;$i<$$settings{reps};$i++){
-    last if(@$allTaxa < 2); # no point in making fst if there is no other group
     my @group2=@{ $$allTaxa[rand(@$allTaxa - 1)] };
-    if(join("",@$group1) eq join("",@group2)){
+    if($group1Str eq join("",@group2)){
       $i--;
       next;
     }
@@ -275,14 +299,11 @@ sub fstDistribution{
     my $between=averageGroupDistance($group1,\@group2,$distance,0,$settings);
     my $within=($within1+$within2)/2;
     my $fst=($between - $within)/$between;
-    #die Dumper ["($within1 $within2)=>$within $between => $fst",$group1,\@group2] if(@group2 < 30);
-    #my $fst=fst($group1,\@group2,$distance);
     push(@fst,$fst);
-    print join("\t",sprintf("%0.4f",$fst),join(",",@$group1),join(",",@group2))."\n";
+    print join("\t",sprintf("%0.4f",$fst),scalar(@$group1),scalar(@group2),join(",",@$group1),join(",",@group2))."\n" if($$settings{outputType} eq 'samples');
   }
-  return(0.01,0) if(@fst < 2);
   $stat->add_data(@fst);
-  return($stat->mean,$stat->standard_deviation);
+  return($stat->mean,$stat->standard_deviation,\@fst);
 }
 
 sub fst{
@@ -327,8 +348,9 @@ sub usage{
   Outputs groups with fst > 0.7
   -t in.dnd The tree file, which will be parsed by BioPerl. Format determined by extension.
   -p pairwise.tsv The pairwise distances file. NOTE: you can get pairwise distances from pairwiseDistances.pl
-  -o prefix The output prefix. Prefix can have a directory name encoded in it also, e.g. 'tmp/prefix'
+  --outprefix prefix The output prefix. Prefix can have a directory name encoded in it also, e.g. 'tmp/prefix'
     Output files are: prefix.fst.dnd, prefix.pvalue.dnd
+  --outputType samples The type of stdout you want.  Samples==every random sample; averages==average per node
   OPTIONAL
   -f fst.tsv A background fixation index file whose first column is Fst. This script outputs Fst in stdout and so you can run this script first to get that background and then run it again with known Fst values.
   --numcpus 1 The number of cpus to use
