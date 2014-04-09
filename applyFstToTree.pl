@@ -22,7 +22,7 @@ exit main();
 sub main{
   my $settings={};
   GetOptions($settings,qw(tree=s pairwise=s outprefix=s fst=s help numcpus=i reps=i outputType=s)) or die $!;
-  die usage() if($$settings{help});
+  die usage($settings) if($$settings{help});
   $$settings{numcpus}||=1;
   $$settings{reps}||=100;
   $$settings{outputType}||="samples";
@@ -343,18 +343,22 @@ sub averageGroupDistance{
 
 
 sub usage{
-  "Applies the fixation index (Fst) to a tree using pairwise distances.
-  Usage: $0 -t in.dnd -p pairwise.tsv -o prefix > fstgroups.tsv
+  my($settings)=@_;
+  my $help="Applies the fixation index (Fst) to a tree using pairwise distances.
+  Usage: $0 -t in.dnd -p pairwise.tsv --outprefix out --outputType averages > fstaverages.tsv
   Outputs groups with fst > 0.7
   -t in.dnd The tree file, which will be parsed by BioPerl. Format determined by extension.
   -p pairwise.tsv The pairwise distances file. NOTE: you can get pairwise distances from pairwiseDistances.pl
   --outprefix prefix The output prefix. Prefix can have a directory name encoded in it also, e.g. 'tmp/prefix'
     Output files are: prefix.fst.dnd, prefix.pvalue.dnd
-  --outputType samples The type of stdout you want.  Samples==every random sample; averages==average per node
+  -h for additional help";
+  return $help if(!$$settings{help}); # return shorthand help
+  $help.="
   OPTIONAL
-  -f fst.tsv A background fixation index file whose first column is Fst. This script outputs Fst in stdout and so you can run this script first to get that background and then run it again with known Fst values.
-  --numcpus 1 The number of cpus to use
-  --reps 100 The number of repetitions for each node
-  Example: $0 -t in.dnd -p pairwise.tsv -o prefix > fstgroups.tsv; $0 -t in.dnd -p pairwise.tsv -o prefix -f fstgroups.tsv > /dev/null
-  "
+  --outputType samples The type of stdout you want.  samples==every random sample; averages==average per node; >/dev/null for no output
+  --numcpus 1 The number of cpus to use (not currently multithreaded anyway)
+  --reps 100 The number of repetitions for each node to calculate an average Fst
+  Example: $0 applyFstToTree.pl -p pairwise.tsv -t 4b.dnd --outprefix out --outputType samples > fstsampling.tsv
+  ";
+  return $help;
 }
