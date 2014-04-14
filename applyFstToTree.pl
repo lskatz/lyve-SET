@@ -10,6 +10,7 @@ use File::Basename;
 use List::Util qw/min max sum/;
 use FindBin;
 use Statistics::Descriptive;
+use Math::Round qw/nearest/;
 
 use lib "$FindBin::Bin/lib";
 use Statistics::Data;
@@ -154,7 +155,7 @@ sub applyFst{
       # find Fst
       my @group1=map($_->id,@d);
       # min/max allowed in a group that group1 is randomly compared against. 5% down/5% up
-      my($minNum,$maxNum)=(int($numDesc * 0.95),int($numDesc / 0.95));
+      my($minNum,$maxNum)=(nearest(1,$numDesc * 0.95),nearest(1,$numDesc / 0.95));
       # create a sample set of all these groups
       my @clades;
       for($i=$minNum;$i<$maxNum;$i++){
