@@ -1,5 +1,5 @@
 #!/bin/sh
-#$/bin/sh
+#$ -S /bin/sh
 #$ -pe smp 8
 #$ -cwd
 #$ -V

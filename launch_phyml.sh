@@ -1,5 +1,5 @@
 #!/bin/sh
-#$/bin/sh
+#$ -S /bin/sh
 #$ -pe smp 8
 #$ -cwd
 #$ -V
@@ -18,6 +18,6 @@ phyml=`(which phyml || which PhyML || which PhyML-3.1_linux64 || which phyml_lin
 if [ $? -gt 0 ]; then echo "Could not find phyml"; exit 1; fi;
 echo "Found phyml at $phyml"
 
-$phyml -i $aln -b -4 -m GTR -s BEST --quiet
+$phyml -np 8 -i $aln -b -4 -m GTR -s BEST --quiet
 if [ $? -gt 0 ]; then exit 1; fi;
 
