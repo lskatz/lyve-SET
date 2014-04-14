@@ -1,4 +1,9 @@
 #!/bin/sh
+#$/bin/sh
+#$ -pe smp 8
+#$ -cwd
+#$ -V
+#$ -o launch_phyml.sh.out -j y
 
 # makes a tree out of an aln
 
