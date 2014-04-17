@@ -1,3 +1,6 @@
 [submodule "lib/Schedule"]
 	path = lib/Schedule
 	url = https://github.com/lskatz/Schedule--SGELK.git
+[submodule "lib/callsam"]
+	path = lib/callsam
+	url = https://github.com/lskatz/callsam.git

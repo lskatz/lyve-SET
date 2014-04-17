@@ -288,7 +288,11 @@ sub fstDistribution{
   my $group1Str=join("",@$group1);
 
   my @fst;
-  return(0.01,0,\@fst) if(@$allTaxa < 5);# no point in making fst if there are only a few other groups
+
+  # return a bad fst if
+  #  1) there are only a few other groups
+  #  2) the number of taxa in group1 is too high.  >50 I guess?
+  return(0.01,0,\@fst) if(@$allTaxa < 2 || scalar(@$group1 > 50) );
   my $within1=averageGroupDistance($group1,$group1,$distance,1,$settings);
   for(my $i=0;$i<$$settings{reps};$i++){
     my @group2=@{ $$allTaxa[rand(@$allTaxa - 1)] };
