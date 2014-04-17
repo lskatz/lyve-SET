@@ -28,7 +28,10 @@ sub main{
   # organize vcf/bam files to their actual extension/type
   my(@VCF,@BAM);
   while(my $file=shift(@ARGV)){
-    my($dir,$name,$ext)=fileparse($file,qw(.unfiltered.vcf .vcf .bam));
+    my($dir,$name,$ext)=fileparse($file,qw(.unfiltered.vcf .vcf .vcf.gz .bam));
+    if($ext=~/gz/){
+      die "ERROR: gz files are not supported yet";
+    }
     if($ext=~/vcf/i){
       push(@VCF,$file);
     } elsif($ext=~/bam/i){
@@ -261,7 +264,7 @@ sub printPositions{
 
 sub usage{
   "Creates an alignment of SNPs, given a set of VCFs. Output is in fasta format.
-  usage: $0 *.bam *.vcf -r reference.fasta > alignment.fasta
+  usage: $0 *.bam *.vcf [*.vcf.gz] -r reference.fasta > alignment.fasta
     Note: multiple nucleotide polymorphic sites and indels are changed to 'n'. Use filterVcf.pl to help retain some of these positions.
     -n numcpus (default: 1)
     -coverage 10 The minimum coverage allowed to accept the snp. Or, the reference base, if the base caller didn't call a position.
