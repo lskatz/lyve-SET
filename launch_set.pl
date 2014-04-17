@@ -23,7 +23,7 @@ exit(main());
 
 sub main{
   my $settings={trees=>1,clean=>1, msa=>1, mapper=>"smalt"};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean! msa! mapper=s));
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean! msa! mapper=s snpcaller=s));
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
@@ -33,6 +33,7 @@ sub main{
   $$settings{min_coverage}||=10;
   $$settings{qsubxopts}||="";
   $$settings{mapper}=lc($$settings{mapper});
+  $$settings{snpcaller}||="freebayes";
 
   logmsg "Checking to make sure all directories are in place";
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir)){
@@ -122,7 +123,6 @@ sub mapReads{
 
 sub variantCalls{
   my($ref,$bamdir,$vcfdir,$settings)=@_;
-  $sge->set("numcpus",1);
   my @bam=glob("$bamdir/*.sorted.bam");
   my @jobid;
   for my $bam(@bam){
@@ -132,10 +132,19 @@ sub variantCalls{
       logmsg "Found $vcfdir/$b.vcf. Skipping";
       next;
     }
-    my $j=$sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}");
+    my $j; # job identifier
+    if($$settings{snpcaller} eq 'freebayes'){
+      $j=$sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}",{numcpus=>1});
+      # terminate called after throwing an instance of 'std::out_of_range'
+    } elsif($$settings{snpcaller} eq 'callsam'){
+      my $jobname="callsam$b";
+      # call snps
+      $j=$sge->pleaseExecute("$scriptsdir/lib/callsam/bin/callsam.pl $bam --numcpus $$settings{numcpus} --min-coverage $$settings{min_coverage} --min-frequency $$settings{min_alt_frac} --reference '$ref' > $vcfdir/unfiltered/$b.vcf",{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
+      # filter the vcf but make it depend on the callsam script to finish
+      $sge->pleaseExecute("$scriptsdir/filterVcf.pl $vcfdir/unfiltered/$b.vcf --noindels -d 10 -o $vcfdir/$b.vcf",{qsubxopts=>"-hold_jid $jobname",numcpus=>1,jobname=>"filter$b"});
+    }
     push(@jobid,$j);
   }
-  # terminate called after throwing an instance of 'std::out_of_range'
   logmsg "All variant-calling jobs have been submitted. Waiting on them to finish";
   $sge->wrapItUp();
   return 1;
@@ -208,5 +217,6 @@ sub usage{
     -q '-q long.q' extra options to pass to qsub. This is not sanitized.
     --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with)
     --mapper smalt Choose the mapper you want to use. Choices: smalt (default), snap
+    --snpcaller freebayes Choose the snp caller you want to use. Choices: freebayes (default), callsam
   "
 }
