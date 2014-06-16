@@ -99,6 +99,11 @@ sub vcfToFastaWorker{
     my @bam=grep(/$genome\b/,@$BAM);
     die "ERROR: there are many bams that fit the description $genome: ".join(" ",@bam) if(@bam>1);
     my $bam=$bam[0];
+    if(!$bam || !-e $bam){
+      logmsg "ERROR: I could not find a bam file to match against your vcf file $vcf but was expecting something with the prefix $genome";
+      logmsg "These are the possible bam files that you have given me to choose from: ".Dumper $BAM;
+      die;
+    }
 
     # get the depth of this bam
     my $coverage=covDepth($bam,$settings);
