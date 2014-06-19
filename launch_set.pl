@@ -51,6 +51,9 @@ sub main{
   die usage() if($$settings{help} || !defined($$settings{ref}) || !-f $$settings{ref});
   my $ref=$$settings{ref};
 
+  logmsg "Simulating reads from any assemblies";
+  simulateReads($settings);
+  logmsg "Indexing the reference for read mapping";
   indexReference($ref,$settings);
   logmsg "Mapping reads";
   mapReads($ref,$$settings{readsdir},$$settings{bamdir},$settings);
@@ -67,6 +70,32 @@ sub main{
   logmsg "Done!";
 
   return 0;
+}
+
+sub simulateReads{
+  my($settings)=@_;
+  my @asm=glob("$$settings{asmdir}/*.{fasta,fna,ffn,fa,mfa,mfasta}");
+  return if(!@asm);
+
+  my $exec=`which wombac-shred_fasta`;
+  if($?){
+    $ENV{PATH}="$ENV{PATH}:$FindBin::RealBin/lib/wombac-1.2/bin";
+    $exec=`which wombac-shred_fasta`;
+    die "ERROR could not find wombac-shred_fasta in your path" if $?;
+  }
+  chomp($exec);
+
+  logmsg "Using Wombac to shred reads. Please give credit to Wombac if using this stage of SET. Details at http://www.vicbioinformatics.com/";
+  for my $asm (@asm){
+    my $b=fileparse $asm;
+    my $outFastq="$$settings{readsdir}/$b.shredded.fastq";
+    my $outGz="$outFastq.gz";
+    next if(-e $outGz);
+    logmsg "I did not find $outFastq simulated reads. Simulating now with $exec.";
+    $sge->set("jobname","sim$b");
+    $sge->pleaseExecute_andWait("$exec --verbose --readlen 1000 --coverage 50 --fastq --qual 40 '$asm' 2>&1 1> '$outFastq'");
+    $sge->pleaseExecute_andWait("gzip -v '$outFastq' 2>&1");
+  }
 }
 
 sub indexReference{
