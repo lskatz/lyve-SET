@@ -1,0 +1,129 @@
+#!/usr/bin/env perl
+use warnings;
+use strict;
+use Data::Dumper;
+use List::MoreUtils qw(any);
+
+my(@Options, $verbose, $mindepth, $noref);
+setOptions();
+
+my %snp;
+my @id;
+my $num_snps=0;
+
+for my $prefix (@ARGV) {
+  -r "$prefix.bam" or die "can not read BAM file: $prefix.bam";
+  open VCF, '<', "$prefix.vcf" or die "can not open VCF file: $prefix.vcf";
+  my $id = $prefix;
+  $id =~ s{^.*/}{};
+  $id =~ s/\.vcf$//;
+  push @id, $id;
+  while (<VCF>) {
+    # CHROM  POS     ID      REF     ALT     QUAL    FILTER  INFO    FORMAT  unknown
+    next if m/^#/;
+    chomp;
+    my($seq,$pos,undef,$ref,$alt) = split m/\t/;
+    next unless length($ref)==1 and length($alt)==1;
+    $snp{$seq}{$pos}{REF} = $ref;
+    $snp{$seq}{$pos}{$id} = $alt;
+    $num_snps++;
+  }
+  close VCF;
+}
+printf STDERR "Read %d VCF files.\n", scalar(@id);
+
+my $BED = 'snps.bed';
+print STDERR "Creating BED file\n";
+open BED, '>', $BED or die "Unable to write/create '$BED'";
+for my $seq (keys %snp) {
+  for my $pos (sort { $a <=> $b } keys %{$snp{$seq}}) {
+     print BED join("\t", $seq, $pos-1, $pos),"\n";
+  }
+}
+close BED;
+
+my $IDS = write_list( 'ids.txt', \@id );
+my $FOF = write_list( 'bamfiles.txt', [ map { "$_.bam" } @id ] );
+
+print STDERR "Checking depth/coreness of each SNP site...\n";
+my %aln;
+open DEPTH, "samtools depth -b $BED -f bamfiles.txt |";
+while (<DEPTH>) {
+  my($seq,$pos,@cov) = split m/\t/;
+  print STDERR "\rChecking: $seq $pos" if $verbose;
+  if (any { $_ < $mindepth } @cov) {   # this is the most important line! => core genome?
+    delete $snp{$seq}{$pos};
+  }
+  else {
+    for my $id (@id) {
+      $aln{$id} .= ( $snp{$seq}{$pos}{$id} || $snp{$seq}{$pos}{REF} );
+    }
+  }
+}
+unlink $BED, $FOF, $IDS;
+
+print STDERR "\n" if $verbose;
+if (not defined $aln{$id[0]}) {
+  print STDERR "WARNING: No core SNPs found in: @id\n";  
+  exit -1;
+}
+
+delete $aln{'ref'} if $noref;
+
+printf STDERR "Found %d core SNPs from %d candidates.\n", 
+  length($aln{$id[0]}), 
+  $num_snps;
+
+for my $id (@id) {
+  print ">$id\n", $aln{$id}, "\n";
+} 
+
+#----------------------------------------------------------------------
+
+sub write_list {
+  my($filename, $list) = @_;
+  print STDERR "Writing to file: $filename\n";
+  open OUT, '>', $filename or die "Unable to create/write '$filename'";
+  print OUT map { "$_\n" } @$list;
+  close OUT;
+  return $filename;
+}
+
+#----------------------------------------------------------------------
+
+#----------------------------------------------------------------------
+# Option setting routines
+
+sub setOptions {
+  use Getopt::Long;
+
+  @Options = (
+    {OPT=>"help",    VAR=>\&usage,             DESC=>"This help"},
+    {OPT=>"verbose!",  VAR=>\$verbose, DEFAULT=>0, DESC=>"Verbose output"},
+    {OPT=>"mindepth=i",  VAR=>\$mindepth, DEFAULT=>1, DESC=>"Minimum depth to count as covered"},
+    {OPT=>"noref!",  VAR=>\$noref, DEFAULT=>0, DESC=>"Don't include reference in tree"},
+  );
+
+  (!@ARGV) && (usage());
+
+  &GetOptions(map {$_->{OPT}, $_->{VAR}} @Options) || usage();
+
+  # Now setup default values.
+  foreach (@Options) {
+    if (defined($_->{DEFAULT}) && !defined(${$_->{VAR}})) {
+      ${$_->{VAR}} = $_->{DEFAULT};
+    }
+  }
+}
+
+sub usage {
+  print "Usage: $0 [options] sample1 sample2 ...\n";
+  print "(expects to be able to read sampleX.vcf and sampleX.bam\n";
+  foreach (@Options) {
+    printf "  --%-13s %s%s.\n",$_->{OPT},$_->{DESC},
+           defined($_->{DEFAULT}) ? " (default '$_->{DEFAULT}')" : "";
+  }
+  exit(1);
+}
+ 
+#----------------------------------------------------------------------

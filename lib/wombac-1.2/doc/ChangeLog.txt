@@ -1,0 +1,17 @@
+
+Version 1.2
+-----------
+* Added --distant option to help get SNPs (more sensitive alignment)
+* Added --noref to exclude reference from tree (prev. was default excluded)
+* Put version in --help output
+
+Version 1.1
+-----------
+* Added support for *.contig.tar.gz files from Bacteria_DRAFT
+* Bugfix: too many SNPs filtered out - fixed homozygous PL caller
+* Bugfix: nway was totally wrong, need to use depth at each pos too
+* Bugfix: Replaced faulty wombac-vcf_nway with wombac-nway
+
+Version 1.0
+-----------
+* Initial release

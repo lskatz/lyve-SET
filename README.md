@@ -14,6 +14,7 @@ Requirements
 * Smalt
 * CG-Pipeline
 * Samtools
+* Wombac if you are simulating reads
 * Schedule::SGELK (installed at the same time if you download with git)
 
 Installation

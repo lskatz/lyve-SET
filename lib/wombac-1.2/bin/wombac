@@ -1,0 +1,354 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Time::Piece;
+use FindBin;
+use File::Path qw(make_path);
+use File::Spec;
+use List::Util qw(min max);
+use Data::Dumper;
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# global variables
+
+my $EXE = $FindBin::RealScript;
+my $HOMEDIR = $FindBin::Bin;
+my $VERSION = "1.2";
+my $SYNOPSIS = "Fast bacterial core genome SNP trees";
+my $AUTHOR = 'Torsten Seemann <torsten.seemann@monash.edu>';
+my $URL = 'http://www.vicbioinformatics.com';
+my $OPSYS = $^O;
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# command line options
+
+my(@Options, $quiet, $outdir, $force, $jobs, $threads, $ref, $run, $distant, $noref);
+setOptions();
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# greet the user
+
+msg("This is $EXE $VERSION");
+msg("Written by $AUTHOR");
+msg("Obtained from $URL");
+msg("Detected operating system: $OPSYS");
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+# give access to bundled tools (at end of PATH)
+
+msg("Enabling bundled tools in: $HOMEDIR/binaries/{$OPSYS,noarch}");
+$ENV{PATH} .= ":$HOMEDIR/binaries/$OPSYS:$HOMEDIR/binaries/noarch";
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# check for exes
+
+for my $exe (qw(bwa samtools bcftools vcfutils.pl wombac-vcf_homozygous wombac-shred_fasta wombac-nway make grep zcat find)) {
+  system("which $exe > /dev/null")==0 or err("Can not find '$exe' in PATH");
+  msg("Found $exe - ok.");
+}
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# type check parameters
+
+my @samples = map { File::Spec->rel2abs($_) } @ARGV;
+@samples = grep { -d $_ or -f _ } @samples;
+my $nsamp = scalar(@samples);
+msg("You provided $nsamp samples.");
+$nsamp > 1 or err("You need to provide 2 or more valid readsets (folder) or contigs (file).");
+
+my $cores = num_cores();
+msg("Your computer has $cores cores.");
+if ($threads < 1 and $jobs < 1) {
+  $threads = max( 1, int($cores/$nsamp) );
+  $jobs = min( $nsamp, int($cores/$threads) );
+}
+$threads > 0 or err("Invalid --threads $threads");
+$jobs > 0 or err("Invalid --jobs $jobs");
+$threads*$jobs <= $cores or err("Using too many concurrent cores with $jobs jobs x $threads threads");
+msg("Found $nsamp samples. Will run concurrent $jobs jobs with $threads threads each.");
+
+$ref or err("Please supply a reference FASTA file with --reference");
+-r $ref or err("Invalid --reference filename");
+$ref = File::Spec->rel2abs($ref);
+msg("Using reference genome: $ref");
+
+unless ($noref) {
+  unshift @samples, $ref;
+  msg("Added the --ref file to list of samples. Use --noref to prevent this.");
+}
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# prepare output folder
+
+$outdir or err("Please specify where to write results to using --outdir folder");
+if (-d $outdir) {
+  $force ? msg("Re-using existing output folder: $outdir")
+         : err("Output folder '$outdir' already exists. Remove it, or use --force");
+}
+else {
+  msg("Creatint output folder: $outdir");
+  make_path($outdir);
+}
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# set options for --distant parameter
+
+my $bwa_mem_opts = '';
+my $shred_opts = '';
+
+if ($distant) {
+  $bwa_mem_opts = '-k 11 -w 200 -B 2 -U 5 -L 2';
+  $shred_opts = '--readlen 50';
+}
+
+msg("Using BWA MEM options: $bwa_mem_opts");
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# generate a makefile
+
+my %seen;
+
+open my $MF, '>', "$outdir/Makefile";
+select $MF;
+
+print
+"THREADS=$threads\n",
+".PHONY: all\n",
+"\n",
+"all: ref.fa.bwt ref.fa.fai snps.aln ids.txt\n",
+"ref.fa: $ref\n",
+"\tcp -v '$ref' ref.fa\n",
+"ref.fa.fai: ref.fa\n",
+"\tsamtools faidx ref.fa\n",
+"ref.fa.bwt: ref.fa\n",
+"\tbwa index ref.fa\n",
+"";
+
+my @id;
+for my $sample (@samples) 
+{
+  msg("Examining sample: $sample");
+  my $id = file_to_id($sample);
+  $seen{$id}++ and err("ID '$id' already in use.");
+  msg("Assigned ID: $id");
+  if ($id =~ m/^ref\.fa|^all$|^snps.aln$/) {
+    err("Sorry, you can't have samples with ref.fa/snps.aln/all in their name");
+  }
+
+  my @reads;
+  my @dep;
+  
+  if (-d $sample) {
+    # sample which is a FOLDER
+    @reads = find_read_files($sample);
+    @reads > 0 or err("Could not find any reads in folder '$sample'");
+    @dep = @reads;
+  }
+  else {
+    # sample which is a FILE
+    # if .tgz then assume NCBI tarball of contigs, else assume a fasta file
+    if ( $sample =~ m/(\.tgz|\.tar.gz)$/ ) {
+      @reads = ( "'<(tar -O -zxf $sample | wombac-shred_fasta $shred_opts --fastq)'" );
+    }
+    else {
+      @reads = ( "'<(zcat -f $sample | wombac-shred_fasta $shred_opts --fastq)'" );
+    }
+    @dep = ($sample);
+  }
+  
+  msg("$id reads: @reads");
+  push @id, $id;
+
+  print
+  "\n",
+  "$id.bam: ref.fa.bwt @dep\n",
+  "\tbwa mem $bwa_mem_opts -t \$(THREADS) ref.fa @reads",
+    " | samtools view -@ \$(THREADS) -S -b -u -T ref.fa -",
+    " | samtools sort -@ \$(THREADS) -m 1G - $id\n",
+
+  "$id.bam.bai: $id.bam\n",
+  "\tsamtools index $id.bam $id.bam.bai\n",
+
+  "$id.vcf: ref.fa $id.bam.bai $id.bam.flagstat\n",
+  "\tsamtools mpileup -E -q 10 -f ref.fa -g -u -I $id.bam",    # -I = no indels
+    " | bcftools view -c -v -",
+    " | vcfutils.pl varFilter -Q 30",
+    " | wombac-vcf_homozygous",
+    " > $id.vcf\n",
+
+  "$id.bam.flagstat: $id.bam\n",
+  "\tsamtools flagstat $id.bam > $id.bam.flagstat\n",
+  "";
+}
+
+print "ids.txt: snps.aln\n";
+print "\trm -f ids.txt\n";
+print "\techo '$_' >> ids.txt\n" for @id;
+
+my @vcfs = map { "$_.vcf" } @id;
+my @bams = map { "$_.bam" } @id;
+
+print "snps.aln: @vcfs @bams\n";
+print "\twombac-nway @id > snps.aln\n";
+print "\t\@echo 'Results are in $outdir/snps.aln - try: SplitsTree -i $outdir/snps.aln'\n";
+
+select STDOUT;
+
+msg("Folder $outdir/ is now ready for analysis.");
+if ($run) {
+  system("nice make -j $jobs -C $outdir 2> $outdir/logfile.txt");
+  msg("Check $outdir/logfile.txt for errors.");
+  msg("Done.");
+}
+else {
+  msg("To run automagically, add the --run option to your command line.");
+  msg("To run interactively: nice make -j $jobs -C $outdir");
+  msg("To run and then log out: nohup nice make -j $jobs -C $outdir 1> $outdir/log.out 2> $outdir/log.err &");
+}
+
+#----------------------------------------------------------------------
+
+sub file_to_id {
+  my($path) = @_;
+  my(undef,$dirs,$fname) = File::Spec->splitpath($path);
+  if ($fname) {
+    $fname =~ s/\..*?$//; # remove extension
+    return $fname;
+  }
+  my @dir = File::Spec->splitdir($dirs);
+  return $dir[-1];
+}
+
+#----------------------------------------------------------------------
+
+sub find_read_files {
+  my($dir) = @_;
+  # we try looking for data files in this order with these patterns:
+  my @spec = qw(*.fastq.gz *.fastq *.fq.gz *.fq s_*.txt s_*.txt.gz);
+  my @file;
+  for my $spec (@spec) {
+    msg("Checking for $spec");
+    @file = sort( glob "$dir/$spec" );
+    last if @file==2 or @file==1; # only SE or PE patterns
+  }
+  return @file;
+}
+
+#----------------------------------------------------------------------
+
+sub num_cores {
+  if ($^O =~ m/linux/i) {
+    my($line) = qx(grep -c ^processor /proc/cpuinfo);
+    return $1 if $line =~ m/^(\d+)/;
+  }
+  elsif ($^O =~ m/darwin/i){
+    my($line) = qx(system_profiler SPHardwareDataType | grep Cores);
+    return $1 if $line =~ /Cores: (\d+)/;
+  }
+  return 1; # assume single CPU if all else fails
+}
+
+#----------------------------------------------------------------------
+
+sub msg {
+  return if $quiet;
+  my $t = localtime;
+  my $line = "[".$t->hms."] @_\n";
+  print STDERR $line;
+}
+
+#----------------------------------------------------------------------
+
+sub err {
+  $quiet=0;
+  msg(@_);
+  exit(2);
+}
+
+#----------------------------------------------------------------------
+
+sub version {
+  print STDERR "$EXE $VERSION\n";
+  exit;
+}
+
+#----------------------------------------------------------------------
+
+sub show_citation {
+  print STDERR << "EOCITE";
+  
+If you use $EXE in your work, please cite:
+
+    Seemann T (2013)
+    $EXE: $SYNOPSIS
+    http://vicbioinformatics.com/
+    
+Thank you.
+
+EOCITE
+
+  exit;
+}
+
+#----------------------------------------------------------------------
+# Option setting routines
+
+sub setOptions {
+  use Getopt::Long;
+
+  @Options = (
+    'Options:',
+    {OPT=>"help",      VAR=>\&usage,               DESC=>"This help"},
+    {OPT=>"version",   VAR=>\&version,             DESC=>"Print version and exit"},
+    {OPT=>"citation",  VAR=>\&show_citation,       DESC=>"Print citation for referencing $EXE"},
+    {OPT=>"quiet!",    VAR=>\$quiet, DEFAULT=>0,   DESC=>"No screen output"},
+    {OPT=>"ref=s",     VAR=>\$ref, DEFAULT=>'',    DESC=>"Reference FASTA file"},
+    {OPT=>"noref!",    VAR=>\$noref, DEFAULT=>0,   DESC=>"Exclude reference from tree"},
+    {OPT=>"outdir=s",  VAR=>\$outdir, DEFAULT=>'', DESC=>"Output folder"},
+    {OPT=>"force!",    VAR=>\$force, DEFAULT=>0,   DESC=>"Re-use existing output folder (can re-use calculations)"},
+    {OPT=>"threads=i", VAR=>\$threads, DEFAULT=>0, DESC=>"Number of threads per job for bwa/samtools [auto]"},
+    {OPT=>"jobs=i",    VAR=>\$jobs, DEFAULT=>0,    DESC=>"Number of parallel jobs to run [auto]"},
+    {OPT=>"run!",      VAR=>\$run, DEFAULT=>0,     DESC=>"Run the analysis after setting up"},
+    {OPT=>"distant!",  VAR=>\$distant, DEFAULT=>0, DESC=>"Use settings best for samples distant from reference (slower)"},
+  );
+
+  (!@ARGV) && (usage());
+
+  &GetOptions(map {$_->{OPT}, $_->{VAR}} grep { ref } @Options) || usage();
+
+  # Now setup default values.
+  foreach (@Options) {
+    if (ref $_ && defined($_->{DEFAULT}) && !defined(${$_->{VAR}})) {
+      ${$_->{VAR}} = $_->{DEFAULT};
+    }
+  }
+}
+
+#----------------------------------------------------------------------
+
+sub usage {
+  print STDERR "Synopsis:\n  $EXE $VERSION - $SYNOPSIS\n";
+  print STDERR "Author:\n  $AUTHOR\n";
+  print STDERR "Usage:\n  $EXE [options] --ref <ref.fa>  <sample1> <sample2> <sample3> ...\n";
+  print STDERR "    <sample> = folder  ->  expect FASTQ files in it (will auto-detect them)\n";
+  print STDERR "    <sample> = .tar.gz ->  expect tar of FASTA contigs (like NCBI/EBI distribute)\n";
+  print STDERR "    <sample> = a file  ->  treat as FASTA file of contigs (already assembled)\n";
+  foreach (@Options) {
+    if (ref) {
+      my $def = defined($_->{DEFAULT}) ? " (default '$_->{DEFAULT}')" : "";
+      $def = ($def ? ' (default OFF)' : '(default ON)') if $_->{OPT} =~ m/!$/;
+      my $opt = $_->{OPT};
+      $opt =~ s/!$//; 
+      $opt =~ s/=s$/ [X]/; 
+      $opt =~ s/=i$/ [N]/;
+      $opt =~ s/=f$/ [n.n]/;
+      printf STDERR "  --%-15s %s%s\n", $opt, $_->{DESC}, $def;
+    }
+    else {
+      print STDERR "$_\n";
+    }      
+  }
+  exit(1);
+}
+
+#----------------------------------------------------------------------

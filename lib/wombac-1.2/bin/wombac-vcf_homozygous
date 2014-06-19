@@ -1,0 +1,10 @@
+#!/usr/bin/env perl
+use strict;
+
+while (<>) 
+{
+  # allow comment lines or SNPs which are likely homozygous
+
+  print if m/^#/ or m/\tPL\t\d+,\d+,0$/;
+}
+
