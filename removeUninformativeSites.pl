@@ -7,6 +7,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 use Getopt::Long;
+use Bio::SeqIO;
 
 sub logmsg{$|++;print STDERR "@_\n"; $|--;}
 exit main();
@@ -19,18 +20,13 @@ sub main{
 
   ## read in the fasta file into @seq and %seq, and keep the deflines
   my($length,$defline,@defline,@seq,%seq);
-  while(<>){
-    chomp; 
-    if(/^>/){
-      s/>//; 
-      $defline=$_;
-      push(@defline,$defline);
-      next;
-    } 
-    $seq{$defline}=$_; 
-    push(@seq,$_); 
-    $length=length($_);
-  } 
+  my $in=Bio::SeqIO->new(-fh=>\*STDIN,-format=>"fasta");
+  while(my $seqObj=$in->next_seq){
+    push(@seq,$seqObj->seq);
+    push(@defline,$seqObj->id);
+    $length=$seqObj->length;
+  }
+  $in->close;
 
   ## read informative positions into @pos
   # compare each sequence to the reference sequence (the first sequence)
