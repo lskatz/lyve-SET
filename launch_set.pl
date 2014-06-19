@@ -23,7 +23,7 @@ exit(main());
 
 sub main{
   my $settings={trees=>1,clean=>1, msa=>1, mapper=>"smalt"};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean! msa! mapper=s snpcaller=s));
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean! msa! mapper=s snpcaller=s));
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
@@ -36,7 +36,7 @@ sub main{
   $$settings{snpcaller}||="freebayes";
 
   logmsg "Checking to make sure all directories are in place";
-  for my $param (qw(vcfdir bamdir msadir readsdir tmpdir)){
+  for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir)){
     my $b=$param;
     $b=~s/dir$//;
     $$settings{$param}||=$b;

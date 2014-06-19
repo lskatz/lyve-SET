@@ -28,7 +28,7 @@ sub createProjectDir{
   die "ERROR: project $dir already exists!" if(-d $dir);
   mkdir $dir;
   die $! if $?;
-  for(qw(vcf vcf/unfiltered msa bam reads reference tmp)){
+  for(qw(vcf vcf/unfiltered msa bam reads reference tmp asm)){
     mkdir "$dir/$_";
     die $! if $?;
   }
