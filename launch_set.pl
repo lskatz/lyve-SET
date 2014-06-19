@@ -202,7 +202,7 @@ sub msaToPhylogeny{
 
 sub usage{
   $0=fileparse $0;
-  "Usage: $0 -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/]
+  "Usage: $0 -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/ -asm asm/]
     Where parameters with a / are directories
     -r where fastq and fastq.gz files are located
     -b where to put bams
@@ -211,7 +211,8 @@ sub usage{
     -numcpus number of cpus
     -numnodes maximum number of nodes
     -w working directory where qsub commands can be stored. Default: CWD
-    -a allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+    -all allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+    -asm directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
     --nomsa to not make a multiple sequence alignment
     --notrees to not make phylogenies
     -q '-q long.q' extra options to pass to qsub. This is not sanitized.
