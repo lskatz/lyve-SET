@@ -19,6 +19,17 @@ phyml=`(which phyml || which PhyML || which PhyML-3.1_linux64 || which phyml_lin
 if [ $? -gt 0 ]; then echo "Could not find phyml"; exit 1; fi;
 echo "$script: Found phyml at $phyml"
 
+# get the extension
+b=`basename $aln`;
+suffix="${b##*.}";
+if [ "$suffix" != "phy" ]; then
+  echo "Converting to phylip format because I did not see a phy extension";
+  convertAlignment.pl -f phylip -i $aln -o $aln.phy;
+  if [ $? -gt 0 ]; then exit 1; fi;
+  aln="$aln.phy";
+fi;
+
+
 $phyml -i $aln -b -4 -m GTR -s BEST --quiet
 if [ $? -gt 0 ]; then echo "$script: ERROR in phyml" exit 1; fi;
 echo "$script: Finished without error!";
