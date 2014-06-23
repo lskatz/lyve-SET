@@ -13,10 +13,12 @@ sub logmsg{$|++;print STDERR "@_\n"; $|--;}
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help verbose ambiguities-allowed gaps-allowed));
+  GetOptions($settings,qw(help verbose ambiguities-allowed gaps-allowed sort=s)) or die $!;
   die usage() if($$settings{help});
   $$settings{"ambiguities-allowed"} ||=0;
   $$settings{"gaps-allowed"} ||=0;
+  $$settings{sort}||="";
+  $$settings{sort}=lc($$settings{sort});
 
   ## read in the fasta file into @seq and %seq, and keep the deflines
   my $in;
@@ -25,7 +27,7 @@ sub main{
   } else {
     $in=Bio::SeqIO->new(-fh=>\*STDIN,-format=>"fasta");
   }
-  my($length,$defline,@defline,@seq,%seq);
+  my($length,$defline,@defline,@seq);
   while(my $seqObj=$in->next_seq){
     push(@seq,$seqObj->seq);
     push(@defline,$seqObj->id);
@@ -50,7 +52,6 @@ sub main{
     # see if the rest of this column shows that it is informative
     my $informative=0; # guilty until proven innocent
     for(my $i=0;$i<$numOtherSeq;$i++){
-      #my $sequence=$seq[$i];
       my $nt=substr($seq[$i],$j,1); 
       die "ERROR: Sequence $i does not have a nucleotide at position $j! Is the MSA flush?" if(!$nt);
       $informative=1 if($nt ne $refNt);  # It's informative, but you have to continue reviewing
@@ -69,6 +70,29 @@ sub main{
   # Bring back the reference sequence.
   unshift(@seq,$refSeq);
   unshift(@defline,$refId);
+  my %seq;
+  @seq{@defline}=@seq;
+  # sort the sequences by identifier
+  my @sortedId;
+  if($$settings{sort} eq 'alpha'){
+    @sortedId=sort {$a cmp $b} @defline;
+  } elsif($$settings{sort} eq 'num'){
+    @sortedId=sort {$a <=> $b} @defline;
+  } else {
+    @sortedId=@defline;
+  }
+  for (my $i=0;$i<@sortedId;$i++){
+    my $id=$sortedId[$i];
+    my $sequence=$seq{$id};
+    print ">$id\n";
+    for my $pos(@pos){
+      print substr($sequence,$pos,1);
+    }
+    print "\n";
+  }
+  return 0;
+
+
   for (my $i=0;$i<@seq;$i++){
     my $sequence=$seq[$i];
     my $id=$defline[$i];
@@ -90,6 +114,7 @@ sub usage{
   Using the following two options will allow you to keep a master MSA list at-hand if you are converting all VCFs in a project
   --gaps-allowed Allow gaps in the alignment
   --ambiguities-allowed Allow ambiguous bases in the alignment
+  --sort alpha,num Sort the sequences by their deflines.  Values for sort are either ALPHA or NUM (case insensitive)
   "
 }
 
