@@ -19,8 +19,13 @@ sub main{
   $$settings{"gaps-allowed"} ||=0;
 
   ## read in the fasta file into @seq and %seq, and keep the deflines
+  my $in;
+  if(defined($ARGV[0]) && -f $ARGV[0]){
+    $in=Bio::SeqIO->new(-file=>$ARGV[0]);
+  } else {
+    $in=Bio::SeqIO->new(-fh=>\*STDIN,-format=>"fasta");
+  }
   my($length,$defline,@defline,@seq,%seq);
-  my $in=Bio::SeqIO->new(-fh=>\*STDIN,-format=>"fasta");
   while(my $seqObj=$in->next_seq){
     push(@seq,$seqObj->seq);
     push(@defline,$seqObj->id);
