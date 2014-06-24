@@ -1,5 +1,5 @@
-#!/bin/sh
-#$ -S /bin/sh
+#!/bin/bash
+#$ -S /bin/bash
 #$ -pe smp 8
 #$ -cwd
 #$ -V
@@ -12,6 +12,9 @@ if [ "$prefix" = "" ]; then
   echo Usage: `basename $0` aln.phy outprefix
   exit 1;
 fi
+
+# set the number of CPUs according to the number of slots, or 8 if undefined
+numcpus=${NSLOTS:-8}
 
 # get the extension
 b=`basename $aln`;
