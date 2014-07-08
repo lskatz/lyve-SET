@@ -148,20 +148,14 @@ sub is_fastqPE($;$){
   my($fastq,$settings)=@_;
 
   # if checkFirst is undef or 0, this will cause it to check at least the first 20 entries.
+  # 20 reads is probably enough to make sure that it's shuffled (1/2^10 chance I'm wrong)
   $$settings{checkFirst}||=20;
   $$settings{checkFirst}=20 if($$settings{checkFirst}<2);
 
-  # it is paired end if it validates with any naming system
-  my $is_pairedEnd=_is_fastqPESra($fastq,$settings) || _is_fastqPECasava18($fastq,$settings) || _is_fastqPECasava17($fastq,$settings);
-
-  return $is_pairedEnd;
-}
-
-sub _is_fastqPESra{
-  my($fastq,$settings)=@_;
-  my $numEntriesToCheck=$$settings{checkFirst}||20;
-
+  # get the deflines
+  my @defline;
   my $numEntries=0;
+  my $i=0;
   my $fp;
   if($fastq=~/\.gz$/){
     open($fp,"gunzip -c '$fastq' |") or die "Could not open $fastq for reading: $!";
@@ -169,99 +163,86 @@ sub _is_fastqPESra{
     open($fp,"<",$fastq) or die "Could not open $fastq for reading: $!";
   }
   my $discard;
-  while(<$fp>){
-    chomp;
-    s/^@//;
-    my($genome,$info1,$info2)=split(/\s+/);
+  while(my $defline=<$fp>){
+    next if($i++ % 4 != 0);
+    chomp($defline);
+    $defline=~s/^@//;
+    push(@defline,$defline);
+    $numEntries++;
+    last if($numEntries > $$settings{checkFirst});
+  }
+  close $fp;
+
+  # it is paired end if it validates with any naming system
+  my $is_pairedEnd=_is_fastqPESra(\@defline,$settings) || _is_fastqPECasava18(\@defline,$settings) || _is_fastqPECasava17(\@defline,$settings);
+
+  return $is_pairedEnd;
+}
+
+sub _is_fastqPESra{
+  my($defline,$settings)=@_;
+  my @defline=@$defline; # don't overwrite $defline by mistake
+  
+  for(my $i=0;$i<@defline-1;$i++){
+    my($genome,$info1,$info2)=split(/\s+/,$defline[$i]);
     if(!$info2){
-      close $fp;
       return 0;
     }
     my($instrument,$flowcellid,$lane,$x,$y,$X,$Y)=split(/:/,$info1);
-    $discard=<$fp> for(1..3); # discard the sequence and quality of the read for these purposes
-    my $secondId=<$fp>;
-    my($genome2,$info3,$info4)=split(/\s+/,$secondId);
+    my($genome2,$info3,$info4)=split(/\s+/,$defline[$i+1]);
     my($instrument2,$flowcellid2,$lane2,$x2,$y2,$X2,$Y2)=split(/:/,$info3);
     $_||="" for($X,$Y,$X2,$Y2); # these variables might not be present
     if($instrument ne $instrument2 || $flowcellid ne $flowcellid2 || $lane ne $lane2 || $x ne $x2 || $y ne $y2 || $X ne $X2 || $Y ne $Y2){
-      close $fp;
       return 0;
     }
-    $discard=<$fp> for(1..3);
-    $numEntries+=2;
-    last if($numEntries > $numEntriesToCheck);
   }
   return 1;
 }
 
 sub _is_fastqPECasava18{
-  my($fastq,$settings)=@_;
-  my $numEntriesToCheck=$$settings{checkFirst}||20;
+  my($defline,$settings)=@_;
+  my @defline=@$defline;
 
-  my $numEntries=0;
-  my $fp;
-  if($fastq=~/\.gz$/){
-    open($fp,"gunzip -c '$fastq' |") or die "Could not open $fastq for reading: $!";
-  }else{
-    open($fp,"<",$fastq) or die "Could not open $fastq for reading: $!";
-  }
-  while(<$fp>){
-    chomp;
-    s/^@//;
-    my($instrument,$runid,$flowcellid,$lane,$tile,$x,$yandmember,$is_failedRead,$controlBits,$indexSequence)=split(/:/,$_);
-    my $discard;
-    $discard=<$fp> for(1..3); # discard the sequence and quality of the read for these purposes
+  for(my $i=0;$i<@defline-1;$i++){
+    my($instrument,$runid,$flowcellid,$lane,$tile,$x,$yandmember,$is_failedRead,$controlBits,$indexSequence)=split(/:/,$defline[$i]);
     my($y,$member)=split(/\s+/,$yandmember);
 
-    # if all information is the same, except the member (1 to 2), then it is still paired until this point.
-    my $secondId=<$fp>;
-    chomp $secondId;
-    $secondId=~s/^@//;
-    my($inst2,$runid2,$fcid2,$lane2,$tile2,$x2,$yandmember2,$is_failedRead2,$controlBits2,$indexSequence2)=split(/:/,$secondId);
-    $discard=<$fp> for(1..3); # discard the sequence and quality of the read for these purposes
+    my($inst2,$runid2,$fcid2,$lane2,$tile2,$x2,$yandmember2,$is_failedRead2,$controlBits2,$indexSequence2)=split(/:/,$defline[$i+1]);
     my($y2,$member2)=split(/\s+/,$yandmember2);
 
-    if($instrument ne $inst2 || $runid ne $runid2 || $flowcellid ne $fcid2 || $tile ne $tile2 || $member!=1 || $member2!=2){
-      #logmsg "Failed!\n$instrument,$runid,$flowcellid,$lane,$tile,$x,$yandmember,$is_failedRead,$controlBits,$indexSequence\n$inst2,$runid2,$fcid2,$lane2,$tile2,$x2,$yandmember2,$is_failedRead2,$controlBits2,$indexSequence2\n";
-      close $fp;
+    # Instrument, etc must be the same.
+    # The member should be different, usually "1" and "2"
+    if($instrument ne $inst2 || $runid ne $runid2 || $flowcellid ne $fcid2 || $tile ne $tile2 || $member==$member2){
       return 0;
     }
-
-    $numEntries+=2;
-    last if($numEntries>$numEntriesToCheck);
   }
-
-  close $fp;
-
   return 1;
 }
 
+# This format is basically whether the ends of the defline alternate 1 and 2.
 sub _is_fastqPECasava17{
-  my($fastq,$settings)=@_;
-  # 20 reads is probably enough to make sure that it's shuffled (1/2^20 chance I'm wrong)
-  my $numEntriesToCheck=$$settings{checkFirst}||20;
-  my $numEntries=0;
-  my $fp;
-  if($fastq=~/\.gz$/){
-    open($fp,"gunzip -c '$fastq' |") or die "Could not open $fastq for reading: $!";
-  }else{
-    open($fp,"<",$fastq) or die "Could not open $fastq for reading: $!";
-  }
-  while(my $read1Id=<$fp>){
-    my $discard;
-    $discard=<$fp> for(1..3);
-    my $read2Id=<$fp>;
-    $discard=<$fp> for(1..3);
-
-    if($read1Id!~/\/1$/ || $read2Id!~/\/2$/){
-      close $fp;
+  my($defline,$settings)=@_;
+  my @defline=@$defline;
+  for(my $i=0;$i<@defline-1;$i++){
+    # Get each member number but return false if it doesn't even exist.
+    my ($member1,$member2);
+    if($defline[$i] =~ m/(\d+)$/){
+      $member1=$1;
+    } else {
+      return 0;
+    }
+    if($defline[$i+1] =~ /(\d+)$/){
+      $member2=$1;
+    } else {
       return 0;
     }
 
-    $numEntries+=2;
-    last if($numEntries>=$numEntriesToCheck);
+    # The test is whether member1 is less than member2.
+    # They can't be equal either.
+    if($member1 >= $member2){
+      return 0;
+    }
   }
-  close $fp;
 
   return 1;
 }
