@@ -143,7 +143,6 @@ sub mapReads{
 # params: fastq file and settings
 # fastq file can be gzip'd
 # settings:  checkFirst is an integer to check the first X deflines
-# TODO just extract IDs and send them to the other _sub()
 sub is_fastqPE($;$){
   my($fastq,$settings)=@_;
 
@@ -212,7 +211,7 @@ sub _is_fastqPECasava18{
 
     # Instrument, etc must be the same.
     # The member should be different, usually "1" and "2"
-    if($instrument ne $inst2 || $runid ne $runid2 || $flowcellid ne $fcid2 || $tile ne $tile2 || $member==$member2){
+    if($instrument ne $inst2 || $runid ne $runid2 || $flowcellid ne $fcid2 || $tile ne $tile2 || $member>=$member2){
       return 0;
     }
   }
