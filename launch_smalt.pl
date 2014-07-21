@@ -85,7 +85,7 @@ sub mapReads{
     die "Problem with deshuffling reads! I am assuming paired end reads." if $?;
 
     # mapping
-    system("smalt map -r -1 -f samsoft -n $$settings{numcpus} $ref '$prefix.1.fastq' '$prefix.2.fastq' | samtools view -bS -T $ref - > $tmpOut");
+    system("smalt map -r -1 -f samsoft -n $$settings{numcpus} $ref '$prefix.1.fastq' '$prefix.2.fastq' | samtools view -F 4 -bS -T $ref - > $tmpOut");
     die if $?;
     system("rm -v '$prefix.1.fastq' '$prefix.2.fastq'"); die if $?;
   } else {
