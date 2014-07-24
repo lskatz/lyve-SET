@@ -23,7 +23,7 @@ exit(main());
 
 sub main{
   my $settings={trees=>1,clean=>1, msa=>1, mapper=>"smalt"};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=i keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean! msa! mapper=s snpcaller=s));
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean! msa! mapper=s snpcaller=s));
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
@@ -187,6 +187,14 @@ sub variantsToMSA{
     return 1;
   }
 
+  # Find the distance that we'd expect SNP-linkage, so that they can be filtered out
+  if($$settings{allowedFlanking} eq 'auto'){
+    my $allowedFlanking=`snpDistribution.pl $vcfdir/unfiltered/*.vcf`;
+    die if $?;
+    chomp($allowedFlanking);
+    $$settings{allowedFlanking}=$allowedFlanking;
+  }
+
   # find all "bad" sites
   my $bad="$vcfdir/allsites.txt";
   system("sort $vcfdir/*.badsites.txt | uniq > $bad"); die if $?;
@@ -241,6 +249,7 @@ sub usage{
     -numnodes maximum number of nodes
     -w working directory where qsub commands can be stored. Default: CWD
     -all allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+      Set -all to 'auto' to let SET determine this distance using snpDistribution.pl
     -asm directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
     --nomsa to not make a multiple sequence alignment
     --notrees to not make phylogenies
