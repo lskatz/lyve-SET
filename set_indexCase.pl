@@ -10,7 +10,7 @@ use FindBin;
 use lib "$FindBin::RealBin/lib";
 use File::Basename qw/basename/;
 
-sub logmsg {local $0=basename $0;my $FH = *STDOUT; print $FH "$0: ".(caller(1))[3].": @_\n";}
+sub logmsg {local $0=basename $0;my $FH = *STDERR; print $FH "$0: ".(caller(1))[3].": @_\n";}
 exit main();
 
 sub main{
@@ -30,11 +30,15 @@ sub eigen{
   my $ranker = Graph::Centrality::Pagerank->new(-useEdgeWeights=>1);
 
   # read the pairwise file to get "edges"
+  my $mostCenteredNode="";
+  my $highestEigen=0;
   my @listOfEdges=gatherEdges($pairwise,$settings);
   my $dump=$ranker->getPagerankOfNodes(listOfEdges=>\@listOfEdges,useEdgeWeights=>1);
   while(my($node,$eigen)=each(%$dump)){
     print join("\t",$node,$eigen)."\n";
+    $mostCenteredNode=$node if($eigen > $highestEigen);
   }
+  logmsg "Highest Eigenvector value is $highestEigen, belonging to $mostCenteredNode";
 
   return 1;
 }
