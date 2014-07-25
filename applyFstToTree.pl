@@ -34,7 +34,7 @@ sub main{
   }
   # check for file existence
   for(qw(tree pairwise)){
-    die "ERROR: file $_ does not exist!" if(!-e $$settings{$_});
+    die "ERROR: file $$settings{$_} does not exist!" if(!-e $$settings{$_});
   }
 
   my ($fstAvg,$fstStdev);
