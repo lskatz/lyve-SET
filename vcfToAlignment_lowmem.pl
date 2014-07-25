@@ -135,12 +135,12 @@ sub getVcfPositions{
   my (@pos);
   while(my($contig,$posIndex)=each(%pos)){
     for my $pos(keys(%$posIndex)){
-      push(@pos,$contig.'_'.$pos);
+      push(@pos,$contig.':'.$pos);
     }
   }
   my @sortedPos=sort {
-    my ($contigA,$posA)=split(/_/,$a);
-    my ($contigB,$posB)=split(/_/,$b);
+    my ($contigA,$posA)=split(/:/,$a);
+    my ($contigB,$posB)=split(/:/,$b);
     return $contigA cmp $contigB if($contigA ne $contigB);
     return $posA <=> $posB;
   } @pos;
@@ -151,10 +151,10 @@ sub getVcfPositions{
   # if there is a min distance specified, remove those SNPs that are too close
   my @newSortedPos;
   my $numPos=@sortedPos;
-  my ($currentDistance,$currentContig,$currentPos)=(0,split(/_/,$sortedPos[0]));
+  my ($currentDistance,$currentContig,$currentPos)=(0,split(/:/,$sortedPos[0]));
   for(my $i=1;$i<$numPos;$i++){
-    my($contig,$pos)=split(/_/,$sortedPos[$i]);
-    my($prevContig,$prevPos)=split(/_/,$sortedPos[$i-1]);
+    my($contig,$pos)=split(/:/,$sortedPos[$i]);
+    my($prevContig,$prevPos)=split(/:/,$sortedPos[$i-1]);
     if($contig ne $currentContig){
       $currentContig=$contig;
       next;
@@ -201,7 +201,7 @@ sub fastaEntry{
   $fasta.= ">$vcf\n";
   $table.="$vcf\t" if($$settings{table});
   for my $posKey(@$posArr){
-    my ($contig,$pos)=split(/_/,$posKey);
+    my ($contig,$pos)=split(/:/,$posKey);
     my $nt=$$v{$contig}{$pos} || 'N';
 
     # If the base caller didn't say anything about this base, see if there is 
@@ -234,7 +234,7 @@ sub covDepth{
   while(<IN>){
     my($rseq,$pos,$depth)=split(/\t/);
     chomp($depth);
-    $depth{$rseq."_".$pos}=$depth;
+    $depth{$rseq.":".$pos}=$depth;
   }
   close IN;
   return \%depth;
