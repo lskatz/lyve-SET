@@ -83,7 +83,7 @@ sub distanceStuff{
   my($infile,$settings)=@_;
 
   my($pairwise,$fst,$eigen);
-  my $sge=Schedule::SGELK->new(keep=>1);
+  my $sge=Schedule::SGELK->new(keep=>1,numcpus=>$$settings{numcpus});
 
   $pairwise=pairwiseDistance($infile,$$settings{pairwisePrefix},$sge,$settings) if($$settings{pairwisePrefix});
 
@@ -111,32 +111,7 @@ sub pairwiseDistance{
 # TODO put this in a separate script
 sub eigen{
   my($pairwise,$prefix,$sge,$settings)=@_;
-  eval{
-    require Graph::Centrality::Pagerank;
-  };
-  if($@){
-    logmsg "Warning: Graph::Centrality::Pagerank was not found on this system. I will not be calculating any eigenvectors.\n  $@";
-    return 0;
-  }
-  
-  my $ranker = Graph::Centrality::Pagerank->new();
-
-  # read the pairwise file to get "edges"
-  my @listOfEdges;
-  open(PW,$pairwise) or die "ERROR: cannot open pairwise distances file $pairwise $!";
-  while(my $line=<PW>){
-    chomp $line;
-    my($from,$to,$weight)=split(/\t/,$line);
-    # transform the weight
-    $weight=1/$weight;
-    push(@listOfEdges,[$from,$to,$weight]);
-    push(@listOfEdges,[$to,$from,$weight]);
-  }
-  close PW;
-  my $dump=$ranker->getPagerankOfNodes(listOfEdges=>\@listOfEdges);
-  while(my($node,$eigen)=each(%$dump)){
-    print join("\t",$node,$eigen)."\n";
-  }
+  $sge->pleaseExecute("set_indexCase.pl $pairwise | sort -k2,2n > $prefix.tsv",{jobname=>"eigen",numcpus=>$$settings{numcpus}});
 }
 
 
@@ -148,7 +123,7 @@ sub eigen{
 sub phylogenies{
   my($inAln,$settings)=@_;
 
-  my $sge=Schedule::SGELK->new(keep=>1);
+  my $sge=Schedule::SGELK->new(keep=>1,numcpus=>$$settings{numcpus});
   my $informativeAln=$inAln; # if an informative MSA is not specified, then this one will do.
   $informativeAln=removeUninformativeSites($inAln,$$settings{alnPrefix},$sge,$settings) if($$settings{alnPrefix});
   my $tree=inferPhylogeny($informativeAln,$$settings{treePrefix},$sge,$settings) if($$settings{treePrefix});
@@ -204,7 +179,7 @@ sub Fst{
     logmsg "$fstTree fst tree was found.  Not recalculating.";
     return $fstTree;
   }
-  my $sge=Schedule::SGELK->new(keep=>1);
+  my $sge=Schedule::SGELK->new(keep=>1,numcpus=>$$settings{numcpus});
   my @command=(
         "applyFstToTree.pl --numcpus $$settings{numcpus} -t $treePrefix.RAxML_bipartitions -p $pairwisePrefix.tsv --outprefix $fstPrefix --outputType averages > $fstPrefix.avg.tsv",
         "applyFstToTree.pl --numcpus $$settings{numcpus} -t $treePrefix.RAxML_bipartitions -p $pairwisePrefix.tsv --outprefix $fstPrefix --outputType samples > $fstPrefix.samples.tsv",
@@ -232,7 +207,7 @@ OUTPUT
   -aln informative.aln  Informative alignment, created by removeUninformativeSites.pl
   -p   pairwisePrefix   Pairwise distances
   -fst fstPrefix        Fixation index output files
-  -e   eigenPrefix      Eigenvalue output files
+  -e   eigenPrefix      Eigenvalue output files (connectedness)
 
   --auto                Indicate that you are currently in a SET directory and that you would like all outputs, overwriting any other output parameters
   --msaDir              Indicate a directory to perform everything in. --auto will be set if --msaDir is invoked
