@@ -52,7 +52,7 @@ sub main{
 
   # print which positions for each nt in the alignment to a file
   open(POS,">","$$settings{outfile}.pos.txt") or die "Cannot open file for writing: $$settings{outfile}.pos.txt:$!";
-  print POS join("\t",@$pos)."\n";
+  print POS join("\n",@$pos)."\n";
   close POS;
   print "List of variant positions is in $$settings{outfile}.pos.txt\n";
 
@@ -84,7 +84,7 @@ sub vcfToFasta{
       next if(/^\s*$/ || /^#/);
       chomp;
       my @F=split /\t/;
-      my $posKey=join("_",@F[0..1]);
+      my $posKey=join(":",@F[0..1]);
       die if(!$posKey);
       next if($badPos{$posKey});
       my $alt=$F[4];
@@ -95,8 +95,8 @@ sub vcfToFasta{
   
   ## sort the positions on two fields
   my @pos=sort({
-    my ($cB,$posB)=split(/_/,$b);
-    my ($cA,$posA)=split(/_/,$a);
+    my ($cB,$posB)=split(/:/,$b);
+    my ($cA,$posA)=split(/:/,$a);
     $cA cmp $cB || 
     $posA <=>$posB;
   } keys(%pos));
@@ -110,7 +110,7 @@ sub vcfToFasta{
     my %genomeDepth=%{$$depth{$genome}};
     for my $posKey(@pos){
       next if($pos{$posKey}{$genome} || $badPos{$posKey});
-      my($rseq,$pos)=split(/_/,$posKey);
+      my($rseq,$pos)=split(/:/,$posKey);
       if($genomeDepth{$posKey} && $genomeDepth{$posKey} >= $$settings{coverage}){
         $pos{$posKey}{$genome}=$$refBase{$rseq}[$pos];
       } else {
@@ -135,7 +135,7 @@ sub vcfToFasta{
       next if($badPos{$posKey});
 
       # do not accept positions that are too close together
-      my($contig,$position)=split /_/,$posKey;
+      my($contig,$position)=split /:/,$posKey;
       next if($prevPos && ($contig eq $prevContig) && ($position-$allowedFlanking < $prevPos));
 
       # some error checking
@@ -143,7 +143,7 @@ sub vcfToFasta{
       die "ERROR: the genome '$genome' is not found under position $posKey" if(!defined $pos{$posKey}{$genome});
 
       $fasta.=$pos{$posKey}{$genome};
-      push(@legitPos,$posKey);
+      push(@legitPos,"$contig:$position");
       $prevContig=$contig;
       $prevPos=$position;
     }
@@ -187,7 +187,7 @@ sub covDepth{
   while(<IN>){
     my($rseq,$pos,$depth)=split(/\t/);
     chomp($depth);
-    $depth{$rseq."_".$pos}=$depth;
+    $depth{$rseq.":".$pos}=$depth;
   }
   close IN;
   return \%depth;
@@ -210,7 +210,7 @@ sub usage{
   "Creates an alignment of SNPs, given a set of VCFs
   usage: $0 *.bam *.vcf -o alignment.fasta -r reference.fasta -b bad.txt
     NOTE: indels and multiple nucleotide polymorphisms will cause an error in this scripts. Use filterVcf.pl to help alleviate this problem.
-    -b bad.txt: all positions that should not be used, in format of contig_pos
+    -b bad.txt: all positions that should not be used, in format of contig_pos or contig:pos
     -a allowed flanking in bp (default: 0)
       nucleotides downstream of another snp this many bp away will not be accepted
     -n numcpus (default: 1)
