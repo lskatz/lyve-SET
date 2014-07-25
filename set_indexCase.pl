@@ -27,14 +27,6 @@ sub main{
 # TODO put this in a separate script
 sub eigen{
   my($pairwise,$settings)=@_;
-  eval{
-    require Graph::Centrality::Pagerank;
-  };
-  if($@){
-    logmsg "Warning: Graph::Centrality::Pagerank was not found on this system. I will not be calculating any eigenvectors.\n  $@";
-    return 0;
-  }
-
   my $ranker = Graph::Centrality::Pagerank->new(-useEdgeWeights=>1);
 
   # read the pairwise file to get "edges"
