@@ -49,7 +49,7 @@ sub filterVcf{
     my @F=split /\t/;
     my $numFields=@F;
     my ($rseq,$pos)=@F[0..1];
-    my $posId=join("_",$rseq,$pos);
+    my $posId=join(":",$rseq,$pos);
 
     # find out if it's an indel
     if(!$$settings{indels} && (length($F[3]) !=  length($F[4])) ){
@@ -76,7 +76,7 @@ sub filterVcf{
     my @ref=split(//,$F[3]);
     my $numBases=max(scalar(@alt),scalar(@ref));
     for(my $i=0;$i<$numBases;$i++){
-      $posId=join("_",$rseq,($pos+$i));
+      $posId=join(":",$rseq,($pos+$i));
       # find out if it passes other attributes like depth
       if($info{DP}<$$settings{depth}){
         push(@badSites,$posId);
