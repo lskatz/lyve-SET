@@ -16,92 +16,205 @@ use threads;
 use Thread::Queue;
 use Schedule::SGELK;
 
-my $sge=Schedule::SGELK;
 sub logmsg {local $0=basename $0;my $FH = *STDOUT; print $FH "$0: ".(caller(1))[3].": @_\n";}
 exit main();
 
 sub main{
   local $0=basename $0;
   my $settings={};
-  GetOptions($settings,qw(auto groups=s@ treePrefix=s alnPrefix=s pairwisePrefix=s fstFile=s eigenPrefix=s numcpus=i)) or die $!;
-  my $infile=$ARGV[0];
-  die "ERROR: need input alignment file\n".usage() if(!$infile || !-f $infile);
+  GetOptions($settings,qw(auto groups=s@ treePrefix=s alnPrefix=s pairwisePrefix=s fstPrefix=s eigenPrefix=s numcpus=i msaDir=s tempdir=s force help)) or die $!;
   $$settings{treePrefix}||="";
   $$settings{alnPrefix}||="";
   $$settings{pairwisePrefix}||="";
-  $$settings{fstFile}||="";
+  $$settings{fstPrefix}||="";
   $$settings{eigenPrefix}||="";
   $$settings{numcpus}||=1;
+  $$settings{auto}||=0;
+  $$settings{msaDir}||=0;
+  $$settings{force}||=0;
+  $$settings{tempdir}||="tmp";
+  mkdir $$settings{tempdir} if(!-d $$settings{tempdir});
+  die usage() if($$settings{help});
 
-  if($$settings{auto}){
-    $$settings{treePrefix}||="msa/RAxML.bipartitions.informative";
-    $$settings{alnPrefix}||="msa/informative";
-    $$settings{pairwisePrefix}||="msa/pairwise";
-    $$settings{fstFile}||="msa/fst.tsv";
-    $$settings{eigenPrefix}||="msa/eigen";
+  if($$settings{auto} || $$settings{msaDir}){
+    if($$settings{auto}){
+      $$settings{msaDir}="msa" if(-e "msa/out.aln.fas");
+      $$settings{msaDir}="." if(-e "./out.aln.fas");
+      die "ERROR: --auto was set but I could not find out.aln.fas in either this directory or in ./msa/\n".usage() if(!$$settings{msaDir});
+    }
+    my $dir="$$settings{msaDir}"; # save me on typing
+    $$settings{treePrefix}||="$dir/RAxML";
+    $$settings{alnPrefix}||="$dir/informative";
+    $$settings{pairwisePrefix}||="$dir/pairwise";
+    $$settings{fstPrefix}||="$dir/fst";
+    $$settings{eigenPrefix}||="$dir/eigen";
+
+    $$settings{auto}=1;  # explicitly set auto
   }
 
-  # Kick off pairwise distances, Fst, eigen stuff
+  my $infile;
+  if(@ARGV){
+    $infile=$ARGV[0];
+  } elsif($$settings{auto}){
+    $infile="$$settings{msaDir}/out.aln.fas";
+  } else {
+    die "ERROR: need input alignment file\n".usage();
+  }
+  if(!-f $infile){
+    die "ERROR: could not find file $infile\n".usage();
+  }
+  logmsg "Input alignment file is ".File::Spec->rel2abs($infile);
+
+  logmsg "Calculating distances";
   distanceStuff($infile,$settings);
-  # Kick off tree stuff
+  logmsg "Calculating phylogenies";
   phylogenies($infile,$settings);
   # Things that depend on a tree and pairwise output
-  $sge->wrapItUp(); # finish all prereqs
-  Fst($$settings{fstFile},$settings) if($$settings{fstFile});
+  Fst($infile,$$settings{pairwisePrefix},$$settings{treePrefix},$$settings{fstPrefix},$settings) if($$settings{fstPrefix} && $$settings{treePrefix} && $$settings{pairwisePrefix});
 
   return 0;
 }
+
+####
+## distance metrics stuff
+####
 
 sub distanceStuff{
   my($infile,$settings)=@_;
 
   my($pairwise,$fst,$eigen);
+  my $sge=Schedule::SGELK->new(keep=>1);
 
-  $pairwise=pairwiseDistance($infile,$$settings{pairwisePrefix},$settings) if($$settings{pairwisePrefix});
+  $pairwise=pairwiseDistance($infile,$$settings{pairwisePrefix},$sge,$settings) if($$settings{pairwisePrefix});
 
   # Eigen depends on pairwise, so wait for it to finish.
   $sge->wrapItUp();
-  eigen($pairwise,$$settinsg{eigenPrefix},$settings) if($$settings{eigenPrefix} && $pairwise);
+  eigen($pairwise,$$settings{eigenPrefix},$sge,$settings) if($$settings{eigenPrefix} && $pairwise);
+
+  $sge->wrapItUp();  # final wrap-up before leaving this sub
 }
 
 sub pairwiseDistance{
-  my($infile,$prefix,$settings)=@_;
+  my($infile,$prefix,$sge,$settings)=@_;
   my $outfile="$prefix.tsv";
-  $sge->pleaseExecute("pairwiseDistances.pl --numcpus $$settings{numcpus} '$infile' > '$outfile'",{numcpus=>$$settings{numcpus},jobname=>"pairwiseDistance");
-  die if $?;
+  if(-f $outfile){
+    logmsg "$outfile was found. I will not perform pairwise distances again";
+    return $outfile;
+  }
+  logmsg "Calculating pairwise distances";
+  $sge->pleaseExecute("pairwiseDistances.pl --numcpus $$settings{numcpus} '$infile' | sort -k3,3n > '$outfile'",{numcpus=>$$settings{numcpus},jobname=>"pairwiseDistance"});
   
   return $outfile;
   # TODO inter and intra group distances
 }
 
+# TODO put this in a separate script
 sub eigen{
-  my($infile,$prefix,$settings)=@_;
-  logmsg "TODO make eigenvector script";
+  my($pairwise,$prefix,$sge,$settings)=@_;
+  eval{
+    require Graph::Centrality::Pagerank;
+  };
+  if($@){
+    logmsg "Warning: Graph::Centrality::Pagerank was not found on this system. I will not be calculating any eigenvectors.\n  $@";
+    return 0;
+  }
+  
+  my $ranker = Graph::Centrality::Pagerank->new();
+
+  # read the pairwise file to get "edges"
+  my @listOfEdges;
+  open(PW,$pairwise) or die "ERROR: cannot open pairwise distances file $pairwise $!";
+  while(my $line=<PW>){
+    chomp $line;
+    my($from,$to,$weight)=split(/\t/,$line);
+    # transform the weight
+    $weight=1/$weight;
+    push(@listOfEdges,[$from,$to,$weight]);
+    push(@listOfEdges,[$to,$from,$weight]);
+  }
+  close PW;
+  my $dump=$ranker->getPagerankOfNodes(listOfEdges=>\@listOfEdges);
+  while(my($node,$eigen)=each(%$dump)){
+    print join("\t",$node,$eigen)."\n";
+  }
 }
+
+
+######
+## phylogeny subroutines
+#####
 
 
 sub phylogenies{
   my($inAln,$settings)=@_;
 
+  my $sge=Schedule::SGELK->new(keep=>1);
   my $informativeAln=$inAln; # if an informative MSA is not specified, then this one will do.
-  $informativeAln=removeUninformativeSites($inAln,$$settings{alnPrefix},$settings) if($$settings{alnPrefix});
-  $tree=inferPhylogeny($informativeAln,$$settings{treePrefix},$settings) if($$settings{treePrefix});
+  $informativeAln=removeUninformativeSites($inAln,$$settings{alnPrefix},$sge,$settings) if($$settings{alnPrefix});
+  my $tree=inferPhylogeny($informativeAln,$$settings{treePrefix},$sge,$settings) if($$settings{treePrefix});
+
+  $sge->wrapItUp();  # final wrap-up before leaving this sub
 }
 
 sub removeUninformativeSites{
-  my($inAln,$outPrefix,$settings)=@_;
+  my($inAln,$outPrefix,$sge,$settings)=@_;
+  my $informative="$outPrefix.aln.fas";
+  if(-f $informative){
+    logmsg "$informative was found.  I will not recalculate.";
+    return $informative;
+  }
+  logmsg "Removing uninformative sites from the alignment and putting it into $informative";
+  logmsg "  removeUninformativeSites.pl < '$inAln' > '$informative'";
   $sge->pleaseExecute("removeUninformativeSites.pl < '$inAln' > '$informative'",{jobname=>"removeUninformativeSites",numcpus=>1});
-  die if $?;
   return $informative;
 }
 
-sub phylogenies{
-  my($inAln,$prefix,$settings)=@_;
-  
+sub inferPhylogeny{
+  my($inAln,$prefix,$sge,$settings)=@_;
+  my $treeFile="$prefix.RAxML_bipartitions";
+  if(-f "$prefix.RAxML_bipartitions"){
+    logmsg "$prefix.RAxML_bipartitions was found. I will not recalculate the phylogeny.";
+    return $treeFile;
+  }
+  system("rm -fv $$settings{tempdir}/RAxML*");
+  logmsg "Running raxml";
+  logmsg "  cd $$settings{tempdir}; launch_raxml.sh $inAln suffix";
+  #$inAln=File::Spec->rel2abs($inAln);
+  my $rand=int(rand(99999));
+  $sge->pleaseExecute("cd $$settings{tempdir}; launch_raxml.sh ../$inAln suffix",{jobname=>"raxml$rand",numcpus=>$$settings{numcpus}});
+
+  # Move those files over when finished
+  $sge->wrapItUp();
+  for (qw(RAxML_bestTree RAxML_bipartitionsBranchLabels RAxML_bipartitions RAxML_bootstrap RAxML_info)){
+    logmsg "I will move $$settings{tempdir}/$_.suffix to $prefix.$_";
+    $sge->pleaseExecute("mv -v $$settings{tempdir}/$_.suffix $prefix.$_",{jobname=>"mv$_"});
+    #$sge->pleaseExecute("mv -v $$settings{tempdir}/$_.suffix $prefix.$_",{-hold_jid=>"raxml$rand",jobname=>"mv$_"});
+  }
+  return $treeFile
 }
 
+#### 
+# things that depend on pairwise and trees
+####
+
 sub Fst{
-  my($inAln,$inTree,$$settings{fstFile},$settings)=@_;
+  my($inAln,$pairwisePrefix,$treePrefix,$fstPrefix,$settings)=@_;
+  my $fstTree="$fstPrefix.fst.dnd";
+  if(-f $fstTree){
+    logmsg "$fstTree fst tree was found.  Not recalculating.";
+    return $fstTree;
+  }
+  my $sge=Schedule::SGELK->new(keep=>1);
+  my @command=(
+        "applyFstToTree.pl --numcpus $$settings{numcpus} -t $treePrefix.RAxML_bipartitions -p $pairwisePrefix.tsv --outprefix $fstPrefix --outputType averages > $fstPrefix.avg.tsv",
+        "applyFstToTree.pl --numcpus $$settings{numcpus} -t $treePrefix.RAxML_bipartitions -p $pairwisePrefix.tsv --outprefix $fstPrefix --outputType samples > $fstPrefix.samples.tsv",
+  );
+  for (@command){
+    logmsg "COMMAND  $_";
+    $sge->pleaseExecute($_,{numcpus=>$$settings{numcpus}});
+  }
+  $sge->wrapItUp();
+  return $fstTree;
 }
 
 sub usage{
@@ -111,12 +224,17 @@ sub usage{
   -g   groups.txt       Text files of genome names, one per line (multiple -g are encouraged).
                         Groups will help with Fst and with pairwise distances.
   -n   numcpus
-  Output options:
-  -t   treePrefix
+  --force               Files will be overwritten even if they exist
+  --tempdir tmp/        Place to put temporary files
+
+OUTPUT
+  -tre treePrefix
   -aln informative.aln  Informative alignment, created by removeUninformativeSites.pl
   -p   pairwisePrefix   Pairwise distances
-  -f   fstPrefix        Fixation index output files
+  -fst fstPrefix        Fixation index output files
   -e   eigenPrefix      Eigenvalue output files
+
   --auto                Indicate that you are currently in a SET directory and that you would like all outputs, overwriting any other output parameters
+  --msaDir              Indicate a directory to perform everything in. --auto will be set if --msaDir is invoked
   "
 }
