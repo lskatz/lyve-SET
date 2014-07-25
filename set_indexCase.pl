@@ -41,6 +41,12 @@ sub eigen{
 sub gatherEdges{
   my($pairwise,$settings)=@_;
   my @listOfEdges;
+
+  my $pairwiseFiles=join(" ",@$pairwise);
+  my $max=`cut -f 3 $pairwiseFiles|sort -nr|head -n 1`;
+  chomp($max);
+  logmsg "Max pairwise value is $max";
+
   my %seen;
   for my $p(@$pairwise){
     open(PW,$p) or die "ERROR: cannot open pairwise distances file $p $!";
@@ -48,7 +54,7 @@ sub gatherEdges{
       chomp $line;
       my($from,$to,$weight)=split(/\t/,$line);
       # transform the weight
-      $weight=1/$weight;
+      $weight=1+$max-$weight; # add in a pseudocount because zero-distance is only darn near indistinguishable
       push(@listOfEdges,[$from,$to,$weight]);
       push(@listOfEdges,[$to,$from,$weight]);
 
