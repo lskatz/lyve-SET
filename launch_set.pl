@@ -63,8 +63,9 @@ sub main{
   if($$settings{msa}){
     logmsg "Creating a core hqSNP MSA";
     variantsToMSA($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
-    logmsg "MSA => phylogeny";
-    msaToPhylogeny($$settings{msadir},$settings) if($$settings{trees});
+    logmsg "Launching set_processMsa.pl";
+    $sge->pleaseExecute_andWait("set_processMsa.pl --auto --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus}",{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
+    #msaToPhylogeny($$settings{msadir},$settings) if($$settings{trees});
   }
 
   logmsg "Done!";
@@ -208,8 +209,8 @@ sub variantsToMSA{
   $sge->wrapItUp();
 
   # convert fasta to phylip and remove uninformative sites
-  $sge->set("jobname","msaToPhylip");
-  $sge->pleaseExecute_andWait("convertAlignment.pl -i $msadir/out.aln.fas -o $msadir/out.aln.fas.phy -f phylip -r");
+  #$sge->set("jobname","msaToPhylip");
+  #$sge->pleaseExecute_andWait("convertAlignment.pl -i $msadir/out.aln.fas -o $msadir/out.aln.fas.phy -f phylip -r");
   return 1;
 }
 
