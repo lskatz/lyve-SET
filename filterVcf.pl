@@ -5,7 +5,9 @@ use warnings;
 use Data::Dumper;
 use Getopt::Long;
 use List::Util qw/max/;
+use File::Basename qw/basename/;
 
+$0=basename $0;
 exit(main());
 
 sub main{
