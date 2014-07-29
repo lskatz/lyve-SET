@@ -151,9 +151,17 @@ sub inferPhylogeny{
     logmsg "$prefix.RAxML_bipartitions was found. I will not recalculate the phylogeny.";
     return $treeFile;
   }
+  
+  my $numTaxa=`grep -c '>' '$inAln'`; die if $?;
+  chomp($numTaxa);
+  if($numTaxa < 4){
+    logmsg "Only $numTaxa in the alignment. I will not determine the phylogeny";
+    return "";
+  }
+
   system("rm -fv $$settings{tempdir}/RAxML*");
   logmsg "Running raxml";
-  logmsg "  cd $$settings{tempdir}; launch_raxml.sh $inAln suffix";
+  logmsg "  cd $$settings{tempdir}; launch_raxml.sh ../$inAln suffix";
   #$inAln=File::Spec->rel2abs($inAln);
   my $rand=int(rand(99999));
   $sge->pleaseExecute("cd $$settings{tempdir}; launch_raxml.sh ../$inAln suffix",{jobname=>"raxml$rand",numcpus=>$$settings{numcpus}});
@@ -178,6 +186,10 @@ sub Fst{
   if(-f $fstTree){
     logmsg "$fstTree fst tree was found.  Not recalculating.";
     return $fstTree;
+  }
+  if(!-f "$treePrefix.RAxML_bipartitions"){
+    logmsg "Tree was not created. Will not perform Fst on an empty tree";
+    return "";
   }
   my $sge=Schedule::SGELK->new(keep=>1,numcpus=>$$settings{numcpus});
   my @command=(
