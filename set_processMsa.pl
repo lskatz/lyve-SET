@@ -126,6 +126,7 @@ sub phylogenies{
   my $sge=Schedule::SGELK->new(keep=>1,numcpus=>$$settings{numcpus});
   my $informativeAln=$inAln; # if an informative MSA is not specified, then this one will do.
   $informativeAln=removeUninformativeSites($inAln,$$settings{alnPrefix},$sge,$settings) if($$settings{alnPrefix});
+  $sge->wrapItUp();  # need the inf. aln. for the phylogeny step
   my $tree=inferPhylogeny($informativeAln,$$settings{treePrefix},$sge,$settings) if($$settings{treePrefix});
 
   $sge->wrapItUp();  # final wrap-up before leaving this sub
