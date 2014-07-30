@@ -111,7 +111,7 @@ sub pairwiseDistance{
 # TODO put this in a separate script
 sub eigen{
   my($pairwise,$prefix,$sge,$settings)=@_;
-  $sge->pleaseExecute("set_indexCase.pl $pairwise | sort -k2,2n > $prefix.tsv",{jobname=>"eigen",numcpus=>$$settings{numcpus}});
+  $sge->pleaseExecute("set_indexCase.pl $pairwise | sort -k2,2nr > $prefix.tsv",{jobname=>"eigen",numcpus=>$$settings{numcpus}});
 }
 
 
