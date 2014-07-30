@@ -15,7 +15,8 @@ exit main();
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw());
+  GetOptions($settings,qw(showNormalizedEdges help)) or die $!;
+  die usage() if($$settings{help});
 
   my @pairwise=@ARGV;
 
@@ -32,6 +33,14 @@ sub eigen{
   my $mostCenteredNode="";
   my $highestEigen=0;
   my @listOfEdges=gatherEdges($pairwise,$settings);
+
+  if($$settings{showNormalizedEdges}){
+    for(my $i=0;$i<@listOfEdges;$i++){
+      print join("\t",@{$listOfEdges[$i]})."\n";
+    }
+    return 1;
+  }
+
   my $dump=$ranker->getPagerankOfNodes(listOfEdges=>\@listOfEdges,useEdgeWeights=>1);
   while(my($node,$eigen)=each(%$dump)){
     print join("\t",$node,$eigen)."\n";
@@ -74,14 +83,16 @@ sub gatherEdges{
     }
   }
   close PW;
+
   return @listOfEdges;
 }
 
 sub usage{
   local $0=basename $0;
   "Infers the index case of a cluster using Eigenvectors
-  $0 pairwise.tsv [pairwise2.tsv ... ] > connectedness.tsv
+  Usage: $0 pairwise.tsv [pairwise2.tsv ... ] > connectedness.tsv
     You can combine multiple pairwise files but a warning will be expressed if duplicate pairs are found.
+    --showNormalizedEdges To show the edges that are used for calculation
   EXAMPLE
   $0 1.tsv 2.tsv | sort -k2,2nr | head -n 1 | cut -f 1 # the most connected node
   "
