@@ -63,8 +63,10 @@ sub main{
   if($$settings{msa}){
     logmsg "Creating a core hqSNP MSA";
     variantsToMSA($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
-    logmsg "Launching set_processMsa.pl";
-    $sge->pleaseExecute_andWait("set_processMsa.pl --auto --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus}",{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
+    if($$settings{trees}){
+      logmsg "Launching set_processMsa.pl";
+      $sge->pleaseExecute_andWait("set_processMsa.pl --auto --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus}",{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
+    }
     #msaToPhylogeny($$settings{msadir},$settings) if($$settings{trees});
   }
 
@@ -205,7 +207,7 @@ sub variantsToMSA{
   $sge->set("numcpus",$$settings{numcpus});
   $sge->pleaseExecute("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o $msadir/out.aln.fas -r $ref -b $bad -a $$settings{allowedFlanking}");
   # convert VCFs to an MSA using a low-memory script
-  $sge->pleaseExecute("vcfToAlignment_lowmem.pl $vcfdir/unfiltered/*.vcf $bamdir/*.sorted.bam -n $$settings{numcpus} -ref $ref -p $msadir/out_lowmem.aln.fas.pos.txt -t $msadir/out_lowmem.aln.fas.pos.tsv > $msadir/out_lowmem.aln.fas",{numcpus=>$$settings{numcpus},jobname=>"variantsToMSA_lowmem"});
+  $sge->pleaseExecute("vcfToAlignment_lowmem.pl $vcfdir/unfiltered/*.vcf $bamdir/*.sorted.bam -n $$settings{numcpus} -ref $ref -p $msadir/out_lowmem.aln.fas.pos.txt -t $msadir/out_lowmem.aln.fas.pos.tsv > $msadir/out_lowmem.aln.fas",{numcpus=>$$settings{numcpus},jobname=>"variantsToMSA_lowmem"}) if(-d "$vcfdir/unfiltered");
   $sge->wrapItUp();
 
   # convert fasta to phylip and remove uninformative sites
