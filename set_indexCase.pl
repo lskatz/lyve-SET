@@ -36,9 +36,12 @@ sub eigen{
   my $dump=$ranker->getPagerankOfNodes(listOfEdges=>\@listOfEdges,useEdgeWeights=>1);
   while(my($node,$eigen)=each(%$dump)){
     print join("\t",$node,$eigen)."\n";
-    $mostCenteredNode=$node if($eigen > $highestEigen);
+    if($eigen > $highestEigen){
+      $mostCenteredNode=$node;
+      $highestEigen=$eigen;
+    }
   }
-  logmsg "Highest Eigenvector value is $highestEigen, belonging to $mostCenteredNode";
+  logmsg "Highest Eigenvector value is ".sprintf("%0.4f",$highestEigen).", belonging to $mostCenteredNode";
 
   return 1;
 }
