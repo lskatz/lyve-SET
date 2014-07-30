@@ -59,8 +59,8 @@ sub gatherEdges{
 
   my $pairwiseFiles=join(" ",@$pairwise);
   my $max=`cut -f 3 $pairwiseFiles|sort -nr|head -n 1`;
-  chomp($max);
-  logmsg "Max pairwise value is $max";
+  $max++; # add in a pseudocount because zero-distance is only darn near indistinguishable
+  logmsg "Max pairwise value is $max (with pseudocount)";
 
   my %seen;
   for my $p(@$pairwise){
@@ -70,8 +70,9 @@ sub gatherEdges{
       my($from,$to,$weight)=split(/\t/,$line);
       # transform the weight
       $weight++; # add in a pseudocount because zero-distance is only darn near indistinguishable
-      $weight=$max-$weight; # Transform
-      $weight=$weight/$max; # normalize
+      $weight=$max-$weight;                 # Transform
+      $weight=$weight/$max;                 # normalize
+      $weight=1/$max if($weight < 1/$max);  # keep positive numbers (sanity check)
       push(@listOfEdges,[$to,$from,$weight]);
 
       # check for duplicates across files
