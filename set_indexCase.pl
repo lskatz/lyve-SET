@@ -24,10 +24,9 @@ sub main{
   eigen(\@pairwise,$settings);
 }
 
-# TODO put this in a separate script
 sub eigen{
   my($pairwise,$settings)=@_;
-  my $ranker = Graph::Centrality::Pagerank->new(-useEdgeWeights=>1);
+  my $ranker = Graph::Centrality::Pagerank->new(-useEdgeWeights=>1,directed=>0);
 
   # read the pairwise file to get "edges"
   my $mostCenteredNode="";
@@ -61,8 +60,9 @@ sub gatherEdges{
       chomp $line;
       my($from,$to,$weight)=split(/\t/,$line);
       # transform the weight
-      $weight=1+$max-$weight; # add in a pseudocount because zero-distance is only darn near indistinguishable
-      push(@listOfEdges,[$from,$to,$weight]);
+      $weight++; # add in a pseudocount because zero-distance is only darn near indistinguishable
+      $weight=$max-$weight; # Transform
+      $weight=$weight/$max; # normalize
       push(@listOfEdges,[$to,$from,$weight]);
 
       # check for duplicates across files
