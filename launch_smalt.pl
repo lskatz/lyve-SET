@@ -15,12 +15,18 @@ exit(main());
 
 sub main{
   my $settings={clean=>1};
-  GetOptions($settings,qw(help reference=s fastq=s bam=s tempdir=s clean! numcpus=i));
-  for(qw(reference fastq bam)){
-    die "ERROR: need option $_\n".usage() if(!$$settings{$_});
-  }
+  GetOptions($settings,qw(help reference=s fastq=s bam=s tempdir=s clean! numcpus=i smaltxopts=s)) or die $!;
   $$settings{numcpus}||=1;
   $$settings{tempdir}||="tmp";
+
+  # smalt extra options
+  $$settings{smaltxopts}||="";
+  $$settings{smaltxopts}.=" -y 0.95 -r -1 -f samsoft -n $$settings{numcpus}";
+
+  for(qw(reference fastq bam)){
+    die "ERROR: need option $_\n".usage($settings) if(!$$settings{$_});
+  }
+  die usage($settings) if($$settings{help});
 
   mkdir $$settings{tempdir} if(!-d $$settings{tempdir});
 
@@ -85,13 +91,13 @@ sub mapReads{
     die "Problem with deshuffling reads! I am assuming paired end reads." if $?;
 
     # mapping
-    system("smalt map -r -1 -f samsoft -n $$settings{numcpus} $ref '$prefix.1.fastq' '$prefix.2.fastq' | samtools view -F 4 -bS -T $ref - > $tmpOut");
+    system("smalt map $$settings{smaltxopts} $ref '$prefix.1.fastq' '$prefix.2.fastq' | samtools view -F 4 -bS -T $ref - > $tmpOut");
     die if $?;
     system("rm -v '$prefix.1.fastq' '$prefix.2.fastq'"); die if $?;
   } else {
     system("gunzip -c '$query' > $prefix.SE.fastq");
     die if $?;
-    system("smalt map -r -1 -f samsoft -n $$settings{numcpus} $ref '$prefix.SE.fastq' | samtools view -bS -T $ref - > $tmpOut");
+    system("smalt map $$settings{smaltxopts} $ref '$prefix.SE.fastq' | samtools view -bS -T $ref - > $tmpOut");
     die if $?;
     system("rm -v '$prefix.SE.fastq'"); die if $?;
   }
@@ -154,11 +160,13 @@ sub is_fastqPE($;$){
 
 
 sub usage{
+  my($settings)=@_;
   "Maps a read set against a reference genome using smalt. Output file will be file.bam and file.bam.depth
   Usage: $0 -f file.fastq -b file.bam -t tmp/ -r reference.fasta
   --noclean if you don't want to clean the reads internally
   -t tmp to set the temporary directory as 'tmp'
   --numcpus 1 number of cpus to use
+  -s '' Extra smalt map options (not validated). Default: $$settings{smaltxopts} 
   "
 }
 
