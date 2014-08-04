@@ -30,7 +30,8 @@ sub main{
   while(my $file=shift(@ARGV)){
     my($dir,$name,$ext)=fileparse($file,qw(.unfiltered.vcf .vcf .vcf.gz .bam));
     if($ext=~/gz/){
-      die "ERROR: gz files are not supported yet";
+      #die "ERROR: gz files are not supported yet";
+      push(@VCF,$file);
     }
     if($ext=~/vcf/i){
       push(@VCF,$file);
@@ -173,7 +174,12 @@ sub readVcf{
   my($vcf,$settings)=@_;
   my $vcfHash={};
   $diskIoStick->down; # mark that one process is using the disk
-  open(VCF,"<",$vcf) or die "ERROR: could not open vcf file $vcf:$!";
+
+  if($vcf=~/\.gz$/){ # gzipped
+    open(VCF,"gunzip -c '$vcf' | ") or die "ERROR: could not open vcf file $vcf:$!";
+  } else {
+    open(VCF,"<",$vcf) or die "ERROR: could not open vcf file $vcf:$!";
+  }
   while(<VCF>){
     next if(/^#/);
     chomp;
