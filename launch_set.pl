@@ -23,7 +23,7 @@ exit(main());
 
 sub main{
   my $settings={trees=>1,clean=>1, msa=>1, mapper=>"smalt"};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean! msa! mapper=s snpcaller=s));
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean! msa! mapper=s snpcaller=s)) or die $!;
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
@@ -157,6 +157,12 @@ sub variantCalls{
   my($ref,$bamdir,$vcfdir,$settings)=@_;
   my @bam=glob("$bamdir/*.sorted.bam");
   my @jobid;
+
+  # see if bgzip and tabix exist
+  my $bgzip=`which bgzip 2>/dev/null`; chomp($bgzip);
+  my $tabix=`which tabix 2>/dev/null`; chomp($tabix);
+
+  # TODO make the variant callers output to bgzip and indexed files
   for my $bam(@bam){
     my $b=fileparse($bam,".sorted.bam");
     $sge->set("jobname","varcall$b");
@@ -171,12 +177,31 @@ sub variantCalls{
     } elsif($$settings{snpcaller} eq 'callsam'){
       my $jobname="callsam$b";
       # call snps
-      $j=$sge->pleaseExecute("$scriptsdir/lib/callsam/bin/callsam.pl $bam --numcpus $$settings{numcpus} --min-coverage $$settings{min_coverage} --min-frequency $$settings{min_alt_frac} --reference '$ref' > $vcfdir/unfiltered/$b.vcf",{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
+      $j=$sge->pleaseExecute("$scriptsdir/lib/callsam/bin/callsam_MT.pl $bam --numcpus $$settings{numcpus} --min-coverage $$settings{min_coverage} --min-frequency $$settings{min_alt_frac} --reference '$ref' > $vcfdir/unfiltered/$b.vcf",{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
       # filter the vcf but make it depend on the callsam script to finish
       $sge->pleaseExecute("$scriptsdir/filterVcf.pl $vcfdir/unfiltered/$b.vcf --noindels -d 10 -o $vcfdir/$b.vcf",{qsubxopts=>"-hold_jid $jobname",numcpus=>1,jobname=>"filter$b"});
     }
     push(@jobid,$j);
-  }
+
+    # bgzip and tabix indexing
+    # TODO enable this if statement or put it into the launch_* scripts
+    if(0 && $bgzip && $tabix){
+      eval{
+        # Unfiltered
+        $sge->pleaseExecute("set_vcf_sort.sh '$vcfdir/unfiltered/$b.vcf' > '$vcfdir/unfiltered/$b.vcf.sorted.tmp' && mv '$vcfdir/unfiltered/$b.vcf.sorted.tmp' '$vcfdir/unfiltered/$b.vcf'",{qsubxopts=>"-hold_jid filter$b",jobname=>"vcfsortUnfiltered$b",numcpus=>1});
+        $sge->pleaseExecute("$bgzip '$vcfdir/unfiltered/$b.vcf'",{qsubxopts=>"-hold_jid vcfsortUnfiltered$b",jobname=>"bgzipUnfiltered$b",numcpus=>1});
+        $sge->pleaseExecute("$tabix '$vcfdir/unfiltered/$b.vcf.gz'",{qsubxopts=>"-hold_jid 'bgzipUnfiltered$b'",jobname=>"tabixUnfiltered$b",numcpus=>1});
+
+        # Filtered
+        $sge->pleaseExecute("set_vcf_sort.sh '$vcfdir/$b.vcf' > '$vcfdir/$b.vcf.sorted.tmp' && mv '$vcfdir/$b.vcf.sorted.tmp' '$vcfdir/$b.vcf'",{qsubxopts=>"-hold_jid filter$b",jobname=>"vcfsort$b",numcpus=>1});
+        $sge->pleaseExecute("$bgzip '$vcfdir/$b.vcf'",{qsubxopts=>"-hold_jid vcfsort$b",jobname=>"bgzip$b",numcpus=>1});
+        $sge->pleaseExecute("$tabix '$vcfdir/$b.vcf.gz'",{qsubxopts=>"-hold_jid 'bgzip$b'",jobname=>"tabix$b",numcpus=>1});
+      };
+      if($@){
+        logmsg "Warning: Could not compress and index $vcfdir/$b.vcf: $@";
+      } # END if eval warning
+    } # END IF bgzip && tabix
+  } # END bam while loop
   logmsg "All variant-calling jobs have been submitted. Waiting on them to finish";
   $sge->wrapItUp();
   return 1;
@@ -247,6 +272,7 @@ sub usage{
     -r where fastq and fastq.gz files are located
     -b where to put bams
     -v where to put vcfs
+    --tmpdir tmp/ Where to put temporary files
     --msadir multiple sequence alignment and tree files (final output)
     -numcpus number of cpus
     -numnodes maximum number of nodes
