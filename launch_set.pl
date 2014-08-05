@@ -34,6 +34,7 @@ sub main{
   $$settings{qsubxopts}||="";
   $$settings{mapper}=lc($$settings{mapper});
   $$settings{snpcaller}||="freebayes";
+  $$settings{vcfToAlignment_xopts}||="-l h_vmem=110G";
 
   logmsg "Checking to make sure all directories are in place";
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir)){
@@ -230,7 +231,7 @@ sub variantsToMSA{
   # convert VCFs to an MSA (long step)
   $sge->set("jobname","variantsToMSA");
   $sge->set("numcpus",$$settings{numcpus});
-  $sge->pleaseExecute("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o $msadir/out.aln.fas -r $ref -b $bad -a $$settings{allowedFlanking}");
+  $sge->pleaseExecute("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o $msadir/out.aln.fas -r $ref -b $bad -a $$settings{allowedFlanking}",{qsubxopts=>$$settings{vcfToAlignment_xopts}});
   # convert VCFs to an MSA using a low-memory script
   $sge->pleaseExecute("vcfToAlignment_lowmem.pl $vcfdir/unfiltered/*.vcf $bamdir/*.sorted.bam -n $$settings{numcpus} -ref $ref -p $msadir/out_lowmem.aln.fas.pos.txt -t $msadir/out_lowmem.aln.fas.pos.tsv > $msadir/out_lowmem.aln.fas",{numcpus=>$$settings{numcpus},jobname=>"variantsToMSA_lowmem"}) if(-d "$vcfdir/unfiltered");
   $sge->wrapItUp();
