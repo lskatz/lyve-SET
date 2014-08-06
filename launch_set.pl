@@ -13,6 +13,7 @@ use File::Spec;
 use threads;
 use Thread::Queue;
 use Schedule::SGELK;
+use ExtUtils::Command;
 
 sub logmsg {local $0=basename $0;my $FH = *STDOUT; print $FH "$0: ".(caller(1))[3].": @_\n";}
 my ($name,$scriptsdir,$suffix)=fileparse($0);
@@ -22,8 +23,9 @@ my $sge=Schedule::SGELK->new(-verbose=>1,-numnodes=>5,-numcpus=>8);
 exit(main());
 
 sub main{
+  # start with the settings that are on by default, and which can be turned off by, e.g., --noclean
   my $settings={trees=>1,clean=>1, msa=>1, mapper=>"smalt"};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! qsubxopts=s clean! msa! mapper=s snpcaller=s)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s clean! msa! mapper=s snpcaller=s)) or die $!;
   $$settings{numcpus}||=8;
   $$settings{numnodes}||=6;
   $$settings{workingdir}||=$sge->get("workingdir");
@@ -32,9 +34,10 @@ sub main{
   $$settings{min_alt_frac}||=0.75;
   $$settings{min_coverage}||=10;
   $$settings{qsubxopts}||="";
+  $$settings{queue}||="";
   $$settings{mapper}=lc($$settings{mapper});
   $$settings{snpcaller}||="freebayes";
-  $$settings{vcfToAlignment_xopts}||="-l h_vmem=110G";
+  $$settings{vcfToAlignment_xopts}||="-l mem_free=100G -q highmem.q";
 
   logmsg "Checking to make sure all directories are in place";
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir)){
@@ -45,8 +48,8 @@ sub main{
     $$settings{$param}=File::Spec->rel2abs($$settings{$param});
   }
   # SGE params
-  for (qw(workingdir numnodes numcpus keep qsubxopts)){
-    $sge->set($_,$$settings{$_});
+  for (qw(workingdir numnodes numcpus keep qsubxopts queue)){
+    $sge->set($_,$$settings{$_}) if($$settings{$_});
   }
 
   die usage() if($$settings{help} || !defined($$settings{ref}) || !-f $$settings{ref});
@@ -226,7 +229,11 @@ sub variantsToMSA{
 
   # find all "bad" sites
   my $bad="$vcfdir/allsites.txt";
-  system("sort $vcfdir/*.badsites.txt | uniq > $bad"); die if $?;
+  if(glob("$vcfdir/*.badsites.txt")){
+    system("sort $vcfdir/*.badsites.txt | uniq > $bad"); die if $?;
+  }else{
+    system("touch $bad"); die if $?;
+  }
 
   # convert VCFs to an MSA (long step)
   $sge->set("jobname","variantsToMSA");
@@ -283,7 +290,8 @@ sub usage{
     -asm directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
     --nomsa to not make a multiple sequence alignment
     --notrees to not make phylogenies
-    -q '-q long.q' extra options to pass to qsub. This is not sanitized.
+    --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
+    --queue     all.q         The default queue to use.
     --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with)
     --mapper smalt Choose the mapper you want to use. Choices: smalt (default), snap
     --snpcaller freebayes Choose the snp caller you want to use. Choices: freebayes (default), callsam
