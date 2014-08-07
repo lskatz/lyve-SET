@@ -49,6 +49,40 @@ Lyve-SET is modular and so the individual scripts can be run too.  For example, 
 
 Examples
 ------
+    # Set up the directory with your reads and reference genome
+    $ set_create.pl setTest  # directory structure created
+    $ tree setTest           # View the new directory structure
+    setTest
+    ├── asm
+    ├── bam
+    ├── msa
+    ├── reads
+    ├── reference
+    ├── tmp
+    └── vcf
+        └── unfiltered
+
+    $ cd setTest/            
+    $ cp -v ../path/to/fastq.gz/dir/*.fastq.gz reads/  # copy over all your fastq files to the reads directory
+    $ cp -v ../path/to/fasta/dir/*.fasta asm/          # copy over all assembled genomes that you want to include in the tree in the asm directory
+    $ cp -v ../path/to/fasta/dir/reference.fasta reference/  # copy over your single reference genome (only one permitted)
+
+NOTE: no underscores or dashes allowed in the reference genome fasta file
+    
+Run Lyve-SET
+
+    $ launch_set.pl -ref reference/reference.fasta  # simple
+
+More complex
+
+    $ launch_set.pl -ref reference/reference.fasta  --queue all.q --numnodes 20 --numcpus 16 --noclean --notrees
+    
+If you specified notrees, then you can edit the multiple sequence alignment before analyzing it
+
+    $ cd msa
+    $ gedit out.aln.fas  # alter the deflines or whatever you want before moving on
+    # => out.aln.fas is here
+    $ set_process_msa.pl --auto
 
 Citing lyve-SET
 -----
