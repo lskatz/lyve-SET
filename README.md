@@ -14,7 +14,7 @@ Requirements
 * Smalt
 * CG-Pipeline
 * Samtools
-* Wombac if you are simulating reads
+* wgsim (part of samtools) if you are simulating reads
 * Schedule::SGELK (installed at the same time if you download with git)
 
 Installation
@@ -46,6 +46,9 @@ Usage
       -q '-q long.q' extra options to pass to qsub. This is not sanitized.
       --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with)
 Lyve-SET is modular and so the individual scripts can be run too.  For example, you can run launch\_smalt.pl or launch\_snap.pl to run mapping alone; however, indexing the reference fasta takes place in launch_set.pl.  To get usage help on any of these scripts, run the script with no options.
+
+Examples
+------
 
 Citing lyve-SET
 -----
