@@ -19,15 +19,15 @@ sub logmsg {local $0=basename $0;my $FH = *STDOUT; print $FH "$0: ".(caller(1))[
 my ($name,$scriptsdir,$suffix)=fileparse($0);
 $scriptsdir=File::Spec->rel2abs($scriptsdir);
 
-my $sge=Schedule::SGELK->new(-verbose=>1,-numnodes=>5,-numcpus=>8);
+my $sge=Schedule::SGELK->new(-verbose=>1,-numnodes=>20,-numcpus=>8);
 exit(main());
 
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --noclean
   my $settings={trees=>1,clean=>1, msa=>1, mapper=>"smalt"};
   GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s clean! msa! mapper=s snpcaller=s)) or die $!;
-  $$settings{numcpus}||=8;
-  $$settings{numnodes}||=6;
+  $$settings{numcpus}||=1;
+  $$settings{numnodes}||=20;
   $$settings{workingdir}||=$sge->get("workingdir");
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
@@ -84,25 +84,30 @@ sub simulateReads{
   my @asm=glob("$$settings{asmdir}/*.{fasta,fna,ffn,fa,mfa,mfasta}");
   return if(!@asm);
 
-  my $exec=`which wombac-shred_fasta`;
-  if($?){
-    $ENV{PATH}="$ENV{PATH}:$FindBin::RealBin/lib/wombac-1.2/bin";
-    $exec=`which wombac-shred_fasta`;
-    die "ERROR could not find wombac-shred_fasta in your path" if $?;
-  }
+  my $exec=`which wgsim`;
+  die "ERROR: Could not find wgsim which is part of samtools" if $?;
   chomp($exec);
 
-  logmsg "Using Wombac to shred reads. Please give credit to Wombac if using this stage of SET. Details at http://www.vicbioinformatics.com/";
   for my $asm (@asm){
     my $b=fileparse $asm;
-    my $outFastq="$$settings{readsdir}/$b.shredded.fastq";
+    my $outFastq="$$settings{readsdir}/$b.wgsim.fastq";
     my $outGz="$outFastq.gz";
-    next if(-e $outGz);
+    my $out1="$$settings{tmpdir}/$b.1.fastq";
+    my $out2="$$settings{tmpdir}/$b.2.fastq";
+    next if(-e $outGz && !-e $outFastq); 
     logmsg "I did not find $outFastq simulated reads. Simulating now with $exec.";
-    $sge->set("jobname","sim$b");
-    $sge->pleaseExecute_andWait("$exec --verbose --readlen 1000 --coverage 50 --fastq --qual 40 '$asm' 2>&1 1> '$outFastq'");
-    $sge->pleaseExecute_andWait("gzip -v '$outFastq' 2>&1");
+    
+    # Four successive jobs that depend on each other:
+    #   1. Simulate into paired ends
+    #   2. Shuffle
+    #   3. Gzip
+    #   4. Remove simulated unshuffled reads (depends on the shuffle step and not gzip)
+    $sge->pleaseExecute("$exec -d 400 -N 100000 -1 250 -2 250 -e 0.02 -r 0.0009 -R 0.0001 -h '$asm' $out1 $out2",{jobname=>"wgsim$b",numcpus=>1});
+    $sge->pleaseExecute("run_assembly_shuffleReads.pl $out1 $out2 > $outFastq",{jobname=>"shuffle$b",qsubxopts=>"-hold_jid wgsim$b",numcpus=>1});
+    $sge->pleaseExecute("gzip -v '$outFastq' 2>&1",{jobname=>"gzip$b",qsubxopts=>"-hold_jid shuffle$b",numcpus=>1});
+    $sge->pleaseExecute("rm -v $out1 $out2",{jobname=>"rmTmp$b",qsubxopts=>"-hold_jid shuffle$b",numcpus=>1});
   }
+  $sge->wrapItUp();
 }
 
 sub indexReference{
