@@ -44,7 +44,7 @@ sub main{
     my $b=$param;
     $b=~s/dir$//;
     $$settings{$param}||=$b;
-    die "ERROR: Could not find $param under $$settings{$param}/ \n".usage() if(!-d $$settings{$param});
+    die "ERROR: Could not find $param under $$settings{$param}/ \n".usage($settings) if(!-d $$settings{$param});
     $$settings{$param}=File::Spec->rel2abs($$settings{$param});
   }
   # SGE params
@@ -52,7 +52,7 @@ sub main{
     $sge->set($_,$$settings{$_}) if($$settings{$_});
   }
 
-  die usage() if($$settings{help} || !defined($$settings{ref}) || !-f $$settings{ref});
+  die usage($settings) if($$settings{help} || !defined($$settings{ref}) || !-f $$settings{ref});
   my $ref=$$settings{ref};
 
   logmsg "Simulating reads from any assemblies";
@@ -279,26 +279,37 @@ sub msaToPhylogeny{
 }
 
 sub usage{
+  my($settings)=@_;
   $0=fileparse $0;
-  "Usage: $0 -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/ -asm asm/]
+  my $help="Usage: $0 -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/ -asm asm/]
     Where parameters with a / are directories
-    -r where fastq and fastq.gz files are located
-    -b where to put bams
-    -v where to put vcfs
-    --tmpdir tmp/ Where to put temporary files
-    --msadir multiple sequence alignment and tree files (final output)
-    -numcpus number of cpus
-    -numnodes maximum number of nodes
-    -w working directory where qsub commands can be stored. Default: CWD
+    -reads where fastq and fastq.gz files are located
+    -bam   where to put bams
+    -vcf   where to put vcfs
+    --tmpdir   tmp/ Where to put temporary files
+    --msadir   multiple sequence alignment and tree files (final output)
+    -asm       directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
     -all allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
       Set -all to 'auto' to let SET determine this distance using snpDistribution.pl
-    -asm directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
+    --help To view more help
+    ";
+    return $help if(!$$settings{help});
+
+    $help.="
+    SKIP CERTAIN STEPS
+    --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with; removes the requirement for CG-Pipeline)
     --nomsa to not make a multiple sequence alignment
     --notrees to not make phylogenies
-    --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
-    --queue     all.q         The default queue to use.
-    --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with)
+    MODULES
     --mapper smalt Choose the mapper you want to use. Choices: smalt (default), snap
     --snpcaller freebayes Choose the snp caller you want to use. Choices: freebayes (default), callsam
-  "
+    SCHEDULER AND MULTITHREADING OPTIONS
+    --queue     all.q         The default queue to use.
+    --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
+    --numnodes  20  maximum number of nodes
+    --numcpus   number of cpus
+    OTHER OPTIONS rarely used
+    -w dir/        working directory where qsub commands can be stored. Default: CWD/.SGELK/
+  ";
+  return $help;
 }
