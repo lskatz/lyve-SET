@@ -63,9 +63,16 @@ Examples
         └── unfiltered
 
     $ cd setTest/            
-    $ cp -v ../path/to/fastq.gz/dir/*.fastq.gz reads/  # copy over all your fastq files to the reads directory
-    $ cp -v ../path/to/fasta/dir/*.fasta asm/          # copy over all assembled genomes that you want to include in the tree in the asm directory
-    $ cp -v ../path/to/fasta/dir/reference.fasta reference/  # copy over your single reference genome (only one permitted)
+    # copy over all your fastq files to the reads directory
+    $ cp -v ../path/to/fastq.gz/dir/*.fastq.gz reads/     
+    # OR symlink your fastq files
+    $ cd reads
+    $ ln -sv ../../path/to/fastq.gz/dir/*.fastq.gz .
+    $ cd ..
+    # copy over all assembled genomes that you want to include in the tree in the asm directory
+    $ cp -v ../path/to/fasta/dir/*.fasta asm/                 
+    # copy over your single reference genome (only one permitted)
+    $ cp -v ../path/to/fasta/dir/reference.fasta reference/  
 
 NOTE: no underscores or dashes allowed in the reference genome fasta file
     
