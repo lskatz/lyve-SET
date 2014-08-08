@@ -77,7 +77,6 @@ sub main{
       logmsg "Launching set_processMsa.pl";
       $sge->pleaseExecute_andWait("set_processMsa.pl --auto --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus}",{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
     }
-    #msaToPhylogeny($$settings{msadir},$settings) if($$settings{trees});
   }
 
   logmsg "Done!";
@@ -195,6 +194,8 @@ sub variantCalls{
       $j=$sge->pleaseExecute("$scriptsdir/lib/callsam/bin/callsam_MT.pl $bam --numcpus $$settings{numcpus} --min-coverage $$settings{min_coverage} --min-frequency $$settings{min_alt_frac} --reference '$ref' > $vcfdir/unfiltered/$b.vcf",{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
       # filter the vcf but make it depend on the callsam script to finish
       $sge->pleaseExecute("$scriptsdir/filterVcf.pl $vcfdir/unfiltered/$b.vcf --noindels -d 10 -o $vcfdir/$b.vcf",{qsubxopts=>"-hold_jid $jobname",numcpus=>1,jobname=>"filter$b"});
+    } else {
+      die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
     }
     push(@jobid,$j);
 
@@ -249,14 +250,14 @@ sub variantsToMSA{
   # convert VCFs to an MSA (long step)
   $sge->set("jobname","variantsToMSA");
   $sge->set("numcpus",$$settings{numcpus});
-  $sge->pleaseExecute("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o $msadir/out.aln.fas -r $ref -b $bad -a $$settings{allowedFlanking}",{qsubxopts=>$$settings{vcfToAlignment_xopts}});
-  # convert VCFs to an MSA using a low-memory script
-  $sge->pleaseExecute("vcfToAlignment_lowmem.pl $vcfdir/unfiltered/*.vcf $bamdir/*.sorted.bam -n $$settings{numcpus} -ref $ref -p $msadir/out_lowmem.aln.fas.pos.txt -t $msadir/out_lowmem.aln.fas.pos.tsv > $msadir/out_lowmem.aln.fas",{numcpus=>$$settings{numcpus},jobname=>"variantsToMSA_lowmem"}) if(-d "$vcfdir/unfiltered");
+  if($$settings{'msa-creation'} eq 'lyve-set'){
+    $sge->pleaseExecute("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o $msadir/out.aln.fas -r $ref -b $bad -a $$settings{allowedFlanking}",{qsubxopts=>$$settings{vcfToAlignment_xopts}});
+  } elsif($$settings{'msa-creation'} eq 'lyve-set-lowmem'){
+    # convert VCFs to an MSA using a low-memory script
+    $sge->pleaseExecute("vcfToAlignment_lowmem.pl $vcfdir/unfiltered/*.vcf $bamdir/*.sorted.bam -n $$settings{numcpus} -ref $ref -p $msadir/out_lowmem.aln.fas.pos.txt -t $msadir/out_lowmem.aln.fas.pos.tsv > $msadir/out_lowmem.aln.fas",{numcpus=>$$settings{numcpus},jobname=>"variantsToMSA_lowmem"}) if(-d "$vcfdir/unfiltered");
+  }
   $sge->wrapItUp();
 
-  # convert fasta to phylip and remove uninformative sites
-  #$sge->set("jobname","msaToPhylip");
-  #$sge->pleaseExecute_andWait("convertAlignment.pl -i $msadir/out.aln.fas -o $msadir/out.aln.fas.phy -f phylip -r");
   return 1;
 }
 
