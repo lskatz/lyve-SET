@@ -281,7 +281,8 @@ sub msaToPhylogeny{
 sub usage{
   my($settings)=@_;
   $0=fileparse $0;
-  my $help="Usage: $0 -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/ -asm asm/]
+  my $help="$0: Launches the Lyve-SET pipeline
+    Usage: $0 -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/ -asm asm/]
     Where parameters with a / are directories
     -reads where fastq and fastq.gz files are located
     -bam   where to put bams
