@@ -24,20 +24,26 @@ exit(main());
 
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --noclean
-  my $settings={trees=>1,clean=>1, msa=>1, mapper=>"smalt"};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s clean! msa! mapper=s snpcaller=s)) or die $!;
-  $$settings{numcpus}||=1;
-  $$settings{numnodes}||=20;
-  $$settings{workingdir}||=$sge->get("workingdir");
+  my $settings={trees=>1,clean=>1, msa=>1};
+  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s clean! msa! mapper=s snpcaller=s msa-creation=s)) or die $!;
+  # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
   $$settings{min_alt_frac}||=0.75;
   $$settings{min_coverage}||=10;
+  # modules defaults
+  $$settings{mapper}||="smalt";
+  $$settings{snpcaller}||="freebayes";
+  $$settings{'msa-creation'}||="lyve-set";
+  # queue stuff
+  $$settings{vcfToAlignment_xopts}||="-l mem_free=100G -q highmem.q";
+  $$settings{numcpus}||=1;
+  $$settings{numnodes}||=20;
+  $$settings{workingdir}||=$sge->get("workingdir");
   $$settings{qsubxopts}||="";
   $$settings{queue}||="";
-  $$settings{mapper}=lc($$settings{mapper});
-  $$settings{snpcaller}||="freebayes";
-  $$settings{vcfToAlignment_xopts}||="-l mem_free=100G -q highmem.q";
+  # Some things need to just be lowercase to make things easier downstream
+  $$settings{$_}=lc($$settings{$_}) for(qw(msa-creation snpcaller mapper));
 
   logmsg "Checking to make sure all directories are in place";
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir)){
@@ -280,21 +286,30 @@ sub msaToPhylogeny{
 
 sub usage{
   my($settings)=@_;
+
+  ## Format a few variables correctly
+  # simplified pathnames for some options
+  my @dir=qw(asmdir msadir readsdir bamdir vcfdir tmpdir);
+  $$settings{$_}=File::Spec->abs2rel($_).'/' for(@dir);
+  # right padding for some options
+  $$settings{$_}=reverse(sprintf("%15s","".reverse($$settings{$_}))) for(qw(mapper snpcaller msa-creation allowedFlanking),@dir);
+  #$$settings{$_}=sprintf("%10s",$$settings{$_}) for(qw(mapper snpcaller msa-creation));
   $0=fileparse $0;
+
+  # The help menu
   my $help="$0: Launches the Lyve-SET pipeline
     Usage: $0 -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/ -asm asm/]
     Where parameters with a / are directories
-    -reads where fastq and fastq.gz files are located
-    -bam   where to put bams
-    -vcf   where to put vcfs
-    --tmpdir   tmp/ Where to put temporary files
-    --msadir   multiple sequence alignment and tree files (final output)
-    -asm       directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
-    -all allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
-      Set -all to 'auto' to let SET determine this distance using snpDistribution.pl
-    --help To view more help
+    -reads    $$settings{readsdir} where fastq and fastq.gz files are located
+    -bam      $$settings{bamdir} where to put bams
+    -vcf      $$settings{vcfdir} where to put vcfs
+    --tmpdir  $$settings{tmpdir} tmp/ Where to put temporary files
+    --msadir  $$settings{msadir} multiple sequence alignment and tree files (final output)
+    -asm      $$settings{asmdir} directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
+    -all      $$settings{allowedFlanking} allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+      NOTE: Set -all to 'auto' to let SET determine this distance using snpDistribution.pl
     ";
-    return $help if(!$$settings{help});
+    return "$help\n  --help To view more help\n" if(!$$settings{help});
 
     $help.="
     SKIP CERTAIN STEPS
@@ -302,15 +317,15 @@ sub usage{
     --nomsa to not make a multiple sequence alignment
     --notrees to not make phylogenies
     MODULES
-    --mapper smalt Choose the mapper you want to use. Choices: smalt (default), snap
-    --snpcaller freebayes Choose the snp caller you want to use. Choices: freebayes (default), callsam
+    --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap
+    --snpcaller    $$settings{snpcaller}   Which SNP caller? Choices: freebayes, callsam
+    --msa-creation ".$$settings{'msa-creation'}."   Which method of making the multiple sequence alignment? lyve-set, lyve-set-lowmem (unvalidated)
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue     all.q         The default queue to use.
     --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
     --numnodes  20  maximum number of nodes
-    --numcpus   number of cpus
-    OTHER OPTIONS rarely used
-    -w dir/        working directory where qsub commands can be stored. Default: CWD/.SGELK/
+    --numcpus   $$settings{numcpus}  number of cpus
+    -w dir/     working directory where qsub commands can be stored. Default: CWD/.SGELK/
   ";
   return $help;
 }
