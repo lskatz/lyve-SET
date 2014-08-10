@@ -16,6 +16,7 @@ Requirements
 * Samtools
 * wgsim (part of samtools) if you are simulating reads
 * Schedule::SGELK (installed at the same time if you download with git)
+* CallSam (installed at the same time if you download with git)
 
 Installation
 ------------
@@ -27,7 +28,7 @@ Installation
 
 TO UPDATE, in case any updates or fixes are made, run this command at any time from the base lyve-SET directory.
 
-    $ git pull -u --recurse-submodules=yes
+    $ git pull -u origin master
 
 Usage
 -----
