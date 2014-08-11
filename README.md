@@ -109,7 +109,13 @@ Why would you want to edit the out.aln.fas file?  Or what kinds of things can yo
     # => consider removing any genome with too many masked bases
 
     # Run SET on your new set of genomes out2.aln.fas.
-    set_process_msa.pl out2.aln.fas --auto --numcpus 12
+    $ set_process_msa.pl out2.aln.fas --auto --numcpus 12
+    
+    # Create a new subset as needed, but you should always read from your master record,
+    # which is the original out.aln.fas.
+    $ cp -v out.aln.fas out3.aln.fas
+    $ ...
+    $ set_process_msa.pl out3.aln.fas --auto --numcpus 12
 
 Citing lyve-SET
 -----
