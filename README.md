@@ -85,7 +85,7 @@ More complex
 
     $ launch_set.pl -ref reference/reference.fasta  --queue all.q --numnodes 20 --numcpus 16 --noclean --notrees
     
-If you specified notrees, then you can edit the multiple sequence alignment before analyzing it
+If you specified notrees, then you can edit the multiple sequence alignment before analyzing it. See the next section on examples on how/why you would edit the alignment.
 
     $ cd msa
     $ gedit out.aln.fas  # alter the deflines or whatever you want before moving on
@@ -96,13 +96,20 @@ If you specified notrees, then you can edit the multiple sequence alignment befo
 
 Why would you want to edit the out.aln.fas file?  Or what kinds of things can you observe here before making a tree?
     
-    # find the genomes with the most number of Ns (ie masked SNP calls)
-    $ perl -lane 'chomp; if(/^>/){s/>//;$id=$_;}else{$num=(s/(N)/$1/gi); print "$id\t$num";}' < out.aln.fas|sort -k2,2n|column -t
-    # => consider removing any genome with too many masked bases
-    
     # Alter the identifiers of your genomes, so that they look nice in the phylogeny(ies)
     $ sed -i.bak 's/\.fastq\.gz.*//' out.aln.fas
+
+    # After the taxon names are edited nicely,
+    # make a new file from which you can extract your taxa of choice (out2.aln.fas).
+    $ cp -v out.aln.fas out2.aln.fas
+
     # => All extensions are removed in taxon names; a backup of the file was named out.aln.fas.bak
+    # find the genomes with the most number of Ns (ie masked SNP calls)
+    $ perl -lane 'chomp; if(/^>/){s/>//;$id=$_;}else{$num=(s/(N)/$1/gi); print "$id\t$num";}' < out2.aln.fas|sort -k2,2n|column -t
+    # => consider removing any genome with too many masked bases
+
+    # Run SET on your new set of genomes out2.aln.fas.
+    set_process_msa.pl out2.aln.fas --auto --numcpus 12
 
 Citing lyve-SET
 -----
