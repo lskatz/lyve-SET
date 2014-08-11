@@ -94,6 +94,16 @@ If you specified notrees, then you can edit the multiple sequence alignment befo
     # Optionally, qsub this script instead because it could be cpu-intensive
     $ qsub -pe smp 12 -cwd -V -o trees.log -j y -N msaLyveSET -S $(which perl) $(which set_process_msa.pl) --auto --numcpus 12
 
+Why would you want to edit the out.aln.fas file?  Or what kinds of things can you observe here before making a tree?
+    
+    # find the genomes with the most number of Ns (ie masked SNP calls)
+    $ perl -lane 'chomp; if(/^>/){s/>//;$id=$_;}else{$num=(s/(N)/$1/gi); print "$id\t$num";}' < out.aln.fas|sort -k2,2n|column -t
+    # => consider removing any genome with too many masked bases
+    
+    # Alter the identifiers of your genomes, so that they look nice in the phylogeny(ies)
+    $ sed -i.bak 's/\.fastq\.gz.*//' out.aln.fas
+    # => All extensions are removed in taxon names; a backup of the file was named out.aln.fas.bak
+
 Citing lyve-SET
 -----
 To cite lyve-SET, please reference this site and cite the Haiti Anniversary paper. Lyve-SET also makes use of the tools shown above in the prerequisites.  If you feel like your study relied heavily on any of those tools, please don't forget to cite them!
