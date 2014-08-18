@@ -146,6 +146,7 @@ sub removeUninformativeSites{
   return $informative;
 }
 
+# TODO put back in phyml
 sub inferPhylogeny{
   my($inAln,$prefix,$settings)=@_;
   my $treeFile="$prefix.RAxML_bipartitions";

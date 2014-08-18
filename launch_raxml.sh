@@ -1,6 +1,6 @@
 #!/bin/bash
 #$ -S /bin/bash
-#$ -pe smp 8
+#$ -pe smp 2
 #$ -cwd
 #$ -V
 #$ -o launch_raxml.sh.out -j y
@@ -14,7 +14,7 @@ if [ "$prefix" = "" ]; then
 fi
 
 # set the number of CPUs according to the number of slots, or 8 if undefined
-numcpus=${NSLOTS:-8}
+numcpus=${NSLOTS:-2}
 
 # get the extension
 b=`basename $aln`;
@@ -26,6 +26,15 @@ if [ "$suffix" != "phy" ]; then
   aln="$aln.phy";
 fi;
 
-raxmlHPC-PTHREADS -f a -s $aln -n $prefix -T 8 -m GTRGAMMA -p $RANDOM -x $RANDOM -N 100
+# what version is raxml?
+VERSION=$(raxmlHPC-PTHREADS -v | grep -o 'version [0-9]' | grep -o [0-9]);
+echo "I detect that you are using version $VERSION of raxml."
+
+if [ $VERSION = 8 ]; then
+  MODEL=ASC_GTRGAMMA
+else
+  MODEL=GTRGAMMA
+fi
+raxmlHPC-PTHREADS -f a -s $aln -n $prefix -T $numcpus -p $RANDOM -x $RANDOM -N 100 -m $MODEL
 if [ $? -gt 0 ]; then exit 1; fi;
 
