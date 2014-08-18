@@ -1,3 +1,6 @@
+# Author: Lee Katz <lkatz@cdc.gov>
+# Lyve-SET
+
 PREFIX := /opt/Lyve-SET
 PROFILE := $(HOME)/.bashrc
 VERSION := 0.8
