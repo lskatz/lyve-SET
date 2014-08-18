@@ -5,12 +5,16 @@ PREFIX := /opt/Lyve-SET
 PROFILE := $(HOME)/.bashrc
 VERSION := 0.8
 
+# Derived variables
 TMPDIR := $(PREFIX)/build
 TARFILE=Lyve-SET.v$(VERSION).tar.gz
 TMPTARFILE=$(TMPDIR)/$(TARFILE)
 
+# Style variables
 T= "	"
 T2=$(T)$(T)
+
+###################################
 
 default: help
 
@@ -35,6 +39,11 @@ install:
 	tar zxvf $(TMPTARFILE)
 	# Move all the untarred files to the install directory
 	mv -v $(TMPDIR)/lyve-SET-$(VERSION)/* $(PREFIX)/
+	# download necessary submodules because git doesn't package them in the release
+	rm -rvf $(PREFIX)/lib/*
+	cd $(PREFIX)/lib && \
+	git clone https://github.com/lskatz/callsam.git && \
+	git clone https://github.com/lskatz/Schedule--SGELK.git $(PREFIX)/lib/Schedule
 	@echo NOTE: 'make env' in order to set your path permanently.
 	@echo NOTE: 'make clean' to remove the temporary directory.
 
