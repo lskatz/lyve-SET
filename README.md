@@ -20,15 +20,18 @@ Requirements
 
 Installation
 ------------
-    
-    $ mkdir ~/bin
-    $ cd ~/bin
-    $ git clone --recursive https://github.com/lskatz/lyve-SET.git
-    $ export PATH=$PATH:~/bin/lyve-SET # you might also put this line into your .bash_profile or other login script
 
-TO UPDATE, in case any updates or fixes are made, run this command at any time from the base lyve-SET directory.
+To install, just download and set your path correctly.
 
-    $ git pull -u origin master
+1. Create a directory to put files into `mkdir ~/bin`
+2. Go into the directory `cd ~/bin`
+3. Download
+    1. semi-stable: `wget https://github.com/lskatz/lyve-SET/archive/v0.8.tar.gz -O Lyve-SET.v0.8.tar.gz`
+    2. bleeding edge: `git clone --recursive https://github.com/lskatz/lyve-SET.git`
+4. Set your path `export PATH=$PATH:~/bin/lyve-SET`
+    1. Place this `export` command into `~/.bashrc` to set the path permanently
+5. If you downloaded the bleeding edge version with `git`, then you can update at any time with the following command `git pull -u origin master`
+        
 
 Usage
 -----
