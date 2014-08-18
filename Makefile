@@ -38,10 +38,16 @@ install:
 	@echo NOTE: 'make env' in order to set your path permanently.
 	@echo NOTE: 'make clean' to remove the temporary directory.
 
+cuttingedge:
+	-rmdir $(PREFIX)
+	git clone --recursive https://github.com/lskatz/lyve-SET.git $(PREFIX)
+	@echo NOTE: 'make env' in order to set your path permanently.
+	@echo NOTE: 'make clean' to remove the temporary directory.
+
 env:
 	echo -e "#Lyve-SET\nexport PATH=\$$PATH:$(PREFIX)" >> $(PROFILE)
 
 clean:
-	rm -vr $(TMPDIR)
-	@echo "remove the line with PATH and Lyve-SET from $(PROFILE)"
+	rm -vrf $(TMPDIR)
+	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
 
