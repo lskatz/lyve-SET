@@ -54,6 +54,8 @@ Usage
 
 Examples
 ------
+If you have version 0.8 or earlier, use the following sytax:
+
     # Set up the directory with your reads and reference genome
     $ set_create.pl setTest  # directory structure created
     $ tree setTest           # View the new directory structure
@@ -78,6 +80,19 @@ Examples
     $ cp -v ../path/to/fasta/dir/*.fasta asm/                 
     # copy over your single reference genome (only one permitted)
     $ cp -v ../path/to/fasta/dir/reference.fasta reference/  
+
+If you have a newer version >0.8 then you have the script set_manage.pl and you should use the following syntax:
+    
+    $ set_manage.pl -c setTest
+    $ set_manage.pl setTest --add-reads file1.fastq.gz
+    $ set_manage.pl setTest --add-reads file2.fastq.gz
+    $ set_manage.pl setTest --add-reads file3.fastq.gz
+    $ set_manage.pl setTest --add-reads file4.fastq.gz
+    $ set_manage.pl setTest --add-reads file5.fastq.gz
+    $ set_manage.pl setTest --add-assembly file1.fasta
+    $ set_manage.pl setTest --add-assembly file2.fasta
+    $ set_manage.pl setTest --change-reference file3.fasta
+    $ cd  setTest # get into the directory before running launch_set.pl
 
 NOTE: no underscores or dashes allowed in the reference genome fasta file
     
