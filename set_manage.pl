@@ -17,8 +17,8 @@ sub main{
   my $settings={};
   GetOptions($settings,qw(help create delete add-reads=s remove-reads=s add-assembly=s remove-assembly=s)) or die $!;
   die usage() if($$settings{help});
+  die "ERROR: need a SET project\n".usage() if(!@ARGV);
   my $project=shift(@ARGV);
-  die "ERROR: need a SET project\n".usage() if(!-e $project);
 
   createProjectDir($project,$settings) if($$settings{create});
   if(!is_project($project,$settings)){

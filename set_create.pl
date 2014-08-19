@@ -1,5 +1,7 @@
 #!/usr/bin/env perl
 
+die "DEPRECATED: use 'set_manage proj/ -c'";
+
 use strict;
 use warnings;
 use Getopt::Long;
