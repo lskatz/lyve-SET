@@ -62,3 +62,7 @@ clean:
 	rm -vrf $(TMPDIR)
 	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
 
+fail:
+	touch /dfjkd/dfjdksajo/dfj32098/dkdl
+	exit 5
+	exit 1
