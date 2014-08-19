@@ -43,13 +43,13 @@ install:
 	mkdir $(TMPDIR)
 	wget https://github.com/lskatz/lyve-SET/archive/v$(VERSION).tar.gz -O $(TMPTARFILE)
 	cd $(TMPDIR) && \
-	tar zxvf $(TMPTARFILE)
+	tar zxvf $(TARFILE)
 	# Move all the untarred files to the install directory
 	mv -v $(TMPDIR)/lyve-SET-$(VERSION)/* $(PREFIX)/
 	# download necessary submodules because git doesn't package them in the release
 	rm -rvf $(PREFIX)/lib/*
 	cd $(PREFIX)/lib && \
-	git clone https://github.com/lskatz/callsam.git && \
+	git clone https://github.com/lskatz/callsam.git
 	git clone https://github.com/lskatz/Schedule--SGELK.git $(PREFIX)/lib/Schedule
 
 cuttingedge:
