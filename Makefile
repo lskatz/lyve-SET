@@ -20,16 +20,23 @@ default: help
 
 help:
 	@echo Commands:
-	@echo $(T) all - Perform install and env. All parameters are valid to use here.
+	@echo $(T) all - Perform install, env, and clean. All parameters are valid to use here.
 	@echo $(T) install - copy all files over to an installation directory
-	@echo $(T2) PREFIX=$(PREFIX) 
+	@echo $(T2) PREFIX=$(PREFIX)
 	@echo $(T2) VERSION=$(VERSION)
+	@echo $(T) cuttingedge - download and install the most up to date code. Does not include 'make env'
+	@echo $(T2) PREFIX=$(PREFIX)
 	@echo $(T) env - put all environmental variables into a profile file 
 	@echo $(T2) PROFILE=$(PROFILE)
+	@echo $(T) clean - delete the temporary files. Does not remove the result of 'make env.'
+	@echo $(T2) PREFIX=$(PREFIX)
+	@echo NOTES: 
+	@echo $(T) All paths must be absolute
 	@echo Example:
 	@echo $(T) make all PREFIX=$(PREFIX) VERSION=$(VERSION) PROFILE=$(PROFILE)
+	@echo $(T) "make cuttingedge PREFIX=$(PREFIX) && make env PROFILE=$(PROFILE)"
 
-all: install env
+all: install env clean
 
 install:
 	mkdir $(PREFIX) 
@@ -44,14 +51,9 @@ install:
 	cd $(PREFIX)/lib && \
 	git clone https://github.com/lskatz/callsam.git && \
 	git clone https://github.com/lskatz/Schedule--SGELK.git $(PREFIX)/lib/Schedule
-	@echo NOTE: 'make env' in order to set your path permanently.
-	@echo NOTE: 'make clean' to remove the temporary directory.
 
 cuttingedge:
-	-rmdir $(PREFIX)
 	git clone --recursive https://github.com/lskatz/lyve-SET.git $(PREFIX)
-	@echo NOTE: 'make env' in order to set your path permanently.
-	@echo NOTE: 'make clean' to remove the temporary directory.
 
 env:
 	echo -e "#Lyve-SET\nexport PATH=\$$PATH:$(PREFIX)" >> $(PROFILE)
