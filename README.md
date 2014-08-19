@@ -25,21 +25,32 @@ To install, just run the make file with `make install`.  Run `make help` for all
 
 Usage
 -----
-    Usage: launch_set.pl -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/]
-      Where parameters with a / are directories
-      -r where fastq and fastq.gz files are located
-      -b where to put bams
-      -v where to put vcfs
-      --msadir multiple sequence alignment and tree files (final output)
-      -numcpus number of cpus
-      -numnodes maximum number of nodes
-      -w working directory where qsub commands can be stored. Default: CWD
-      -a allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
-      --nomsa to not make a multiple sequence alignment
-      --notrees to not make phylogenies
-      -q '-q long.q' extra options to pass to qsub. This is not sanitized.
-      --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with)
-Lyve-SET is modular and so the individual scripts can be run too.  For example, you can run launch\_smalt.pl or launch\_snap.pl to run mapping alone; however, indexing the reference fasta takes place in launch_set.pl.  To get usage help on any of these scripts, run the script with no options.
+    Usage: launch_set.pl -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/ -asm asm/]
+    Where parameters with a / are directories
+    -reads    readsdir/       where fastq and fastq.gz files are located
+    -bam      bamdir/         where to put bams
+    -vcf      vcfdir/         where to put vcfs
+    --tmpdir  tmpdir/         tmp/ Where to put temporary files
+    --msadir  msadir/         multiple sequence alignment and tree files (final output)
+    -asm      asmdir/         directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
+    -all      0               allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+      NOTE: Set -all to 'auto' to let SET determine this distance using snpDistribution.pl
+
+    SKIP CERTAIN STEPS
+    --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with; removes the requirement for CG-Pipeline)
+    --nomsa to not make a multiple sequence alignment
+    --notrees to not make phylogenies
+    MODULES
+    --mapper       smalt             Which mapper? Choices: smalt, snap
+    --snpcaller    freebayes         Which SNP caller? Choices: freebayes, callsam
+    --msa-creation lyve-set          Which method of making the multiple sequence alignment? lyve-set, lyve-set-lowmem (unvalidated)
+    SCHEDULER AND MULTITHREADING OPTIONS
+    --queue     all.q         The default queue to use.
+    --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
+    --numnodes  20  maximum number of nodes
+    --numcpus   1  number of cpus
+    -w dir/     working directory where qsub commands can be stored. Default: CWD/.SGELK/
+
 
 Examples
 ------
