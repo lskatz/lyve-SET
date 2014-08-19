@@ -45,11 +45,24 @@ sub main{
   # Some things need to just be lowercase to make things easier downstream
   $$settings{$_}=lc($$settings{$_}) for(qw(msa-creation snpcaller mapper));
 
+  # If a project is given then set some default parameters
+  my $project=shift(@ARGV);
+  if(defined($project)){
+    logmsg "Project was defined as $project.";
+    # Checks to make sure that this is a project
+    system("set_manage.pl '$project'"); die if $?;
+    # Set the defaults if they aren't set already
+    $$settings{ref}||="$project/reference/reference.fasta";
+    for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir)){
+      my $b=$param;
+      $b=~s/dir$//;
+      $$settings{$param}||="$project/$b";
+    }
+  }
+
+  # Check these directory parameters
   logmsg "Checking to make sure all directories are in place";
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir)){
-    my $b=$param;
-    $b=~s/dir$//;
-    $$settings{$param}||=$b;
     die "ERROR: Could not find $param under $$settings{$param}/ \n".usage($settings) if(!-d $$settings{$param});
     $$settings{$param}=File::Spec->rel2abs($$settings{$param});
   }
@@ -58,6 +71,7 @@ sub main{
     $sge->set($_,$$settings{$_}) if($$settings{$_});
   }
 
+  # Check the reference parameter
   die usage($settings) if($$settings{help} || !defined($$settings{ref}) || !-f $$settings{ref});
   my $ref=$$settings{ref};
 
@@ -301,8 +315,10 @@ sub usage{
 
   # The help menu
   my $help="$0: Launches the Lyve-SET pipeline
-    Usage: $0 -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/ -asm asm/]
+    Usage: $0 [project] [-ref reference.fasta -b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/ -asm asm/]
+    You must either supply a Lyve-SET project name or a reference assembly using -ref
     Where parameters with a / are directories
+    -ref      proj/reference/reference.fasta   The reference genome assembly
     -reads    $$settings{readsdir} where fastq and fastq.gz files are located
     -bam      $$settings{bamdir} where to put bams
     -vcf      $$settings{vcfdir} where to put vcfs
