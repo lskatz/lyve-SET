@@ -9,13 +9,14 @@ use Getopt::Long;
 #use File::Spec;
 use Cwd qw/realpath/;
 use File::Basename qw/basename/;
+use File::Copy qw/copy/;
 
 sub logmsg{print STDERR "@_\n";}
 exit main();
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help create delete add-reads=s remove-reads=s add-assembly=s remove-assembly=s)) or die $!;
+  GetOptions($settings,qw(help create delete add-reads=s remove-reads=s add-assembly=s remove-assembly=s change-reference=s)) or die $!;
   die usage() if($$settings{help});
   die "ERROR: need a SET project\n".usage() if(!@ARGV);
   my $project=shift(@ARGV);
@@ -26,6 +27,7 @@ sub main{
   }
   addReads($project,$settings) if($$settings{'add-reads'});
   addAssembly($project,$settings) if($$settings{'add-assembly'});
+  changeReference($project,$settings) if($$settings{'change-reference'});
   removeAssembly($project,$settings) if($$settings{'remove-assembly'});
   removeReads($project,$settings) if($$settings{'remove-reads'});
   deleteProject($project,$settings) if($$settings{delete});
@@ -87,6 +89,19 @@ sub removeAssembly{
   return 1;
 }
 
+sub changeReference{
+  my($project,$settings)=@_;
+  my $ref=$$settings{'change-reference'};
+  my $newPath="$project/reference/".basename($ref);
+  copy($ref,$newPath) or die "ERROR: could not copy $ref to $newPath";
+  logmsg "cp $ref => $newPath";
+
+  unlink("$project/reference/reference.fasta");
+  symlink(basename($newPath),"$project/reference/reference.fasta");
+  logmsg "symlink $newPath => $project/reference/reference.fasta";
+  return 1;
+}
+
 sub deleteProject{
   my($project,$settings)=@_;
   system("rm -rfv '$project'");
@@ -99,10 +114,11 @@ sub usage{
   Usage: $0 setProject [options]
   -c Create a set project
   -d Delete a set project
-  --add-reads file.fastq.gz Add reads to your project (using symlink)
-  --remove-reads file.fastq.gz Remove reads from your project (using rm)
-  --add-assembly file.fasta Add an assembly to your project (using symlink)
-  --remove-assembly file.fasta Remove an assembly from your project (using rm)
+  --add-reads file.fastq.gz       Add reads to your project (using symlink)
+  --remove-reads file.fastq.gz    Remove reads from your project (using rm)
+  --add-assembly file.fasta       Add an assembly to your project (using symlink)
+  --remove-assembly file.fasta    Remove an assembly from your project (using rm)
+  --change-reference file.fasta   Add a reference assembly to your project and remove any existing one (using cp)
   Examples
     set_manage.pl projDir --add-reads ../../reads/unknown/file.cleaned.fastq.gz
     set_manage.pl projDir --remove-reads file.cleaned.fastq.gz
