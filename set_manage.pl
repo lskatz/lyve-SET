@@ -112,8 +112,8 @@ sub deleteProject{
 sub usage{
   "Manages a Lyve-SET project and confirms that a directory is a Lyve-SET project.
   Usage: $0 setProject [options]
-  -c Create a set project
-  -d Delete a set project
+  --create Create a set project
+  --delete Delete a set project
   --add-reads file.fastq.gz       Add reads to your project (using symlink)
   --remove-reads file.fastq.gz    Remove reads from your project (using rm)
   --add-assembly file.fasta       Add an assembly to your project (using symlink)
