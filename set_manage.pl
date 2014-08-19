@@ -63,7 +63,12 @@ sub addReads{
 }
 sub addAssembly{
   my($project,$settings)=@_;
-  ...
+  my $asm=realpath($$settings{'add-assembly'});
+  my $symlink="$project/asm/".basename($asm);
+  symlink($asm,$symlink);
+  logmsg "$asm => $symlink";
+  return 1;
+
 }
 sub removeReads{
   my($project,$settings)=@_;
@@ -75,7 +80,11 @@ sub removeReads{
 }
 sub removeAssembly{
   my($project,$settings)=@_;
-  ...
+  my $name=$$settings{'remove-assembly'};
+  for my $file("$project/asm/$name"){
+    unlink($file) or logmsg "Warning: could not remove $file";
+  }
+  return 1;
 }
 
 sub deleteProject{
@@ -94,5 +103,8 @@ sub usage{
   --remove-reads file.fastq.gz Remove reads from your project (using rm)
   --add-assembly file.fasta Add an assembly to your project (using symlink)
   --remove-assembly file.fasta Remove an assembly from your project (using rm)
+  Examples
+    set_manage.pl projDir --add-reads ../../reads/unknown/file.cleaned.fastq.gz
+    set_manage.pl projDir --remove-reads file.cleaned.fastq.gz
   "
 }
