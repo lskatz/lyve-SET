@@ -3,7 +3,7 @@
 
 PREFIX := /opt/Lyve-SET
 PROFILE := $(HOME)/.bashrc
-VERSION := 0.8
+VERSION := 0.8.1
 
 # Derived variables
 TMPDIR := $(PREFIX)/build
