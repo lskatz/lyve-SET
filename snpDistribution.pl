@@ -151,7 +151,7 @@ sub readVcf{
 }
 
 sub usage{
-  "Given a set of VCFs and their coordinates, determines how close a SNP must be in order for it to be 'clustered.'  The 'clustered' distance is two standard deviations plus the lower peak's mean.
+  "Given a set of VCFs and their coordinates, determines how close a SNP must be in order for it to be 'clustered.'  The 'clustered' distance is at the 95% cutoff.
   Usage: $0 *.vcf
   -b binning (default: 10)
   -o default

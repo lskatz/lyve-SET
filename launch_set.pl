@@ -236,7 +236,9 @@ sub variantsToMSA{
     my $allowedFlanking=`snpDistribution.pl $vcfdir/unfiltered/*.vcf`;
     die if $?;
     chomp($allowedFlanking);
-    $$settings{allowedFlanking}=$allowedFlanking;
+
+    # let's make it a little bit more strict actually.
+    $$settings{allowedFlanking}=$allowedFlanking*3;
   }
 
   # find all "bad" sites
