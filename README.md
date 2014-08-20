@@ -96,13 +96,19 @@ If you have a newer version >0.8 then you have the script set_manage.pl and you 
 
 NOTE: no underscores or dashes allowed in the reference genome fasta file
     
-Run Lyve-SET
+Run Lyve-SET with as few options as possible
 
-    $ launch_set.pl -ref reference/reference.fasta  # simple
+    $ cd setProj && launch_set.pl -ref reference/reference.fasta  # < v0.8.1
+    $ launch_set.pl setProj                                       # >= v0.8.1
 
 More complex
 
-    $ launch_set.pl -ref reference/reference.fasta  --queue all.q --numnodes 20 --numcpus 16 --noclean --notrees
+    # < v0.8.1
+    $ cd setProj && launch_set.pl -ref reference/reference.fasta  --queue all.q --numnodes 20 --numcpus 16 --noclean --notrees
+    # >= v0.8.1
+    $ launch_set.pl setProj --queue all.q --numnodes 20 --numcpus 16 --noclean --notrees
+    # Change some module steps, >= v0.7
+    $ launch_set setProj --snpcaller callsam --msa-creation lyve-set-lowmem
     
 If you specified notrees, then you can edit the multiple sequence alignment before analyzing it. See the next section on examples on how/why you would edit the alignment.
 
