@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 use Getopt::Long;
-#use File::Spec;
+use File::Spec;
 use Cwd qw/realpath/;
 use File::Basename qw/basename/;
 use File::Copy qw/copy/;
@@ -57,7 +57,7 @@ sub is_project{
 
 sub addReads{
   my($project,$settings)=@_;
-  my $reads=realpath($$settings{'add-reads'});
+  my $reads=File::Spec->rel2abs($$settings{'add-reads'});
   my $symlink="$project/reads/".basename($reads);
   symlink($reads,$symlink);
   logmsg "$reads => $symlink";
@@ -65,7 +65,7 @@ sub addReads{
 }
 sub addAssembly{
   my($project,$settings)=@_;
-  my $asm=realpath($$settings{'add-assembly'});
+  my $asm=File::Spec->rel2abs($$settings{'add-assembly'});
   my $symlink="$project/asm/".basename($asm);
   symlink($asm,$symlink);
   logmsg "$asm => $symlink";
