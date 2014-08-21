@@ -71,8 +71,10 @@ sub main{
     $sge->set($_,$$settings{$_}) if($$settings{$_});
   }
 
+  die usage($settings) if($$settings{help});
   # Check the reference parameter
-  die usage($settings) if($$settings{help} || !defined($$settings{ref}) || !-f $$settings{ref});
+  die "ERROR: reference file was not given\n".usage($settings) if(!defined($$settings{ref}));
+  die "ERROR: Could not find the reference file at $$settings{ref}\n".usage($settings) if(!-f $$settings{ref});
   my $ref=$$settings{ref};
 
   logmsg "Simulating reads from any assemblies";
@@ -325,11 +327,12 @@ sub usage{
     --tmpdir  $$settings{tmpdir} tmp/ Where to put temporary files
     --msadir  $$settings{msadir} multiple sequence alignment and tree files (final output)
     -asm      $$settings{asmdir} directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
-    -all      $$settings{allowedFlanking} allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
       NOTE: Set -all to 'auto' to let SET determine this distance using snpDistribution.pl
 
-    --min_alt_frac $$settings{min_alt_frac}  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
-    --min_coverage $$settings{min_coverage}  Minimum coverage needed before a SNP is called. Otherwise, 'N'
+    SNP MATRIX OPTIONS
+    --allowedFlanking  $$settings{allowedFlanking} allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+    --min_alt_frac     $$settings{min_alt_frac}  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
+    --min_coverage     $$settings{min_coverage}  Minimum coverage needed before a SNP is called. Otherwise, 'N'
     ";
     return "$help\n  --help To view more help\n" if(!$$settings{help});
 
