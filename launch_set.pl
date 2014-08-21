@@ -45,27 +45,24 @@ sub main{
   # Some things need to just be lowercase to make things easier downstream
   $$settings{$_}=lc($$settings{$_}) for(qw(msa-creation snpcaller mapper));
 
-  # If a project is given then set some default parameters
-  my $project=shift(@ARGV);
-  if(defined($project)){
-    logmsg "Project was defined as $project.";
-    # Checks to make sure that this is a project
-    system("set_manage.pl '$project'"); die if $?;
-    # Set the defaults if they aren't set already
-    $$settings{ref}||="$project/reference/reference.fasta";
-    for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir)){
-      my $b=$param;
-      $b=~s/dir$//;
-      $$settings{$param}||="$project/$b";
-    }
-  }
-
-  # Check these directory parameters
-  logmsg "Checking to make sure all directories are in place";
+  ##########################################################
+  ### Other defaults: reference genome; default directories#
+  ##########################################################
+  my $project=shift(@ARGV) || '.'; # by default the user is in the project directory
+  logmsg "Project was defined as $project"; # No period at the end of sentence to avoid ambiguous '..' in the logmsg
+  # Checks to make sure that this is a project
+  system("set_manage.pl '$project'"); die if $?;
+  # Set the defaults if they aren't set already
+  $$settings{ref}||="$project/reference/reference.fasta";
+  # Check SET directories' existence and set their defaults
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir)){
+    my $b=$param;
+    $b=~s/dir$//;  # e.g., vcfdir => vcf
+    $$settings{$param}||="$project/$b";
     die "ERROR: Could not find $param under $$settings{$param}/ \n".usage($settings) if(!-d $$settings{$param});
     $$settings{$param}=File::Spec->rel2abs($$settings{$param});
   }
+
   # SGE params
   for (qw(workingdir numnodes numcpus keep qsubxopts queue)){
     $sge->set($_,$$settings{$_}) if($$settings{$_});
