@@ -4,6 +4,7 @@
 PREFIX := /opt/Lyve-SET
 PROFILE := $(HOME)/.bashrc
 VERSION := 0.8.1
+PROJECT := "setTestProject"
 
 # Derived variables
 TMPDIR := $(PREFIX)/build
@@ -30,11 +31,14 @@ help:
 	@echo $(T2) PROFILE=$(PROFILE)
 	@echo $(T) clean - delete the temporary files. Does not remove the result of 'make env.'
 	@echo $(T2) PREFIX=$(PREFIX)
+	@echo $(T) test - create a test project using the test data found in the installation directory
+	@echo $(T2) PREFIX=$(PREFIX)
+	@echo $(T2) PROJECT=$(PROJECT)
 	@echo NOTES: 
 	@echo $(T) All paths must be absolute
 	@echo Example:
 	@echo $(T) make all PREFIX=$(PREFIX) VERSION=$(VERSION) PROFILE=$(PROFILE)
-	@echo $(T) "make cuttingedge PREFIX=$(PREFIX) && make env PROFILE=$(PROFILE)"
+	@echo $(T) "make cuttingedge PREFIX=$(PREFIX) && make env PROFILE=$(PROFILE) && make test PREFIX=$(PREFIX) PROJECT=$(PROJECT)"
 
 all: install env clean
 
@@ -61,6 +65,17 @@ env:
 clean:
 	rm -vrf $(TMPDIR)
 	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
+
+test:
+	@echo "Test data set given by CFSAN's snp-pipeline package found at https://github.com/CFSAN-Biostatistics/snp-pipeline"
+	set_manage.pl --create $(PROJECT)
+	set_manage.pl $(PROJECT) --add-reads $(PREFIX)/testdata/reads/sample1.fastq.gz
+	set_manage.pl $(PROJECT) --add-reads $(PREFIX)/testdata/reads/sample2.fastq.gz
+	set_manage.pl $(PROJECT) --add-reads $(PREFIX)/testdata/reads/sample3.fastq.gz
+	set_manage.pl $(PROJECT) --add-reads $(PREFIX)/testdata/reads/sample4.fastq.gz
+	set_manage.pl $(PROJECT) --change-reference $(PREFIX)/testdata/reference/lambda_virus.fasta
+	set_manage.pl $(PROJECT) --add-assembly $(PREFIX)/testdata/reference/lambda_virus.fasta
+	launch_set.pl $(PROJECT) --noclean --snpcaller callsam --msa-creation lyve-set-lowmem
 
 fail:
 	touch /dfjkd/dfjdksajo/dfj32098/dkdl
