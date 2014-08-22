@@ -60,7 +60,9 @@ cuttingedge:
 	git clone --recursive https://github.com/lskatz/lyve-SET.git $(PREFIX)
 
 env:
-	echo -e "#Lyve-SET\nexport PATH=\$$PATH:$(PREFIX)" >> $(PROFILE)
+	echo "#Lyve-SET" >> $(PROFILE)
+	echo "export PATH=\$$PATH:$(PREFIX)" >> $(PROFILE)
+	echo "export PERL5LIB=\$$PERL5LIB:$(PREFIX/lib)" >> $(PROFILE)
 
 clean:
 	rm -vrf $(TMPDIR)
