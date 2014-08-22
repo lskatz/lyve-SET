@@ -26,8 +26,12 @@ if [ "$suffix" != "phy" ]; then
   aln="$aln.phy";
 fi;
 
+# Which raxml to use?
+which raxmlHPC 1>/dev/null 2>&1 && EXEC=raxmlHPC
+which raxmlHPC-PTHREADS 1>/dev/null 2>&1 && EXEC=raxmlHPC-PTHREADS
+
 # what version is raxml?
-VERSION=$(raxmlHPC-PTHREADS -v | grep -o 'version [0-9]' | grep -o [0-9]);
+VERSION=$($EXEC -v | grep -o 'version [0-9]' | grep -o [0-9]);
 echo "I detect that you are using version $VERSION of raxml."
 
 if [ $VERSION = 8 ]; then
@@ -35,6 +39,6 @@ if [ $VERSION = 8 ]; then
 else
   MODEL=GTRGAMMA
 fi
-raxmlHPC-PTHREADS -f a -s $aln -n $prefix -T $numcpus -p $RANDOM -x $RANDOM -N 100 -m $MODEL
+$EXEC -f a -s $aln -n $prefix -T $numcpus -p $RANDOM -x $RANDOM -N 100 -m $MODEL
 if [ $? -gt 0 ]; then exit 1; fi;
 

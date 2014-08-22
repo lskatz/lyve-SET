@@ -52,9 +52,13 @@ install:
 	mv -v $(TMPDIR)/lyve-SET-$(VERSION)/* $(PREFIX)/
 	# download necessary submodules because git doesn't package them in the release
 	rm -rvf $(PREFIX)/lib/*
-	cd $(PREFIX)/lib && \
-	git clone https://github.com/lskatz/callsam.git
+	# Git submodules
+	git clone https://github.com/lskatz/callsam.git $(PREFIX)/lib/callsam
 	git clone https://github.com/lskatz/Schedule--SGELK.git $(PREFIX)/lib/Schedule
+	# CGP scripts that are needed and that don't depend on CGP libraries
+	svn checkout https://svn.code.sf.net/p/cg-pipeline/code/ $(PREFIX)/lib/cg-pipeline-code
+	ln -sv $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_isFastqPE.pl $(PREFIX)/
+	ln -sv $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_trimClean.pl $(PREFIX)/
 
 cuttingedge:
 	git clone --recursive https://github.com/lskatz/lyve-SET.git $(PREFIX)
