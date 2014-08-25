@@ -314,8 +314,9 @@ sub usage{
 
   # The help menu
   my $help="$0: Launches the Lyve-SET pipeline
-    Usage: $0 [project] [-ref reference.fasta -b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/ -asm asm/]
-    You must either supply a Lyve-SET project name or a reference assembly using -ref
+    Usage: $0 [project] [-ref reference.fasta]
+    If project is not given, then it is assumed to be the current working directory.
+    If reference is not given, then it is assumed to be proj/reference/reference.fasta
     Where parameters with a / are directories
     -ref      proj/reference/reference.fasta   The reference genome assembly
     -reads    $$settings{readsdir} where fastq and fastq.gz files are located
