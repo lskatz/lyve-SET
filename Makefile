@@ -3,7 +3,7 @@
 
 PREFIX := /opt/Lyve-SET
 PROFILE := $(HOME)/.bashrc
-VERSION := 0.8.1
+VERSION := 0.8.2
 PROJECT := "setTestProject"
 
 # Derived variables
