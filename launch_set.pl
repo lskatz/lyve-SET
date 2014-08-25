@@ -25,7 +25,7 @@ exit(main());
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --noclean
   my $settings={trees=>1,clean=>1, msa=>1};
-  GetOptions($settings,qw(ref=s bamdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s clean! msa! mapper=s snpcaller=s msa-creation=s)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s clean! msa! mapper=s snpcaller=s msa-creation=s)) or die $!;
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
@@ -55,7 +55,7 @@ sub main{
   # Set the defaults if they aren't set already
   $$settings{ref}||="$project/reference/reference.fasta";
   # Check SET directories' existence and set their defaults
-  for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir)){
+  for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir logdir)){
     my $b=$param;
     $b=~s/dir$//;  # e.g., vcfdir => vcf
     $$settings{$param}||="$project/$b";
@@ -305,7 +305,7 @@ sub usage{
 
   ## Format a few variables correctly
   # simplified pathnames for some options
-  my @dir=qw(asmdir msadir readsdir bamdir vcfdir tmpdir);
+  my @dir=qw(asmdir msadir readsdir bamdir vcfdir tmpdir logdir);
   $$settings{$_}=File::Spec->abs2rel($_).'/' for(@dir);
   # right padding for some options
   $$settings{$_}=reverse(sprintf("%15s","".reverse($$settings{$_}))) for(qw(mapper snpcaller msa-creation allowedFlanking),@dir);
@@ -324,6 +324,7 @@ sub usage{
     -vcf      $$settings{vcfdir} where to put vcfs
     --tmpdir  $$settings{tmpdir} tmp/ Where to put temporary files
     --msadir  $$settings{msadir} multiple sequence alignment and tree files (final output)
+    --logdir  $$settings{logdir} Where to put log files
     -asm      $$settings{asmdir} directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
       NOTE: Set -all to 'auto' to let SET determine this distance using snpDistribution.pl
 
