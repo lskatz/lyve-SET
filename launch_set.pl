@@ -1,5 +1,8 @@
 #!/usr/bin/env perl
 
+#TODO make a good log in the log directory
+#TODO make a usable caption in the log directory
+
 use FindBin;
 use lib "$FindBin::RealBin/lib";
 
@@ -25,7 +28,7 @@ exit(main());
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --noclean
   my $settings={trees=>1,clean=>1, msa=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i workingdir=s allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s clean! msa! mapper=s snpcaller=s msa-creation=s)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s clean! msa! mapper=s snpcaller=s msa-creation=s)) or die $!;
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
@@ -39,7 +42,6 @@ sub main{
   $$settings{vcfToAlignment_xopts}||="-l mem_free=100G -q highmem.q";
   $$settings{numcpus}||=1;
   $$settings{numnodes}||=20;
-  $$settings{workingdir}||=$sge->get("workingdir");
   $$settings{qsubxopts}||="";
   $$settings{queue}||="";
   # Some things need to just be lowercase to make things easier downstream
@@ -64,6 +66,7 @@ sub main{
   }
 
   # SGE params
+  $$settings{workingdir}=$$settings{logdir};
   for (qw(workingdir numnodes numcpus keep qsubxopts queue)){
     $sge->set($_,$$settings{$_}) if($$settings{$_});
   }
@@ -324,7 +327,7 @@ sub usage{
     -vcf      $$settings{vcfdir} where to put vcfs
     --tmpdir  $$settings{tmpdir} tmp/ Where to put temporary files
     --msadir  $$settings{msadir} multiple sequence alignment and tree files (final output)
-    --logdir  $$settings{logdir} Where to put log files
+    --logdir  $$settings{logdir} Where to put log files. Qsub commands are also stored here.
     -asm      $$settings{asmdir} directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
       NOTE: Set -all to 'auto' to let SET determine this distance using snpDistribution.pl
 
@@ -349,7 +352,6 @@ sub usage{
     --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
     --numnodes  20  maximum number of nodes
     --numcpus   $$settings{numcpus}  number of cpus
-    -w dir/     working directory where qsub commands can be stored. Default: CWD/.SGELK/
   ";
   return $help;
 }
