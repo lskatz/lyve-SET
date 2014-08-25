@@ -93,12 +93,15 @@ sub distanceStuff{
 sub pairwiseDistance{
   my($infile,$prefix,$settings)=@_;
   my $outfile="$prefix.tsv";
+  my $matrix="$prefix.matrix.tsv";
   if(-f $outfile && !$$settings{force}){
     logmsg "$outfile was found. I will not perform pairwise distances again without --force";
     return $outfile;
   }
   logmsg "Calculating pairwise distances";
   system("pairwiseDistances.pl --numcpus $$settings{numcpus} '$infile' | sort -k3,3n > '$outfile'");
+  die if $?;
+  system("pairwiseTo2d.pl < '$outfile' > '$matrix'");
   die if $?;
   
   return $outfile;
