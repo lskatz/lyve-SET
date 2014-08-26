@@ -30,7 +30,7 @@ sub main{
   my $settings={trees=>1,clean=>1, msa=>1};
   GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s clean! msa! mapper=s snpcaller=s msa-creation=s)) or die $!;
   # Lyve-SET
-  $$settings{allowedFlanking}||=0;
+  $$settings{allowedFlanking}||=100;
   $$settings{keep}||=0;
   $$settings{min_alt_frac}||=0.75;
   $$settings{min_coverage}||=10;
@@ -272,8 +272,8 @@ sub variantsToMSA{
     $sge->pleaseExecute("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o $msadir/out.aln.fas -r $ref -b $bad -a $$settings{allowedFlanking}",{qsubxopts=>$$settings{vcfToAlignment_xopts}});
   } elsif($$settings{'msa-creation'} eq 'lyve-set-lowmem'){
     # convert VCFs to an MSA using a low-memory script
-    $sge->pleaseExecute("vcfToAlignment_lowmem.pl $vcfdir/unfiltered/*.vcf $bamdir/*.sorted.bam -n $$settings{numcpus} -ref $ref -p $msadir/out.aln.fas.pos.txt -t $msadir/out.aln.fas.pos.tsv > $msadir/out.aln.fas",{numcpus=>$$settings{numcpus},jobname=>"variantsToMSA_lowmem"}) if(-d "$vcfdir/unfiltered");
-    # shorten the deflines to just their filenames
+    $sge->pleaseExecute("vcfToAlignment_lowmem.pl $vcfdir/unfiltered/*.vcf $bamdir/*.sorted.bam -n $$settings{numcpus} -ref $ref -p $msadir/out.aln.fas.pos.txt -t $msadir/out.aln.fas.pos.tsv -m $$settings{allowedFlanking} > $msadir/out.aln.fas",{numcpus=>$$settings{numcpus},jobname=>"variantsToMSA_lowmem"}) if(-d "$vcfdir/unfiltered");
+    # shorten the deflines to remove the directory names
     $sge->pleaseExecute("sed -i.bak 's|>.*/|>|g' '$msadir/out.aln.fas'",{qsubxopts=>"-hold_jid variantsToMSA_lowmem"});
   }
   $sge->wrapItUp();
