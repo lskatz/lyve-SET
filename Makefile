@@ -5,6 +5,7 @@ PREFIX := /opt/Lyve-SET
 PROFILE := $(HOME)/.bashrc
 VERSION := 0.8.2
 PROJECT := "setTestProject"
+NUMCPUS := 1
 
 # Derived variables
 TMPDIR := $(PREFIX)/build
@@ -81,7 +82,7 @@ test:
 	set_manage.pl $(PROJECT) --add-reads $(PREFIX)/testdata/reads/sample4.fastq.gz
 	set_manage.pl $(PROJECT) --change-reference $(PREFIX)/testdata/reference/lambda_virus.fasta
 	set_manage.pl $(PROJECT) --add-assembly $(PREFIX)/testdata/reference/lambda_virus.fasta
-	launch_set.pl $(PROJECT) --noclean --snpcaller callsam --msa-creation lyve-set-lowmem
+	launch_set.pl $(PROJECT) --noclean --snpcaller callsam --msa-creation lyve-set-lowmem --numcpus $(NUMCPUS)
 
 fail:
 	touch /dfjkd/dfjdksajo/dfj32098/dkdl
