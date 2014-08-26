@@ -273,6 +273,8 @@ sub variantsToMSA{
   } elsif($$settings{'msa-creation'} eq 'lyve-set-lowmem'){
     # convert VCFs to an MSA using a low-memory script
     $sge->pleaseExecute("vcfToAlignment_lowmem.pl $vcfdir/unfiltered/*.vcf $bamdir/*.sorted.bam -n $$settings{numcpus} -ref $ref -p $msadir/out.aln.fas.pos.txt -t $msadir/out.aln.fas.pos.tsv > $msadir/out.aln.fas",{numcpus=>$$settings{numcpus},jobname=>"variantsToMSA_lowmem"}) if(-d "$vcfdir/unfiltered");
+    # shorten the deflines to just their filenames
+    $sge->pleaseExecute("sed -i.bak 's|>.*/|>|g' '$msadir/out.aln.fas'",{qsubxopts=>"-hold_jid variantsToMSA_lowmem"});
   }
   $sge->wrapItUp();
 

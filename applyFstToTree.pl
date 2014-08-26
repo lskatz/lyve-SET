@@ -13,10 +13,7 @@ use Statistics::Descriptive;
 use Math::Round qw/nearest/;
 
 use lib "$FindBin::Bin/lib";
-use Statistics::Data;
-use Statistics::Zed;
 
-my $zed=Statistics::Zed->new(tails=>1,precision_p=>4,precision_s=>4);
 $0=fileparse $0;
 sub logmsg{print STDERR (caller(1))[3].": @_\n";}
 exit main();
