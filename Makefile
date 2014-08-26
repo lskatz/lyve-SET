@@ -6,6 +6,7 @@ PROFILE := $(HOME)/.bashrc
 VERSION := 0.8.2
 PROJECT := "setTestProject"
 NUMCPUS := 1
+SHELL   := /bin/bash
 
 # Derived variables
 TMPDIR := $(PREFIX)/build
@@ -84,6 +85,27 @@ test:
 	set_manage.pl $(PROJECT) --add-assembly $(PREFIX)/testdata/reference/lambda_virus.fasta
 	launch_set.pl $(PROJECT) --noclean --snpcaller callsam --msa-creation lyve-set-lowmem --numcpus $(NUMCPUS)
 
+check: check-cat check-gzip check-CGP-assembly check-Lyve-SET check-PERL
+	@echo --OK
+check-cat:
+	@which cat >/dev/null
+check-gzip:
+	@which gzip >/dev/null
+check-smalt:
+	@which smalt >/dev/null
+check-CGP-assembly:
+	@which run_assembly_shuffleReads.pl run_assembly_trimClean.pl run_assembly_isFastqPE.pl >/dev/null
+check-Lyve-SET:
+	@echo Checking that SET is in your path
+	@which launch_set.pl >/dev/null
+check-PERL:
+	@echo Checking for perl multithreading
+	@perl -Mthreads -e 1
+	@echo Checking for perl modules
+	@perl -MFile::Slurp -e 1
+	@perl -MString::Escape -e 1
+	@perl -MGraph::Centrality::Pagerank -e 1
+	
 fail:
 	touch /dfjkd/dfjdksajo/dfj32098/dkdl
 	exit 5
