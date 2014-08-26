@@ -164,10 +164,10 @@ sub inferPhylogeny{
 
   system("rm -fv $$settings{tempdir}/RAxML*");
   logmsg "Running raxml";
-  logmsg "  cd $$settings{tempdir}; launch_raxml.sh ../$inAln suffix";
-  #$inAln=File::Spec->rel2abs($inAln);
-  my $rand=int(rand(99999));
-  system("cd $$settings{tempdir}; launch_raxml.sh ../$inAln suffix");
+  my $alnInAbs=File::Spec->rel2abs($inAln);
+  my $command="cd $$settings{tempdir}; launch_raxml.sh $alnInAbs suffix";
+  logmsg "  $command";
+  system($command);
   die if $?;
 
   # Move those files over when finished
