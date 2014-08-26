@@ -37,7 +37,7 @@ sub main{
   # modules defaults
   $$settings{mapper}||="smalt";
   $$settings{snpcaller}||="freebayes";
-  $$settings{'msa-creation'}||="lyve-set";
+  $$settings{'msa-creation'}||="lyve-set-lowmem";
   # queue stuff
   $$settings{vcfToAlignment_xopts}||="-l mem_free=100G -q highmem.q";
   $$settings{numcpus}||=1;
@@ -51,9 +51,10 @@ sub main{
   ### Other defaults: reference genome; default directories#
   ##########################################################
   my $project=shift(@ARGV) || '.'; # by default the user is in the project directory
+  die usage($settings) if($$settings{help});
   logmsg "Project was defined as $project"; # No period at the end of sentence to avoid ambiguous '..' in the logmsg
   # Checks to make sure that this is a project
-  system("set_manage.pl '$project'"); die if $?;
+  #system("set_manage.pl '$project'"); die if $?;
   # Set the defaults if they aren't set already
   $$settings{ref}||="$project/reference/reference.fasta";
   # Check SET directories' existence and set their defaults
@@ -61,7 +62,7 @@ sub main{
     my $b=$param;
     $b=~s/dir$//;  # e.g., vcfdir => vcf
     $$settings{$param}||="$project/$b";
-    die "ERROR: Could not find $param under $$settings{$param}/ \n".usage($settings) if(!-d $$settings{$param});
+    die "ERROR: Could not find $param under $$settings{$param}/\n  mkdir $$settings{$param} to resolve this problem.\n".usage($settings) if(!-d $$settings{$param});
     $$settings{$param}=File::Spec->rel2abs($$settings{$param});
   }
 
@@ -71,7 +72,6 @@ sub main{
     $sge->set($_,$$settings{$_}) if($$settings{$_});
   }
 
-  die usage($settings) if($$settings{help});
   # Check the reference parameter
   die "ERROR: reference file was not given\n".usage($settings) if(!defined($$settings{ref}));
   die "ERROR: Could not find the reference file at $$settings{ref}\n".usage($settings) if(!-f $$settings{ref});
@@ -348,7 +348,7 @@ sub usage{
     MODULES
     --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap
     --snpcaller    $$settings{snpcaller}   Which SNP caller? Choices: freebayes, callsam
-    --msa-creation ".$$settings{'msa-creation'}."   Which method of making the multiple sequence alignment? lyve-set, lyve-set-lowmem (unvalidated)
+    --msa-creation ".$$settings{'msa-creation'}."   Which method of making the multiple sequence alignment? lyve-set, lyve-set-lowmem 
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue     all.q         The default queue to use.
     --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
