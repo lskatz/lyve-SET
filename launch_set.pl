@@ -300,12 +300,12 @@ sub variantsToMSA{
   $sge->set("jobname","variantsToMSA");
   $sge->set("numcpus",$$settings{numcpus});
   if($$settings{'msa-creation'} eq 'lyve-set'){
-    $sge->pleaseExecute("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o $outMsa -r $ref -b $bad -a $$settings{allowedFlanking}",{qsubxopts=>$$settings{vcfToAlignment_xopts}});
+    $sge->pleaseExecute("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o $outMsa -r $ref -b $bad -a $$settings{allowedFlanking}",{qsubxopts=>$$settings{vcfToAlignment_xopts},jobname=>"vcfToMSA"});
   } elsif($$settings{'msa-creation'} eq 'lyve-set-lowmem'){
     # convert VCFs to an MSA using a low-memory script
     $sge->pleaseExecute("vcfToAlignment_lowmem.pl $vcfdir/unfiltered/*.vcf $bamdir/*.sorted.bam -n $$settings{numcpus} -ref $ref -p $posFile -t $matrix -m $$settings{allowedFlanking} > $outMsa",{numcpus=>$$settings{numcpus},jobname=>"variantsToMSA_lowmem"}) if(-d "$vcfdir/unfiltered");
     # shorten the deflines to remove the directory names
-    $sge->pleaseExecute("sed -i.bak 's|>.*/|>|g' '$msadir/out.aln.fas'",{qsubxopts=>"-hold_jid variantsToMSA_lowmem"});
+    $sge->pleaseExecute("sed -i.bak 's|>.*/|>|g' '$msadir/out.aln.fas'",{qsubxopts=>"-hold_jid variantsToMSA_lowmem",jobname=>"sed"});
   }
   $sge->wrapItUp();
 
