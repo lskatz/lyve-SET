@@ -16,11 +16,30 @@ use File::Spec;
 use threads;
 use Thread::Queue;
 use Schedule::SGELK;
-use ExtUtils::Command;
+#use ExtUtils::Command;
 
-sub logmsg {local $0=basename $0;my $FH = *STDOUT; print $FH "$0: ".(caller(1))[3].": @_\n";}
+
 my ($name,$scriptsdir,$suffix)=fileparse($0);
 $scriptsdir=File::Spec->rel2abs($scriptsdir);
+
+# Logging
+my $logmsgFh;
+sub logmsg {
+  local $0=basename $0;
+  my $FH = *STDOUT; 
+  my $msg="$0: ".(caller(1))[3].": @_\n";
+
+  # print the message to the logfile if it's not the same as stdout
+  #print join("\t","===",fileno($logmsgFh),fileno($FH))."\n";
+  if(defined($logmsgFh) && fileno($logmsgFh) > 0){
+    print $logmsgFh $msg;
+  }
+  print $FH $msg;
+}
+local $SIG{'__DIE__'} = sub { local $0=basename $0; my $e = $_[0]; $e =~ s/(at [^\s]+? line \d+\.$)/\nStopped $1/; my $msg="$0: ".(caller(1))[3].": ".$e; logmsg($msg);  die($msg); };
+END{
+  close $logmsgFh if(defined($logmsgFh) && fileno($logmsgFh) > 0);
+}
 
 my $sge=Schedule::SGELK->new(-verbose=>1,-numnodes=>20,-numcpus=>8);
 exit(main());
@@ -72,22 +91,21 @@ sub main{
     $sge->set($_,$$settings{$_}) if($$settings{$_});
   }
 
+  # open the log file now that we know the logdir is there
+  open($logmsgFh,">$$settings{logdir}/launch_set.log") or die "ERROR: could not open log file $$settings{logdir}/launch_set.log";
+  logmsg "======\nOpened logfile at $$settings{logdir}/launch_set.log\n=====";
+
   # Check the reference parameter
   die "ERROR: reference file was not given\n".usage($settings) if(!defined($$settings{ref}));
   die "ERROR: Could not find the reference file at $$settings{ref}\n".usage($settings) if(!-f $$settings{ref});
   my $ref=$$settings{ref};
 
-  logmsg "Simulating reads from any assemblies";
   simulateReads($settings);
-  logmsg "Indexing the reference for read mapping";
   indexReference($ref,$settings);
-  logmsg "Mapping reads";
   mapReads($ref,$$settings{readsdir},$$settings{bamdir},$settings);
-  logmsg "Calling variants";
   variantCalls($ref,$$settings{bamdir},$$settings{vcfdir},$settings);
 
   if($$settings{msa}){
-    logmsg "Creating a core hqSNP MSA";
     variantsToMSA($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
     if($$settings{trees}){
       logmsg "Launching set_processMsa.pl";
@@ -102,6 +120,7 @@ sub main{
 
 sub simulateReads{
   my($settings)=@_;
+  logmsg "Simulating reads from any assemblies";
   my @asm=glob("$$settings{asmdir}/*.{fasta,fna,ffn,fa,mfa,mfasta}");
   return if(!@asm);
 
@@ -133,6 +152,7 @@ sub simulateReads{
 
 sub indexReference{
   my($ref,$settings)=@_;
+  logmsg "Indexing the reference for read mapping";
 
   return $ref if(-e "$ref.sma" && -e "$ref.smi");
   # sanity check: see if the reference has dashes in its defline
@@ -142,6 +162,7 @@ sub indexReference{
     die "Dashes are not allowed in the defline\n Offending defline: $defline" if($defline=~/\-/);
   }
 
+  logmsg "Indexing with $$settings{mapper}";
   if($$settings{mapper} eq 'smalt'){
     system("smalt index -k 5 -s 3 $ref $ref 2>&1");
     die if $?;
@@ -154,6 +175,7 @@ sub indexReference{
 
 sub mapReads{
   my($ref,$readsdir,$bamdir,$settings)=@_;
+  logmsg "Mapping reads with $$settings{mapper}";
   $sge->set("numcpus",$$settings{numcpus});
   my $tmpdir=$$settings{tmpdir};
   my $log=$$settings{logdir};
@@ -185,6 +207,7 @@ sub mapReads{
 
 sub variantCalls{
   my($ref,$bamdir,$vcfdir,$settings)=@_;
+  logmsg "Calling variants with $$settings{snpCaller}";
   my @bam=glob("$bamdir/*.sorted.bam");
   my @jobid;
 
@@ -200,6 +223,7 @@ sub variantCalls{
       logmsg "Found $vcfdir/$b.vcf. Skipping";
       next;
     }
+    logmsg "Calling SNPs into $vcfdir/$b.vcf";
     my $j; # job identifier
     if($$settings{snpcaller} eq 'freebayes'){
       $j=$sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}",{numcpus=>1});
@@ -241,6 +265,7 @@ sub variantCalls{
 
 sub variantsToMSA{
   my ($ref,$bamdir,$vcfdir,$msadir,$settings)=@_;
+  logmsg "Creating a core hqSNP MSA with ".$$settings{'msa-creation'};
   my $logdir=$$settings{logdir};
   if(-e "$msadir/out.aln.fas.phy"){
     logmsg "Found $msadir/out.aln.fas.phy already present. Not re-converting.";
@@ -256,6 +281,7 @@ sub variantsToMSA{
     # let's make it a little bit more strict actually.
     $$settings{allowedFlanking}=$allowedFlanking*3;
   }
+  logmsg "AllowedFlanking: $$settings{allowedFlanking}";
 
   # find all "bad" sites
   my $bad="$vcfdir/allsites.txt";
@@ -265,14 +291,19 @@ sub variantsToMSA{
     system("touch $bad"); die if $?;
   }
 
+  my $outMsa="$msadir/out.aln.fas";
+  my $matrix="$outMsa.pos.tsv";
+  my $posFile="$outMsa.pos.txt";
+  logmsg "Output files: $outMsa*";
+
   # convert VCFs to an MSA (long step)
   $sge->set("jobname","variantsToMSA");
   $sge->set("numcpus",$$settings{numcpus});
   if($$settings{'msa-creation'} eq 'lyve-set'){
-    $sge->pleaseExecute("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o $msadir/out.aln.fas -r $ref -b $bad -a $$settings{allowedFlanking}",{qsubxopts=>$$settings{vcfToAlignment_xopts}});
+    $sge->pleaseExecute("vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o $outMsa -r $ref -b $bad -a $$settings{allowedFlanking}",{qsubxopts=>$$settings{vcfToAlignment_xopts}});
   } elsif($$settings{'msa-creation'} eq 'lyve-set-lowmem'){
     # convert VCFs to an MSA using a low-memory script
-    $sge->pleaseExecute("vcfToAlignment_lowmem.pl $vcfdir/unfiltered/*.vcf $bamdir/*.sorted.bam -n $$settings{numcpus} -ref $ref -p $msadir/out.aln.fas.pos.txt -t $msadir/out.aln.fas.pos.tsv -m $$settings{allowedFlanking} > $msadir/out.aln.fas",{numcpus=>$$settings{numcpus},jobname=>"variantsToMSA_lowmem"}) if(-d "$vcfdir/unfiltered");
+    $sge->pleaseExecute("vcfToAlignment_lowmem.pl $vcfdir/unfiltered/*.vcf $bamdir/*.sorted.bam -n $$settings{numcpus} -ref $ref -p $posFile -t $matrix -m $$settings{allowedFlanking} > $outMsa",{numcpus=>$$settings{numcpus},jobname=>"variantsToMSA_lowmem"}) if(-d "$vcfdir/unfiltered");
     # shorten the deflines to remove the directory names
     $sge->pleaseExecute("sed -i.bak 's|>.*/|>|g' '$msadir/out.aln.fas'",{qsubxopts=>"-hold_jid variantsToMSA_lowmem"});
   }
