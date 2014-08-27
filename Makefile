@@ -61,6 +61,7 @@ install:
 	svn checkout https://svn.code.sf.net/p/cg-pipeline/code/ $(PREFIX)/lib/cg-pipeline-code
 	ln -sv $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_isFastqPE.pl $(PREFIX)/
 	ln -sv $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_trimClean.pl $(PREFIX)/
+	ln -sv $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_shuffleReads.pl $(PREFIX)/
 
 cuttingedge:
 	git clone --recursive https://github.com/lskatz/lyve-SET.git $(PREFIX)
