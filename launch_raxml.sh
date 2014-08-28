@@ -1,10 +1,13 @@
 #!/bin/bash
+# converts alignment to phylip and then makes a tree out of it
+# Author: Lee Katz <lkatz@cdc.gov>
+# TODO: make an outgroup parameter, probably using eigenvectors (least connected is the best guess for an outgroup)
+
 #$ -S /bin/bash
 #$ -pe smp 2
 #$ -cwd
 #$ -V
 #$ -o launch_raxml.sh.out -j y
-# converts alignment to phylip and then makes a tree out of it
 
 aln=$1
 prefix=$2
