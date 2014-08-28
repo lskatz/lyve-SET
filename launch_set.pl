@@ -207,7 +207,7 @@ sub mapReads{
 
 sub variantCalls{
   my($ref,$bamdir,$vcfdir,$settings)=@_;
-  logmsg "Calling variants with $$settings{snpCaller}";
+  logmsg "Calling variants with $$settings{snpcaller}";
   my @bam=glob("$bamdir/*.sorted.bam");
   my @jobid;
 
@@ -233,7 +233,7 @@ sub variantCalls{
       # call snps
       $j=$sge->pleaseExecute("$scriptsdir/lib/callsam/bin/callsam_MT.pl $bam --numcpus $$settings{numcpus} --min-coverage $$settings{min_coverage} --min-frequency $$settings{min_alt_frac} --reference '$ref' > $vcfdir/unfiltered/$b.vcf",{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
       # filter the vcf but make it depend on the callsam script to finish
-      $sge->pleaseExecute("$scriptsdir/filterVcf.pl $vcfdir/unfiltered/$b.vcf --noindels -d 10 -o $vcfdir/$b.vcf",{qsubxopts=>"-hold_jid $jobname",numcpus=>1,jobname=>"filter$b"});
+      $sge->pleaseExecute("$scriptsdir/filterVcf.pl $vcfdir/unfiltered/$b.vcf --noindels -d $$settings{min_coverage} -o $vcfdir/$b.vcf",{qsubxopts=>"-hold_jid $jobname",numcpus=>1,jobname=>"filter$b"});
     } else {
       die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
     }
