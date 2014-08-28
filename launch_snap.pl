@@ -101,7 +101,12 @@ sub mapReads{
     system("touch $tmpOut $tmpOut.bai");
     die if $?;
     system("snap single $ref.snap '$prefix.SE.fastq' -t $$settings{numcpus} -so -o $tmpOut");
-    die if $?;
+    if($?){
+      # longer reads will cause an error.  Try the snapxl binary instead just in case
+      logmsg "Snap failed with an error.  Trying snapxl";
+      system("snapxl single $ref.snap '$prefix.SE.fastq' -t $$settings{numcpus} -so -o $tmpOut");
+      die "ERROR: snpxl failed. Maybe you don't have it in your path? It can be compiled from snap using 'make snapxl' from the snap package (https://github.com/amplab/snap)" if $?;
+    }
 
     system("rm -v '$prefix.SE.fastq'"); die if $?;
   }
