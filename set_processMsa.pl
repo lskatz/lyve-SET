@@ -73,7 +73,7 @@ sub main{
   # Things that depend on a tree and pairwise output
   Fst($infile,$$settings{pairwisePrefix},$$settings{treePrefix},$$settings{fstPrefix},$settings) if($$settings{fstPrefix} && $$settings{treePrefix} && $$settings{pairwisePrefix});
 
-  rmdir $$settings{tempdir};  # don't force this rmdir in case it contains files. This script should remove all tmp files before exiting.
+  #rmdir $$settings{tempdir};  # don't force this rmdir in case it contains files. This script should remove all tmp files before exiting.
 
   return 0;
 }
