@@ -16,6 +16,15 @@ if [ "$prefix" = "" ]; then
   exit 1;
 fi
 
+# If the user specifies the outgroup, then set the parameter for Raxml
+outgroup=$3
+outgroupParam=""
+if [ "$outgroup" = "" ]; then
+  echo Warning: outgroup was not given.
+else
+  outgroupParam="-o $outgroup"
+fi
+
 # set the number of CPUs according to the number of slots, or 8 if undefined
 numcpus=${NSLOTS:-2}
 
@@ -42,6 +51,6 @@ if [ $VERSION = 8 ]; then
 else
   MODEL=GTRGAMMA
 fi
-$EXEC -f a -s $aln -n $prefix -T $numcpus -p $RANDOM -x $RANDOM -N 100 -m $MODEL
+$EXEC -f a -s $aln -n $prefix -T $numcpus -p $RANDOM -x $RANDOM -N 100 -m $MODEL $outgroupParam
 if [ $? -gt 0 ]; then exit 1; fi;
 
