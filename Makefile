@@ -59,9 +59,16 @@ install:
 	git clone https://github.com/lskatz/Schedule--SGELK.git $(PREFIX)/lib/Schedule
 	# CGP scripts that are needed and that don't depend on CGP libraries
 	svn checkout https://svn.code.sf.net/p/cg-pipeline/code/ $(PREFIX)/lib/cg-pipeline-code
-	ln -sv $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_isFastqPE.pl $(PREFIX)/
-	ln -sv $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_trimClean.pl $(PREFIX)/
-	ln -sv $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_shuffleReads.pl $(PREFIX)/
+	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_isFastqPE.pl $(PREFIX)/
+	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_trimClean.pl $(PREFIX)/
+	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_shuffleReads.pl $(PREFIX)/
+	# vcftools
+	wget 'http://downloads.sourceforge.net/project/vcftools/vcftools_0.1.12b.tar.gz?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fvcftools%2Ffiles%2F&ts=1409260024&use_mirror=ufpr' -O $(TMPDIR)/vcftools_0.1.12b.tar.gz
+	cd $(TMPDIR) && \
+	tar zxvf vcftools_0.1.12b.tar.gz
+	mv $(TMPDIR)/vcftools_0.1.12b $(PREFIX)/lib/
+	cd $(PREFIX)/lib/vcftools_0.1.12b && make
+	ln -s $(PREFIX)/lib/vcftools_0.1.12b/bin/vcf-sort $(PREFIX)/
 
 cuttingedge:
 	git clone --recursive https://github.com/lskatz/lyve-SET.git $(PREFIX)
