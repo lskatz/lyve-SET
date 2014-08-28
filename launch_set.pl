@@ -154,7 +154,6 @@ sub indexReference{
   my($ref,$settings)=@_;
   logmsg "Indexing the reference for read mapping";
 
-  return $ref if(-e "$ref.sma" && -e "$ref.smi");
   # sanity check: see if the reference has dashes in its defline
   my $in=Bio::SeqIO->new(-file=>$ref);
   while(my $seq=$in->next_seq){
@@ -164,9 +163,11 @@ sub indexReference{
 
   logmsg "Indexing with $$settings{mapper}";
   if($$settings{mapper} eq 'smalt'){
+    return $ref if(-e "$ref.sma" && -e "$ref.smi");
     system("smalt index -k 5 -s 3 $ref $ref 2>&1");
     die if $?;
   } elsif($$settings{mapper} eq 'snap'){
+    return $ref if(-d "$ref.snap" && -e "$ref.snap/GenomeIndex");
     system("snap index $ref $ref.snap -s 16");
     die if $?;
   }
