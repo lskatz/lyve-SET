@@ -106,7 +106,7 @@ sub main{
     variantsToMSA($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
     if($$settings{trees}){
       logmsg "Launching set_processMsa.pl";
-      $sge->pleaseExecute_andWait("set_processMsa.pl --auto --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus}",{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
+      $sge->pleaseExecute_andWait("set_processMsa.pl --auto --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus} 2>&1 | tee $$settings{logdir}/set_processMsa.log ",{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
     }
   }
 
