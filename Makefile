@@ -34,6 +34,7 @@ help:
 	@echo $(T) clean - delete the temporary files. Does not remove the result of 'make env.'
 	@echo $(T2) PREFIX=$(PREFIX)
 	@echo $(T) test - create a test project using the test data found in the installation directory
+	@echo $(T2) NUMCPUS=$(NUMCPUS)
 	@echo $(T2) PREFIX=$(PREFIX)
 	@echo $(T2) PROJECT=$(PROJECT)
 	@echo NOTES: 
