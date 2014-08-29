@@ -230,8 +230,10 @@ sub variantCalls{
       my $jobname="callsam$b";
       # call snps
       $j=$sge->pleaseExecute("$scriptsdir/lib/callsam/bin/callsam_MT.pl $bam --numcpus $$settings{numcpus} --min-coverage $$settings{min_coverage} --min-frequency $$settings{min_alt_frac} --reference '$ref' > $vcfdir/unfiltered/$b.vcf",{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
-      # filter the vcf but make it depend on the callsam script to finish
-      $sge->pleaseExecute("$scriptsdir/filterVcf.pl $vcfdir/unfiltered/$b.vcf --noindels -d $$settings{min_coverage} -o $vcfdir/$b.vcf",{qsubxopts=>"-hold_jid $jobname",numcpus=>1,jobname=>"filter$b"});
+      # sort VCF
+      $j=$sge->pleaseExecute("mv $vcfdir/unfiltered/$b.vcf $vcfdir/unfiltered/$b.vcf.tmp && vcf-sort < $vcfdir/unfiltered/$b.vcf.tmp > $vcfdir/unfiltered/$b.vcf",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
+      # filter VCF
+      $sge->pleaseExecute("$scriptsdir/filterVcf.pl $vcfdir/unfiltered/$b.vcf --noindels -d $$settings{min_coverage} -o $vcfdir/$b.vcf",{qsubxopts=>"-hold_jid sort$b",numcpus=>1,jobname=>"filter$b"});
     } else {
       die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
     }
@@ -302,7 +304,7 @@ sub variantsToMSA{
     logmsg "  $command";
     $sge->pleaseExecute($command,{qsubxopts=>$$settings{vcfToAlignment_xopts},jobname=>"vcfToMSA"});
   } elsif($$settings{'msa-creation'} eq 'lyve-set-lowmem'){
-    my $command="vcfToAlignment_lowmem.pl $vcfdir/unfiltered/*.vcf $bamdir/*.sorted.bam -n $$settings{numcpus} -ref $ref -p $posFile -t $matrix -m $$settings{allowedFlanking} > $outMsa";
+    my $command="vcfToAlignment_lowmem.pl $vcfdir/*.vcf $bamdir/*.sorted.bam -n $$settings{numcpus} -ref $ref -p $posFile -t $matrix -m $$settings{allowedFlanking} > $outMsa";
     logmsg "  $command";
     $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"variantsToMSA_lowmem"}) if(-d "$vcfdir/unfiltered");
     # shorten the deflines to remove the directory names
