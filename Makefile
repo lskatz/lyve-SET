@@ -3,7 +3,7 @@
 
 PREFIX := /opt/Lyve-SET
 PROFILE := $(HOME)/.bashrc
-VERSION := 0.8.2
+VERSION := 0.8.3
 PROJECT := "setTestProject"
 NUMCPUS := 1
 SHELL   := /bin/bash
@@ -16,32 +16,33 @@ TMPTARFILE=$(TMPDIR)/$(TARFILE)
 # Style variables
 T= "	"
 T2=$(T)$(T)
+PREFIXNOTE="Must be an absolute path directory"
 
 ###################################
 
 default: help
 
 help:
-	@echo Commands:
+	@echo 1. INSTALL CHOICES
 	@echo $(T) all - Perform install, env, and clean. All parameters are valid to use here.
 	@echo $(T) install - copy all files over to an installation directory
-	@echo $(T2) PREFIX=$(PREFIX)
+	@echo $(T2) PREFIX=$(PREFIX) $(PREFIXNOTE)
 	@echo $(T2) VERSION=$(VERSION)
-	@echo $(T) cuttingedge - download and install the most up to date code. Does not include 'make env'
-	@echo $(T2) PREFIX=$(PREFIX)
+	@echo $(T) cuttingedge - download and install the most up to date code. Does not include 'make env' or any prerequisites. Can be used instead of 'make install'
+	@echo $(T2) PREFIX=$(PREFIX) $(PREFIXNOTE)
+	@echo
+	@echo 2. ENVIRONMENT CHECK
 	@echo $(T) env - put all environmental variables into a profile file 
 	@echo $(T2) PROFILE=$(PROFILE)
-	@echo $(T) clean - delete the temporary files. Does not remove the result of 'make env.'
-	@echo $(T2) PREFIX=$(PREFIX)
+	@echo $(T) check - check to see if all prerequisites are installed
 	@echo $(T) test - create a test project using the test data found in the installation directory
+	@echo
+	@echo 3. OTHER
+	@echo $(T) clean - delete the temporary files. Does not remove the result of 'make env.'
+	@echo $(T2) PREFIX=$(PREFIX) $(PREFIXNOTE)
 	@echo $(T2) NUMCPUS=$(NUMCPUS)
-	@echo $(T2) PREFIX=$(PREFIX)
+	@echo $(T2) PREFIX=$(PREFIX) $(PREFIXNOTE)
 	@echo $(T2) PROJECT=$(PROJECT)
-	@echo NOTES: 
-	@echo $(T) All paths must be absolute
-	@echo Example:
-	@echo $(T) make all PREFIX=$(PREFIX) VERSION=$(VERSION) PROFILE=$(PROFILE)
-	@echo $(T) "make cuttingedge PREFIX=$(PREFIX) && make env PROFILE=$(PROFILE) && make test PREFIX=$(PREFIX) PROJECT=$(PROJECT)"
 
 all: install env clean
 
