@@ -31,8 +31,6 @@ sub main{
   $$settings{auto}||=0;
   $$settings{msaDir}||=0;
   $$settings{force}||=0;
-  $$settings{tempdir}||="tmp";
-  mkdir $$settings{tempdir} if(!-d $$settings{tempdir});
   die usage() if($$settings{help});
 
   if($$settings{auto} || $$settings{msaDir}){
@@ -50,6 +48,8 @@ sub main{
     $$settings{fstPrefix}||="$dir/fst";
     $$settings{eigenPrefix}||="$dir/eigen";
   }
+  $$settings{tempdir}||="$$settings{msaDir}/tmp";
+  mkdir $$settings{tempdir} if(!-d $$settings{tempdir});
 
   my $infile;
   if(@ARGV){
@@ -208,7 +208,7 @@ sub usage{
   local $0=basename $0;
   "Process an MSA from a hqSNP pipeline and get useful information
   Usage: $0 file.fasta
-  -g   groups.txt       Text files of genome names, one per line (multiple -g are encouraged).
+  #-g   groups.txt       Text files of genome names, one per line (multiple -g are encouraged).
                         Groups will help with Fst and with pairwise distances.
   -n   numcpus
   --force               Files will be overwritten even if they exist
