@@ -12,7 +12,7 @@ use FindBin;
 use Statistics::Descriptive;
 use Math::Round qw/nearest/;
 
-use lib "$FindBin::Bin/lib";
+use lib "$FindBin::Bin/../lib";
 
 $0=fileparse $0;
 sub logmsg{print STDERR (caller(1))[3].": @_\n";}

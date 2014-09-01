@@ -4,7 +4,7 @@
 # Author: Lee Katz <lkatz@cdc.gov>
 
 use FindBin;
-use lib "$FindBin::RealBin/lib";
+use lib "$FindBin::RealBin/../lib";
 
 use strict;
 use warnings;

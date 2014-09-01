@@ -7,7 +7,7 @@ use Data::Dumper;
 use Graph::Centrality::Pagerank;
 use Getopt::Long;
 use FindBin;
-use lib "$FindBin::RealBin/lib";
+use lib "$FindBin::RealBin/../lib";
 use File::Basename qw/basename/;
 
 sub logmsg {local $0=basename $0;my $FH = *STDERR; print $FH "$0: ".(caller(1))[3].": @_\n";}
