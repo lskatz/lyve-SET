@@ -3,6 +3,8 @@
 
 use strict;
 use warnings;
+use FindBin;
+use lib "$FindBin::Bin/../lib";
 use Getopt::Long;
 use Data::Dumper;
 use Statistics::Descriptive;
