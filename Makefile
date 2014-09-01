@@ -69,9 +69,10 @@ install:
 	cd $(TMPDIR) && \
 	tar zxvf vcftools_0.1.12b.tar.gz
 	mv $(TMPDIR)/vcftools_0.1.12b $(PREFIX)/lib/
-	cd $(PREFIX)/lib/vcftools_0.1.12b && make
-	ln -s $(PREFIX)/lib/vcftools_0.1.12b/bin/vcf-sort $(PREFIX)/
-	ln -s $(PREFIX)/lib/vcftools_0.1.12b/lib/Vcf.pm $(PREFIX)/lib/
+	cd $(PREFIX)/lib/vcftools_0.1.12b &&\
+    make --directory=$(PREFIX)/lib/vcftools_0.1.12b MAKEFLAGS=""
+	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/vcf-sort $(PREFIX)/
+	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/Vcf.pm $(PREFIX)/lib/
 
 cuttingedge:
 	git clone --recursive https://github.com/lskatz/lyve-SET.git $(PREFIX)
