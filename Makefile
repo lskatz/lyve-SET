@@ -55,7 +55,7 @@ install:
 	# Move all the untarred files to the install directory
 	mv -v $(TMPDIR)/lyve-SET-$(VERSION)/* $(PREFIX)/
 	# download necessary submodules because git doesn't package them in the release
-	rm -rvf $(PREFIX)/lib/*
+	#rm -rvf $(PREFIX)/lib/*
 	# Git submodules
 	git clone https://github.com/lskatz/callsam.git $(PREFIX)/lib/callsam
 	git clone https://github.com/lskatz/Schedule--SGELK.git $(PREFIX)/lib/Schedule
