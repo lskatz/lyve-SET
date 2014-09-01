@@ -78,7 +78,7 @@ cuttingedge:
 
 env:
 	echo "#Lyve-SET" >> $(PROFILE)
-	echo "export PATH=\$$PATH:$(PREFIX)" >> $(PROFILE)
+	echo "export PATH=\$$PATH:$(PREFIX)/scripts" >> $(PROFILE)
 	echo "export PERL5LIB=\$$PERL5LIB:$(PREFIX/lib)" >> $(PROFILE)
 
 clean:
