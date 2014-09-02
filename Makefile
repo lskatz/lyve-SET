@@ -130,7 +130,3 @@ check-PERL:
 	@perl -I $(PREFIX)/lib -MString::Escape -e 1
 	@perl -I $(PREFIX)/lib -MGraph::Centrality::Pagerank -e 1
 	
-fail:
-	touch /dfjkd/dfjdksajo/dfj32098/dkdl
-	exit 5
-	exit 1
