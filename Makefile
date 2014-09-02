@@ -10,13 +10,12 @@ SHELL   := /bin/bash
 
 # Derived variables
 TMPDIR := $(PREFIX)/build
-TARFILE=Lyve-SET.v$(VERSION).tar.gz
 TMPTARFILE=$(TMPDIR)/$(TARFILE)
 
 # Style variables
 T= "	"
 T2=$(T)$(T)
-PREFIXNOTE="Must be an absolute path directory"
+PREFIXNOTE="Must be an absolute path directory. Default: $(PWD)"
 
 ###################################
 
@@ -25,9 +24,8 @@ default: help
 help:
 	@echo 1. INSTALL CHOICES
 	@echo $(T) all - Perform install, env, and clean. All parameters are valid to use here.
-	@echo $(T) install - copy all files over to an installation directory
+	@echo $(T) install - copy all files over to an installation directory. Installs most prerequisites.
 	@echo $(T2) PREFIX=$(PREFIX) $(PREFIXNOTE)
-	@echo $(T2) VERSION=$(VERSION)
 	@echo $(T) cuttingedge - download and install the most up to date code. Does not include 'make env' or any prerequisites. Can be used instead of 'make install'
 	@echo $(T2) PREFIX=$(PREFIX) $(PREFIXNOTE)
 	@echo
@@ -92,10 +90,10 @@ cuttingedge:
 env:
 	echo "#Lyve-SET" >> $(PROFILE)
 	echo "export PATH=\$$PATH:$(PREFIX)/scripts" >> $(PROFILE)
-	echo "export PERL5LIB=\$$PERL5LIB:$(PREFIX/lib)" >> $(PROFILE)
+	echo "export PERL5LIB=\$$PERL5LIB:$(PREFIX)/lib" >> $(PROFILE)
 
 clean:
-	rm -vrf $(TMPDIR)
+	rm -vrf $(TMPDIR)/*
 	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
 
 test:
