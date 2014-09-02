@@ -25,31 +25,40 @@ To install, just run the make file with `make install`.  Run `make help` for all
 
 Usage
 -----
-    Usage: launch_set.pl -ref reference.fasta [-b bam/ -v vcf/ -t tmp/ -reads reads/ -m msa/ -asm asm/]
-    Where parameters with a / are directories
-    -reads    readsdir/       where fastq and fastq.gz files are located
-    -bam      bamdir/         where to put bams
-    -vcf      vcfdir/         where to put vcfs
-    --tmpdir  tmpdir/         tmp/ Where to put temporary files
-    --msadir  msadir/         multiple sequence alignment and tree files (final output)
-    -asm      asmdir/         directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
-    -all      0               allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
-      NOTE: Set -all to 'auto' to let SET determine this distance using snpDistribution.pl
+    launch_set.pl: main::main: launch_set.pl: Launches the Lyve-SET pipeline
+    Usage: launch_set.pl [project] [-ref reference.fasta]
+    If project is not given, then it is assumed to be the current working directory.
+    If reference is not given, then it is assumed to be proj/reference/reference.fasta
+	    Where parameters with a / are directories
+	    -ref      proj/reference/reference.fasta   The reference genome assembly
+	    -reads    readsdir/       where fastq and fastq.gz files are located
+	    -bam      bamdir/         where to put bams
+	    -vcf      vcfdir/         where to put vcfs
+	    --tmpdir  tmpdir/         tmp/ Where to put temporary files
+	    --msadir  msadir/         multiple sequence alignment and tree files (final output)
+	    --logdir  logdir/         Where to put log files. Qsub commands are also stored here.
+	    -asm      asmdir/         directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
+	      NOTE: Set -all to 'auto' to let SET determine this distance using snpDistribution.pl
+
+    SNP MATRIX OPTIONS
+	    --allowedFlanking  100             allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+	    --min_alt_frac     0.75  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
+	    --min_coverage     10  Minimum coverage needed before a SNP is called. Otherwise, 'N'
 
     SKIP CERTAIN STEPS
-    --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with; removes the requirement for CG-Pipeline)
-    --nomsa to not make a multiple sequence alignment
-    --notrees to not make phylogenies
+	    --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with; removes the requirement for CG-Pipeline)
+	    --nomsa to not make a multiple sequence alignment
+	    --notrees to not make phylogenies
     MODULES
-    --mapper       smalt             Which mapper? Choices: smalt, snap
-    --snpcaller    freebayes         Which SNP caller? Choices: freebayes, callsam
-    --msa-creation lyve-set          Which method of making the multiple sequence alignment? lyve-set, lyve-set-lowmem (unvalidated)
+	    --mapper       smalt             Which mapper? Choices: smalt, snap
+	    --snpcaller    freebayes         Which SNP caller? Choices: freebayes, callsam
+	    --msa-creation lyve-set-lowmem   Which method of making the multiple sequence alignment? lyve-set, lyve-set-lowmem
     SCHEDULER AND MULTITHREADING OPTIONS
-    --queue     all.q         The default queue to use.
-    --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
-    --numnodes  20  maximum number of nodes
-    --numcpus   1  number of cpus
-    -w dir/     working directory where qsub commands can be stored. Default: CWD/.SGELK/
+	    --queue     all.q         The default queue to use.
+	    --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
+	    --numnodes  20  maximum number of nodes
+	    --numcpus   1  number of cpus
+
 
 
 Examples
@@ -83,7 +92,7 @@ If you have version 0.8 or earlier, use the following sytax:
 
 If you have a newer version >0.8 then you have the script set_manage.pl and you should use the following syntax:
     
-    $ set_manage.pl -c setTest
+    $ set_manage.pl --create setTest
     $ set_manage.pl setTest --add-reads file1.fastq.gz
     $ set_manage.pl setTest --add-reads file2.fastq.gz
     $ set_manage.pl setTest --add-reads file3.fastq.gz
@@ -94,7 +103,7 @@ If you have a newer version >0.8 then you have the script set_manage.pl and you 
     $ set_manage.pl setTest --change-reference file3.fasta
     $ cd  setTest # get into the directory before running launch_set.pl
 
-NOTE: no underscores or dashes allowed in the reference genome fasta file
+NOTE: no underscores or dashes allowed in the reference genome fasta file headers
     
 Run Lyve-SET with as few options as possible
 
