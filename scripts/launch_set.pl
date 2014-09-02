@@ -229,7 +229,7 @@ sub variantCalls{
     } elsif($$settings{snpcaller} eq 'callsam'){
       my $jobname="callsam$b";
       # call snps
-      $j=$sge->pleaseExecute("$scriptsdir/lib/callsam/bin/callsam_MT.pl $bam --numcpus $$settings{numcpus} --min-coverage $$settings{min_coverage} --min-frequency $$settings{min_alt_frac} --reference '$ref' > $vcfdir/unfiltered/$b.vcf",{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
+      $j=$sge->pleaseExecute("$scriptsdir/../lib/callsam/bin/callsam_MT.pl $bam --numcpus $$settings{numcpus} --min-coverage $$settings{min_coverage} --min-frequency $$settings{min_alt_frac} --reference '$ref' > $vcfdir/unfiltered/$b.vcf",{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
       # sort VCF
       $j=$sge->pleaseExecute("mv $vcfdir/unfiltered/$b.vcf $vcfdir/unfiltered/$b.vcf.tmp && vcf-sort < $vcfdir/unfiltered/$b.vcf.tmp > $vcfdir/unfiltered/$b.vcf",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
       # filter VCF
