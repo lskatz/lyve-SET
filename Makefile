@@ -107,12 +107,12 @@ test:
 	set_manage.pl $(PROJECT) --add-assembly $(PREFIX)/testdata/reference/lambda_virus.fasta
 	launch_set.pl $(PROJECT) --noclean --snpcaller callsam --msa-creation lyve-set-lowmem --numcpus $(NUMCPUS)
 
-check: check-cat check-gzip check-Lyve-SET-PATH check-CGP-assembly check-Lyve-SET check-PERL check-smalt check-freebayes check-raxml check-freebayes check-phyml
+check: check-sys check-Lyve-SET-PATH check-CGP-assembly check-Lyve-SET check-PERL check-smalt check-freebayes check-raxml check-freebayes check-phyml
 	@echo --OK
-check-cat:
-	@which cat >/dev/null
-check-gzip:
-	@which gzip >/dev/null
+check-sys:
+	@F=$$(which cat) && echo "Found $$F"
+	@F=$$(which gzip) && echo "Found $$F"
+	@F=$$(which perl) && echo "Found $$F"
 check-smalt:
 	@F=$$(which smalt 2>/dev/null) && echo "Found smalt at $$F"
 check-freebayes:
@@ -135,7 +135,10 @@ check-PERL:
 	@echo Checking for perl multithreading
 	@perl -Mthreads -e 1
 	@echo Checking for perl modules
+	@echo "Looking for File::Slurp"
 	@perl -I $(PREFIX)/lib -MFile::Slurp -e 1
+	@echo "Looking for String::Escape"
 	@perl -I $(PREFIX)/lib -MString::Escape -e 1
+	@echo "Looking for Graph::Centrality::Pagerank"
 	@perl -I $(PREFIX)/lib -MGraph::Centrality::Pagerank -e 1
 	
