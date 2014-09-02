@@ -12,16 +12,21 @@ Requirements
 * PhyML
 * FreeBayes
 * Smalt
-* CG-Pipeline
 * Samtools
-* wgsim (part of samtools) if you are simulating reads
-* Schedule::SGELK (installed at the same time if you download with git)
-* CallSam (installed at the same time if you download with git)
+  * wgsim (part of samtools) if you are simulating reads
+
+Requirements installed with "make install"
+------------
+* CG-Pipeline
+* Schedule::SGELK
+* CallSam 
 
 Installation
 ------------
-
-To install, just run the make file with `make install`.  Run `make help` for all options.
+* `make install`
+* `make check` - check and see if you have all the prerequisites
+* `make test` - run a test phage dataset provided by CFSAN
+* `make help` - for other `make` options
 
 Usage
 -----
