@@ -107,19 +107,30 @@ test:
 	set_manage.pl $(PROJECT) --add-assembly $(PREFIX)/testdata/reference/lambda_virus.fasta
 	launch_set.pl $(PROJECT) --noclean --snpcaller callsam --msa-creation lyve-set-lowmem --numcpus $(NUMCPUS)
 
-check: check-cat check-gzip check-CGP-assembly check-Lyve-SET check-PERL
+check: check-cat check-gzip check-Lyve-SET-PATH check-CGP-assembly check-Lyve-SET check-PERL check-smalt check-freebayes check-raxml check-freebayes check-phyml
 	@echo --OK
 check-cat:
 	@which cat >/dev/null
 check-gzip:
 	@which gzip >/dev/null
 check-smalt:
-	@which smalt >/dev/null
+	@F=$$(which smalt 2>/dev/null) && echo "Found smalt at $$F"
+check-freebayes:
+	@F=$$(which freebayes 2>/dev/null) && echo "Found freebayes at $$F"
+check-raxml:
+	@ RAXML=$$((which raxml || which raxmlHPC-PTHREADS) 2>/dev/null) && echo "Found raxml at $$RAXML"
+check-phyml:
+	@ PHYML=$$((which phyml || which phyml_linux_64 ) 2>/dev/null) && echo "Found phyml at $$PHYML"
+check-callsam:
+	@export PATH=$$PATH:$(PREFIX)/lib/callsam/bin && which callsam_MT.pl >/dev/null
 check-CGP-assembly:
 	@which run_assembly_shuffleReads.pl run_assembly_trimClean.pl run_assembly_isFastqPE.pl >/dev/null
-check-Lyve-SET:
-	@echo Checking that SET is in your path
+check-Lyve-SET-PATH:
+	@echo Checking that your path includes Lyve-SET/scripts
 	@which launch_set.pl >/dev/null
+check-Lyve-SET:
+	@echo Checking that the SET executables are present
+	@export PATH=$$PATH:$(PREFIX)/scripts && which launch_set.pl >/dev/null
 check-PERL:
 	@echo Checking for perl multithreading
 	@perl -Mthreads -e 1
