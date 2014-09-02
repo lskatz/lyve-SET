@@ -47,23 +47,35 @@ help:
 all: install env clean
 
 install: install-prerequisites
+	@echo DONE!
 	@echo "Don't forget to set up update PATH and PERL5LIB to $(PREFIX)/scripts and $(PREFIX)/lib"
 	@echo "Use 'make env' as a shortcut"
 
 install-prerequisites: install-vcftools install-CGP install-callsam install-SGELK
 
 install-callsam:
+	rm -rf $(PREFIX)/lib/callsam # make sure it's removed
 	git clone https://github.com/lskatz/callsam.git $(PREFIX)/lib/callsam
 install-SGELK:
-	git clone https://github.com/lskatz/Schedule--SGELK.git $(PREFIX)/lib/Schedule
+	rm -rf $(TMPDIR)/Schedule # make sure it's removed
+	git clone https://github.com/lskatz/Schedule--SGELK.git $(TMPDIR)/Schedule
+	mv -v $(TMPDIR)/Schedule/SGELK.pm $(PREFIX)/lib/Schedule/
 install-CGP:
+	# make sure these scripts are removed
+	rm -f $(PREFIX)/scripts/run_assembly_isFastqPE.pl
+	rm -f $(PREFIX)/scripts/run_assembly_trimClean.pl
+	rm -f $(PREFIX)/scripts/run_assembly_shuffleReads.pl
+	rm -rvf $(PREFIX)/lib/cg-pipeline-code
 	# CGP scripts that are needed and that don't depend on CGP libraries
 	svn checkout https://svn.code.sf.net/p/cg-pipeline/code/ $(PREFIX)/lib/cg-pipeline-code
-	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_isFastqPE.pl $(PREFIX)/
-	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_trimClean.pl $(PREFIX)/
-	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_shuffleReads.pl $(PREFIX)/
+	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_isFastqPE.pl $(PREFIX)/scripts/
+	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_trimClean.pl $(PREFIX)/scripts/
+	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_shuffleReads.pl $(PREFIX)/scripts/
 
 install-vcftools:
+	rm -rvf $(PREFIX)/lib/vcftools_0.1.12b
+	rm -vf $(PREFIX)/scripts/vcf-sort
+	rm -vf $(PREFIX)/lib/Vcf.pm
 	wget 'http://downloads.sourceforge.net/project/vcftools/vcftools_0.1.12b.tar.gz?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fvcftools%2Ffiles%2F&ts=1409260024&use_mirror=ufpr' -O $(TMPDIR)/vcftools_0.1.12b.tar.gz
 	cd $(TMPDIR) && \
 	tar zxvf vcftools_0.1.12b.tar.gz
@@ -114,9 +126,9 @@ check-PERL:
 	@echo Checking for perl multithreading
 	@perl -Mthreads -e 1
 	@echo Checking for perl modules
-	@perl -MFile::Slurp -e 1
-	@perl -MString::Escape -e 1
-	@perl -MGraph::Centrality::Pagerank -e 1
+	@perl -I $(PREFIX)/lib -MFile::Slurp -e 1
+	@perl -I $(PREFIX)/lib -MString::Escape -e 1
+	@perl -I $(PREFIX)/lib -MGraph::Centrality::Pagerank -e 1
 	
 fail:
 	touch /dfjkd/dfjdksajo/dfj32098/dkdl
