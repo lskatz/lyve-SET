@@ -1,9 +1,9 @@
 # Author: Lee Katz <lkatz@cdc.gov>
 # Lyve-SET
 
-PREFIX := /opt/Lyve-SET
+PREFIX := $(PWD)
 PROFILE := $(HOME)/.bashrc
-VERSION := 0.8.3
+VERSION := 0.8.4
 PROJECT := "setTestProject"
 NUMCPUS := 1
 SHELL   := /bin/bash
@@ -46,36 +46,36 @@ help:
 
 all: install env clean
 
-install:
-	mkdir $(PREFIX) 
-	mkdir $(TMPDIR)
-	wget https://github.com/lskatz/lyve-SET/archive/v$(VERSION).tar.gz -O $(TMPTARFILE)
-	cd $(TMPDIR) && \
-	tar zxvf $(TARFILE)
-	# Move all the untarred files to the install directory
-	mv -v $(TMPDIR)/lyve-SET-$(VERSION)/* $(PREFIX)/
-	# download necessary submodules because git doesn't package them in the release
-	#rm -rvf $(PREFIX)/lib/*
-	# Git submodules
+install: install-prerequisites
+	@echo "Don't forget to set up update PATH and PERL5LIB to $(PREFIX)/scripts and $(PREFIX)/lib"
+	@echo "Use 'make env' as a shortcut"
+
+install-prerequisites: install-vcftools install-CGP install-callsam install-SGELK
+
+install-callsam:
 	git clone https://github.com/lskatz/callsam.git $(PREFIX)/lib/callsam
+install-SGELK:
 	git clone https://github.com/lskatz/Schedule--SGELK.git $(PREFIX)/lib/Schedule
+install-CGP:
 	# CGP scripts that are needed and that don't depend on CGP libraries
 	svn checkout https://svn.code.sf.net/p/cg-pipeline/code/ $(PREFIX)/lib/cg-pipeline-code
 	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_isFastqPE.pl $(PREFIX)/
 	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_trimClean.pl $(PREFIX)/
 	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_shuffleReads.pl $(PREFIX)/
-	# vcftools
+
+install-vcftools:
 	wget 'http://downloads.sourceforge.net/project/vcftools/vcftools_0.1.12b.tar.gz?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fvcftools%2Ffiles%2F&ts=1409260024&use_mirror=ufpr' -O $(TMPDIR)/vcftools_0.1.12b.tar.gz
 	cd $(TMPDIR) && \
 	tar zxvf vcftools_0.1.12b.tar.gz
 	mv $(TMPDIR)/vcftools_0.1.12b $(PREFIX)/lib/
 	cd $(PREFIX)/lib/vcftools_0.1.12b &&\
     make --directory=$(PREFIX)/lib/vcftools_0.1.12b MAKEFLAGS=""
-	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/vcf-sort $(PREFIX)/
+	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/vcf-sort $(PREFIX)/scripts/
 	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/Vcf.pm $(PREFIX)/lib/
-
+	
 cuttingedge:
 	git clone --recursive https://github.com/lskatz/lyve-SET.git $(PREFIX)
+	$(MAKE) install-prerequisites
 
 env:
 	echo "#Lyve-SET" >> $(PROFILE)
