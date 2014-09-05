@@ -11,7 +11,10 @@ use Cwd qw/realpath/;
 use File::Basename qw/basename/;
 use File::Copy qw/copy/;
 
-sub logmsg{print STDERR "@_\n";}
+# The directories a project should have
+my @projectSubdir=qw(vcf vcf/unfiltered msa bam reads reference tmp asm log);
+
+sub logmsg{local $0=basename $0; print STDERR "$0: @_\n";}
 exit main();
 
 sub main{
@@ -31,6 +34,7 @@ sub main{
   removeAssembly($project,$settings) if($$settings{'remove-assembly'});
   removeReads($project,$settings) if($$settings{'remove-reads'});
   deleteProject($project,$settings) if($$settings{delete});
+  removeGenome($project,$settings) if($$settings{'remove-genome'});
 
   return 0;
 }
@@ -40,8 +44,9 @@ sub createProjectDir{
   die "ERROR: directory $dir already exists!" if(-d $dir);
   mkdir $dir;
   die $! if $?;
-  for(qw(vcf vcf/unfiltered msa bam reads reference tmp asm log)){
+  for(@projectSubdir){
     mkdir "$dir/$_";
+    logmsg "mkdir $dir/$_";
     die $! if $?;
   }
   return $dir;
@@ -49,7 +54,7 @@ sub createProjectDir{
 
 sub is_project{
   my($project,$settings)=@_;
-  for(qw(vcf vcf/unfiltered msa bam reads reference tmp asm)){
+  for(@projectSubdir){
     return 0 if(!-e "$project/$_");
   }
   return 1;
@@ -104,8 +109,11 @@ sub changeReference{
 
 sub deleteProject{
   my($project,$settings)=@_;
-  system("rm -rfv '$project'");
-  die if $?;
+  die "ERROR: $project is not a Lyve-SET project" if(!is_project($project,$settings));
+  for (@projectSubdir){
+    system("rm -rfv '$project/$_' 1>&2"); die if $?;
+  }
+  system("rmdir -v $project 1>&2"); die if $?;
   return 1;
 }
 
@@ -115,7 +123,7 @@ sub usage{
   --create Create a set project
   --delete Delete a set project
   --add-reads file.fastq.gz       Add reads to your project (using symlink)
-  --remove-reads file.fastq.gz    Remove reads from your project (using rm)
+  --remove-reads file.fastq.gz    Remove reads from your project (using rm on reads, vcf, and bam directories)
   --add-assembly file.fasta       Add an assembly to your project (using symlink)
   --remove-assembly file.fasta    Remove an assembly from your project (using rm)
   --change-reference file.fasta   Add a reference assembly to your project and remove any existing one (using cp)
