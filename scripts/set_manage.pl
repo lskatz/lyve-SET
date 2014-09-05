@@ -26,7 +26,8 @@ sub main{
 
   createProjectDir($project,$settings) if($$settings{create});
   if(!is_project($project,$settings)){
-    die "$project is not a SET project!";
+    my(undef,$dirs)=is_project($project,$settings);
+    die "$project is not a SET project! Missing $dirs";
   }
   addReads($project,$settings) if($$settings{'add-reads'});
   addAssembly($project,$settings) if($$settings{'add-assembly'});
@@ -54,9 +55,16 @@ sub createProjectDir{
 
 sub is_project{
   my($project,$settings)=@_;
+  my $dirs="";
   for(@projectSubdir){
-    return 0 if(!-e "$project/$_");
+    $dirs.="$project/$_ " if(!-e "$project/$_");
   }
+
+  if($dirs){
+    return (0,$dirs) if wantarray;
+    return 0;
+  }
+  return (1,"") if wantarray;
   return 1;
 }
 
@@ -109,7 +117,6 @@ sub changeReference{
 
 sub deleteProject{
   my($project,$settings)=@_;
-  die "ERROR: $project is not a Lyve-SET project" if(!is_project($project,$settings));
   for (@projectSubdir){
     system("rm -rfv '$project/$_' 1>&2"); die if $?;
   }
