@@ -64,13 +64,8 @@ sub main{
   }
   logmsg "Input alignment file is ".File::Spec->rel2abs($infile);
 
-  # Start off the threads
-  my @thr;
-  $thr[0]=threads->new(\&distanceStuff,$infile,$settings);
-  $thr[1]=threads->new(\&phylogenies,$infile,$settings);
-  $_->join for(@thr); @thr=();
-
-  # Things that depend on a tree and pairwise output
+  my $outgroup=distanceStuff($infile,$settings);
+  my($informativeAln,$tree)=phylogenies($infile,$outgroup,$settings);
   Fst($infile,$$settings{pairwisePrefix},$$settings{treePrefix},$$settings{fstPrefix},$settings) if($$settings{fstPrefix} && $$settings{treePrefix} && $$settings{pairwisePrefix});
 
   #rmdir $$settings{tempdir};  # don't force this rmdir in case it contains files. This script should remove all tmp files before exiting.
@@ -126,7 +121,7 @@ sub eigen{
 
 
 sub phylogenies{
-  my($inAln,$settings)=@_;
+  my($inAln,$outgroup,$settings)=@_;
   logmsg "Calculating phylogenies";
 
   my($informativeAln,$tree);
