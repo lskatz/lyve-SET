@@ -163,7 +163,7 @@ sub inferPhylogeny{
   system("rm -fv $$settings{tempdir}/RAxML*");
   logmsg "Running raxml";
   my $alnInAbs=File::Spec->rel2abs($inAln);
-  my $command="cd $$settings{tempdir}; launch_raxml.sh $alnInAbs suffix";
+  my $command="cd $$settings{tempdir}; launch_raxml.sh -n $$settings{numcpus} $alnInAbs suffix";
   logmsg "  $command";
   system($command);
   die if $?;
