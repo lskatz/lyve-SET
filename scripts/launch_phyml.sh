@@ -30,7 +30,8 @@ if [ "$suffix" != "phy" ]; then
 fi;
 
 
-$phyml -i $aln -b -4 -m GTR -s BEST --quiet
+yes | \
+  $phyml -i $aln -b -4 -m GTR -s BEST --quiet;
 if [ $? -gt 0 ]; then echo "$script: ERROR in phyml" exit 1; fi;
 echo "$script: Finished without error!";
 
