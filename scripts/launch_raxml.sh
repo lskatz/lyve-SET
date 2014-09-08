@@ -9,25 +9,39 @@
 #$ -V
 #$ -o launch_raxml.sh.out -j y
 
+###############
+## Parse options
+# defaults
+outgroupParam=""
+numcpus=${NSLOTS:-2}
+# parsing
+while getopts ":n:o:" o; do
+  case "${o}" in
+    n) 
+      numcpus=$OPTARG
+      ;;
+    o) 
+      outgroupParam="-o $OPTARG"
+      ;;
+    *)
+      echo "ERROR: I do not understand option $OPTARG"
+      ;;
+  esac
+done
+shift $(($OPTIND-1)) # remove the flag arguments from ARGV
+
+#######################
+## positional arguments
 aln=$1
 prefix=$2
-if [ "$prefix" = "" ]; then
-  echo Usage: `basename $0` aln.phy outprefix
+if [ "$prefix" == "" ]; then
+  echo Usage: `basename $0`" [options] aln.phy outprefix"
+  echo -e "Options:\n  -n numcpus\n  -o outgroup"
   exit 1;
 fi
 
-# If the user specifies the outgroup, then set the parameter for Raxml
-outgroup=$3
-outgroupParam=""
-if [ "$outgroup" = "" ]; then
-  echo Warning: outgroup was not given.
-else
-  outgroupParam="-o $outgroup"
-fi
-
-# set the number of CPUs according to the number of slots, or 8 if undefined
-numcpus=${NSLOTS:-2}
-
+############################
+## Convert the alignment (?)
 # get the extension
 b=`basename $aln`;
 suffix="${b##*.}";
@@ -51,6 +65,8 @@ if [ $VERSION = 8 ]; then
 else
   MODEL=GTRGAMMA
 fi
+
+## time to run the program!
 $EXEC -f a -s $aln -n $prefix -T $numcpus -p $RANDOM -x $RANDOM -N 100 -m $MODEL $outgroupParam
 if [ $? -gt 0 ]; then exit 1; fi;
 
