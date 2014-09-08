@@ -15,7 +15,7 @@ if [ "$aln" = "" ]; then
 fi
 
 # find which phyml to use
-phyml=`(which phyml || which PhyML || which PhyML-3.1_linux64 || which phyml_linux_64) 2>/dev/null`;
+phyml=`(which phyml-mpi || which phyml || which PhyML || which PhyML-3.1_linux64 || which phyml_linux_64) 2>/dev/null`;
 if [ $? -gt 0 ]; then echo "Could not find phyml"; exit 1; fi;
 echo "$script: Found phyml at $phyml"
 
