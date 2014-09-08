@@ -173,7 +173,15 @@ sub inferPhylogeny{
     system("mv -v $$settings{tempdir}/$_.suffix $prefix.$_");
     die "ERROR: could not move $$settings{tempdir}/$_.suffix to $prefix.$_: $!" if $?;
   }
-  return $treeFile
+
+  # If phyml exists, then run that too
+  logmsg "Running phyml, if it available on this computer";
+  system("launch_phyml.sh '$inAln'");
+  if($?){
+    logmsg "ERROR with phyml, but raxml completed successfully anyway";
+  }
+
+  return $treeFile;
 }
 
 #### 
