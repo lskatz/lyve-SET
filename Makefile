@@ -45,11 +45,11 @@ help:
 all: install env clean
 
 install: install-prerequisites
-	@echo DONE!
 	@echo "Don't forget to set up update PATH and PERL5LIB to $(PREFIX)/scripts and $(PREFIX)/lib"
-	@echo "Use 'make env' as a shortcut"
+	@echo "'make env' performs this step for you"
 
 install-prerequisites: install-vcftools install-CGP install-callsam install-SGELK
+	@echo DONE installing prerequisites
 
 install-callsam:
 	rm -rf $(PREFIX)/lib/callsam # make sure it's removed
