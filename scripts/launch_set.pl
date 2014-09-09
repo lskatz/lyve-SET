@@ -216,7 +216,6 @@ sub variantCalls{
   # TODO make the variant callers output to bgzip and indexed files
   for my $bam(@bam){
     my $b=fileparse($bam,".sorted.bam");
-    $sge->set("jobname","varcall$b");
     if(-e "$vcfdir/$b.vcf"){
       logmsg "Found $vcfdir/$b.vcf. Skipping";
       next;
@@ -224,7 +223,7 @@ sub variantCalls{
     logmsg "Calling SNPs into $vcfdir/$b.vcf";
     my $j; # job identifier
     if($$settings{snpcaller} eq 'freebayes'){
-      $j=$sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}",{numcpus=>1});
+      $j=$sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}",{numcpus=>1,jobname=>"freebayes$b"});
       # terminate called after throwing an instance of 'std::out_of_range'
     } elsif($$settings{snpcaller} eq 'callsam'){
       my $jobname="callsam$b";
