@@ -23,6 +23,7 @@ sub main{
   die "ERROR: need pairwise file\n".usage() if(!@pairwise);
 
   eigen(\@pairwise,$settings);
+  return 0;
 }
 
 sub eigen{
