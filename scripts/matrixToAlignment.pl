@@ -1,14 +1,15 @@
 #!/usr/bin/env perl
 
-# Changes a SNP matrix to a MSA
-# Author: Lee Katz
+# Changes a SNP matrix to an MSA
+# Author: Lee Katz <lkatz@cdc.gov>
 
 use strict;
 use warnings;
 use Data::Dumper;
 use Getopt::Long;
 use Bio::Perl;
-use File::Basename;
+use Bio::AlignIO;
+use File::Basename qw/fileparse/;
 
 $0=fileparse $0;
 sub logmsg{$|++;print STDERR "$0: @_\n"; $|--;}
@@ -22,9 +23,10 @@ sub main{
 
   die usage() if($$settings{help});
 
-  my $seqObj=readMatrix($settings);
+  my $matrix=readMatrix($settings);
+  $matrix=filterMatrix($matrix,$settings);
 
-  printSeqs($seqObj,$settings);
+  printSeqs($matrix,$settings);
 
   return 0;
 }
@@ -47,31 +49,86 @@ sub readMatrix{
   my $posHeader=<$fh>;
   chomp($posHeader);
   my ($dot,@pos)=split(/\t/,$posHeader);
-  my $seqObj;
+  my %matrix;
   while(<$fh>){
     chomp;
     my($genome,@nt)=split(/\t/,$_);
-    my $sequence=join("",@nt);
-    my $seq=Bio::Seq->new(-id=>$genome,seq=>$sequence);
-    push(@$seqObj,$seq);
+    for(my $i=0;$i<@nt;$i++){
+      my ($contig,$pos)=split(/:/,$pos[$i]);
+      $matrix{$genome}{$contig}{$pos}=$nt[$i];
+    }
   }
   
   close $fh;
-  return ($seqObj,\@pos) if wantarray;
-  return $seqObj;
+  return \%matrix;
 }
 
+sub filterMatrix{
+  my($matrix,$settings)=@_;
+  while(my($genome,$contigHash)=each(%$matrix)){
+    while(my($contig,$posHash)=each(%$contigHash)){
+      my $filteredHash=filterSortedPos($posHash,$settings);
+      $$matrix{$genome}{$contig}=$filteredHash;
+    }
+  }
+  return $matrix;
+}
+
+sub filterSortedPos{
+  my($posHash,$settings)=@_;
+  my @sorted=sort {$a<=>$b} keys(%$posHash);
+
+  my %filtered;
+  my $numPos=@sorted;
+
+  for(my $i=1;$i<$numPos;$i++){
+    my $pos=$sorted[$i];
+    my $prevPos=$sorted[$i-1];
+    my $distance=$pos - $prevPos;
+    if($distance >= $$settings{'min-distance'}){
+      $filtered{$pos}=$$posHash{$pos};
+    } else {
+      #logmsg "filtered: $pos is too close to $prevPos";
+    }
+  }
+  return \%filtered;
+}
+
+
 sub printSeqs{
-  my($seq,$settings)=@_;
-  my $out=Bio::SeqIO->new(-format=>$$settings{format},-fh=>\*STDOUT);
-  return $out->write_seq(@$seq);
+  my($matrix,$settings)=@_;
+
+
+  my @sortedPos;
+  my @seqObj;
+  while(my($genome,$contigHash)=each(%$matrix)){
+    while(my($contig,$posHash)=each(%$contigHash)){
+      # Create a list of sorted positions if they haven't been defined already in this sub
+      # The sorted positions assume that all sequences should have the same positions which is true! 
+      # (but keep an eye on this just in case)
+      if(!@sortedPos){
+        @sortedPos=sort {$a<=>$b} keys(%$posHash);
+      }
+      my $sequence="";
+      $sequence.=$$posHash{$_} for(@sortedPos);
+      my $seqObj=Bio::LocatableSeq->new(-id=>$genome,-seq=>$sequence,-start=>1,-end=>scalar(@sortedPos));
+      push(@seqObj,$seqObj);
+    }
+  }
+
+  my $out=Bio::AlignIO->new(-format=>$$settings{format});
+  my $aln=Bio::SimpleAlign->new(-seqs=>\@seqObj,-source=>"Lyve-SET:$0");
+  $out->write_aln($aln);
+
+
+  return 1;
 }
 
 sub usage{
-  "$0: turns a SNP matrix into an alignment
-  Usage: $0 < matrix.tsv > aln.out.fas
+  "$0: turns a SNP matrix into an alignment. The matrix can be the first parameter or stdin.
+  Usage: $0 matrix.tsv > out.aln
          $0 < matrix.tsv | removeUninformativeSites.pl > informative.aln.fas
   --min-distance 0 The distance in bp between allowed SNPs. Does not count sites where all nt are the same.
-  --format fasta   The output format
+  --format fasta   The output format (uses bioperl's aln format values, e.g., clustalw)
   "
 }
