@@ -116,7 +116,7 @@ sub printSeqs{
     }
   }
 
-  my $out=Bio::AlignIO->new(-format=>$$settings{format});
+  my $out=Bio::AlignIO->new(-format=>$$settings{format},-displayname_flat => 1);
   my $aln=Bio::SimpleAlign->new(-seqs=>\@seqObj,-source=>"Lyve-SET:$0");
   $out->write_aln($aln);
 

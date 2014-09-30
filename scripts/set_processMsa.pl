@@ -35,9 +35,11 @@ sub main{
 
   if($$settings{auto} || $$settings{msaDir}){
     if($$settings{auto}){
-      $$settings{msaDir}="msa" if(-e "msa/out.aln.fas");
-      $$settings{msaDir}="." if(-e "./out.aln.fas");
-      die "ERROR: --auto was set but I could not find out.aln.fas in either this directory or in ./msa/\n".usage() if(!$$settings{msaDir});
+      if(!$$settings{msaDir}){
+        $$settings{msaDir}="msa" if(-e "msa/out.aln.fas");
+        $$settings{msaDir}="." if(-e "./out.aln.fas");
+      }
+      die "ERROR: --auto was set but I could not find out.aln.fas in either this directory or in ./msa/\n".usage() if(!$$settings{msaDir} || !-e "$$settings{msaDir}/out.aln.fas");
     }
     $$settings{auto}=1;  # explicitly set auto if auto or msaDir is set
 

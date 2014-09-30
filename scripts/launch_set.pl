@@ -33,7 +33,7 @@ sub logmsg {
   }
   print $FH $msg;
 }
-local $SIG{'__DIE__'} = sub { local $0=basename $0; my $e = $_[0]; $e =~ s/(at [^\s]+? line \d+\.$)/\nStopped $1/; my $msg="$0: ".(caller(1))[3].": ".$e; logmsg($msg);  die($msg); };
+local $SIG{'__DIE__'} = sub { local $0=basename $0; my $e = $_[0]; $e =~ s/(at [^\s]+? line \d+\.$)/\nStopped $1/; my $msg="$0: ".(caller(1))[3].": ".$e; logmsg($msg);  die(); };
 END{
   close $logmsgFh if(defined($logmsgFh) && fileno($logmsgFh) > 0);
 }
@@ -106,7 +106,8 @@ sub main{
     variantsToMSA($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
     if($$settings{trees}){
       logmsg "Launching set_processMsa.pl";
-      $sge->pleaseExecute_andWait("set_processMsa.pl --auto --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus} 2>&1 | tee $$settings{logdir}/set_processMsa.log ",{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
+      $sge->pleaseExecute("set_processMsa.pl --auto --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus} 2>&1 | tee $$settings{logdir}/set_processMsa.log ",{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
+      $sge->wrapItUp();
     }
   }
 
@@ -266,8 +267,12 @@ sub variantsToMSA{
   my ($ref,$bamdir,$vcfdir,$msadir,$settings)=@_;
   logmsg "Creating a core hqSNP MSA with ".$$settings{'msa-creation'};
   my $logdir=$$settings{logdir};
-  if(-e "$msadir/out.aln.fas.phy"){
-    logmsg "Found $msadir/out.aln.fas.phy already present. Not re-converting.";
+
+  my $outMsa="$msadir/out.aln.fas";
+  my $matrix="$outMsa.pos.tsv";
+  my $posFile="$outMsa.pos.txt";
+  if(-e $outMsa){
+    logmsg "Found $outMsa -- already present. Not re-converting.";
     return 1;
   }
 
@@ -290,25 +295,13 @@ sub variantsToMSA{
     system("touch $bad"); die if $?;
   }
 
-  my $outMsa="$msadir/out.aln.fas";
-  my $matrix="$outMsa.pos.tsv";
-  my $posFile="$outMsa.pos.txt";
   logmsg "Output files: $outMsa*";
 
-  # convert VCFs to an MSA (long step)
-  $sge->set("jobname","variantsToMSA");
-  $sge->set("numcpus",$$settings{numcpus});
-  if($$settings{'msa-creation'} eq 'lyve-set'){
-    my $command="vcfToAlignment.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -o $outMsa -r $ref -b $bad -a $$settings{allowedFlanking}";
-    logmsg "  $command";
-    $sge->pleaseExecute($command,{qsubxopts=>$$settings{vcfToAlignment_xopts},jobname=>"vcfToMSA"});
-  } elsif($$settings{'msa-creation'} eq 'lyve-set-lowmem'){
-    my $command="vcfToAlignment_lowmem.pl $vcfdir/*.vcf $bamdir/*.sorted.bam -n $$settings{numcpus} -ref $ref -p $posFile -t $matrix -m $$settings{allowedFlanking} > $outMsa";
-    logmsg "  $command";
-    $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"variantsToMSA_lowmem"}) if(-d "$vcfdir/unfiltered");
-    # shorten the deflines to remove the directory names
-    $sge->pleaseExecute("sed -i.bak 's|>.*/|>|g' '$msadir/out.aln.fas'",{qsubxopts=>"-hold_jid variantsToMSA_lowmem",jobname=>"sed"});
-  }
+  $sge->pleaseExecute("vcfToMatrix.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -r $ref --numcpus $$settings{numcpus} > $matrix",{jobname=>"vcfToMatrix",numcpus=>$$settings{numcpus}});
+  $sge->pleaseExecute("matrixToAlignment.pl --min-distance $$settings{allowedFlanking} < $matrix > $outMsa",{jobname=>"matrixToMSA",qsubxopts=>"-hold_jid vcfToMatrix",numcpus=>1});
+  # shorten the deflines to remove the directory names
+  $sge->pleaseExecute("sed -i.bak 's|>.*/|>|g' '$msadir/out.aln.fas'",{qsubxopts=>"-hold_jid matrixToMSA",jobname=>"sedOnAln",numcpus=>1});
+
   $sge->wrapItUp();
 
   return 1;
