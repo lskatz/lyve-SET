@@ -77,7 +77,7 @@ sub vcfToTableWorker{
   my($BAM,$posArr,$refBase,$Q,$printQ,$settings)=@_;
 
   while(defined(my $vcf=$Q->dequeue)){
-    my $genome=basename($vcf,qw(.unfiltered.vcf .vcf)); # done for each vcf...
+    my $genome=basename($vcf,qw(.unfiltered.vcf .vcf .unfiltered.vcf.gz .vcf.gz)); # done for each vcf...
     # get the correct bam for the vcf
     my @bam=grep(/$genome\b/,@$BAM);
     die "ERROR: there are many bams that fit the description $genome: ".join(" ",@bam) if(@bam>1);

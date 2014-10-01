@@ -9,6 +9,7 @@ use Getopt::Long;
 use Data::Dumper;
 use Statistics::Descriptive;
 use Math::Round qw/nearest/;
+use File::Basename qw/fileparse/;
 
 exit(main());
 
@@ -133,7 +134,11 @@ sub readVcf{
   my($vcf,$settings)=@_;
   my $vcfHash={};
   #$diskIoStick->down; # mark that one process is using the disk
-  open(VCF,"<",$vcf) or die "ERROR: could not open vcf file $vcf:$!";
+  if($vcf=~/\.gz$/){
+    open(VCF,"gunzip -c '$vcf' |") or die "ERROR: could not gunzip $vcf: $!";
+  } else {
+    open(VCF,"<",$vcf) or die "ERROR: could not open vcf file $vcf:$!";
+  }
   while(<VCF>){
     next if(/^#/);
     chomp;

@@ -208,7 +208,6 @@ sub variantCalls{
   my($ref,$bamdir,$vcfdir,$settings)=@_;
   logmsg "Calling variants with $$settings{snpcaller}";
   my @bam=glob("$bamdir/*.sorted.bam");
-  my @jobid;
 
   # see if bgzip and tabix exist
   my $bgzip=`which bgzip 2>/dev/null`; chomp($bgzip);
@@ -217,46 +216,35 @@ sub variantCalls{
   # TODO make the variant callers output to bgzip and indexed files
   for my $bam(@bam){
     my $b=fileparse($bam,".sorted.bam");
-    if(-e "$vcfdir/$b.vcf"){
+    if(-e "$vcfdir/$b.vcf" || -e "$vcfdir/$b.vcf.gz"){
       logmsg "Found $vcfdir/$b.vcf. Skipping";
       next;
     }
     logmsg "Calling SNPs into $vcfdir/$b.vcf";
-    my $j; # job identifier
+    my $jobname=""; # the job that the filter/sort scripts are waiting for
     if($$settings{snpcaller} eq 'freebayes'){
-      $j=$sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}",{numcpus=>1,jobname=>"freebayes$b"});
+      $jobname="freebayes$b";
+      $sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}",{numcpus=>1,jobname=>$jobname});
       # terminate called after throwing an instance of 'std::out_of_range'
     } elsif($$settings{snpcaller} eq 'callsam'){
-      my $jobname="callsam$b";
+      $jobname="callsam$b";
       # call snps
-      $j=$sge->pleaseExecute("$scriptsdir/../lib/callsam/bin/callsam_MT.pl $bam --numcpus $$settings{numcpus} --min-coverage $$settings{min_coverage} --min-frequency $$settings{min_alt_frac} --reference '$ref' > $vcfdir/unfiltered/$b.vcf",{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
+      $sge->pleaseExecute("$scriptsdir/../lib/callsam/bin/callsam_MT.pl $bam --numcpus $$settings{numcpus} --min-coverage $$settings{min_coverage} --min-frequency $$settings{min_alt_frac} --reference '$ref' > $vcfdir/unfiltered/$b.vcf",{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
       # sort VCF
-      $j=$sge->pleaseExecute("mv $vcfdir/unfiltered/$b.vcf $vcfdir/unfiltered/$b.vcf.tmp && vcf-sort < $vcfdir/unfiltered/$b.vcf.tmp > $vcfdir/unfiltered/$b.vcf",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
+      $sge->pleaseExecute("mv $vcfdir/unfiltered/$b.vcf $vcfdir/unfiltered/$b.vcf.tmp && vcf-sort < $vcfdir/unfiltered/$b.vcf.tmp > $vcfdir/unfiltered/$b.vcf",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
       # filter VCF
-      $sge->pleaseExecute("$scriptsdir/filterVcf.pl $vcfdir/unfiltered/$b.vcf --noindels -d $$settings{min_coverage} -o $vcfdir/$b.vcf",{qsubxopts=>"-hold_jid sort$b",numcpus=>1,jobname=>"filter$b"});
+      $jobname="filter$b";
+      $sge->pleaseExecute("$scriptsdir/filterVcf.pl $vcfdir/unfiltered/$b.vcf --noindels -d $$settings{min_coverage} -o $vcfdir/$b.vcf",{qsubxopts=>"-hold_jid sort$b",numcpus=>1,jobname=>$jobname});
     } else {
       die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
     }
-    push(@jobid,$j);
 
     # bgzip and tabix indexing
     # TODO enable this if statement or put it into the launch_* scripts
-    if(0 && $bgzip && $tabix){
-      eval{
-        # Unfiltered
-        $sge->pleaseExecute("set_vcf_sort.sh '$vcfdir/unfiltered/$b.vcf' > '$vcfdir/unfiltered/$b.vcf.sorted.tmp' && mv '$vcfdir/unfiltered/$b.vcf.sorted.tmp' '$vcfdir/unfiltered/$b.vcf'",{qsubxopts=>"-hold_jid filter$b",jobname=>"vcfsortUnfiltered$b",numcpus=>1});
-        $sge->pleaseExecute("$bgzip '$vcfdir/unfiltered/$b.vcf'",{qsubxopts=>"-hold_jid vcfsortUnfiltered$b",jobname=>"bgzipUnfiltered$b",numcpus=>1});
-        $sge->pleaseExecute("$tabix '$vcfdir/unfiltered/$b.vcf.gz'",{qsubxopts=>"-hold_jid 'bgzipUnfiltered$b'",jobname=>"tabixUnfiltered$b",numcpus=>1});
-
-        # Filtered
-        $sge->pleaseExecute("set_vcf_sort.sh '$vcfdir/$b.vcf' > '$vcfdir/$b.vcf.sorted.tmp' && mv '$vcfdir/$b.vcf.sorted.tmp' '$vcfdir/$b.vcf'",{qsubxopts=>"-hold_jid filter$b",jobname=>"vcfsort$b",numcpus=>1});
-        $sge->pleaseExecute("$bgzip '$vcfdir/$b.vcf'",{qsubxopts=>"-hold_jid vcfsort$b",jobname=>"bgzip$b",numcpus=>1});
-        $sge->pleaseExecute("$tabix '$vcfdir/$b.vcf.gz'",{qsubxopts=>"-hold_jid 'bgzip$b'",jobname=>"tabix$b",numcpus=>1});
-      };
-      if($@){
-        logmsg "Warning: Could not compress and index $vcfdir/$b.vcf: $@";
-      } # END if eval warning
-    } # END IF bgzip && tabix
+    if($bgzip && $tabix){
+      indexAndCompressVcf("$vcfdir/unfiltered/$b.vcf",$jobname,$settings);
+      indexAndCompressVcf("$vcfdir/$b.vcf",$jobname,$settings);
+    }
     else {
       for($bgzip,$tabix){
         logmsg "I could not find $_ in your path and so I will not compress and index VCFs" if(!$_);
@@ -268,22 +256,42 @@ sub variantCalls{
   return 1;
 }
 
+# returns the last SGE job information in a hash ref
+sub indexAndCompressVcf{
+  my($vcf,$holdjid,$settings)=@_;
+  my $j={};
+  eval{
+  $j=$sge->pleaseExecute("vcf-sort < '$vcf' > '$vcf.sorted.tmp' && mv '$vcf.sorted.tmp' '$vcf'",{qsubxopts=>"-hold_jid $holdjid",jobname=>"vcf-sort",numcpus=>1});
+  $j=$sge->pleaseExecute("bgzip -f '$vcf'",{qsubxopts=>"-hold_jid $$j{jobid}",jobname=>"bgzip",numcpus=>1});
+  $j=$sge->pleaseExecute("tabix '$vcf.gz'",{qsubxopts=>"-hold_jid $$j{jobid}",jobname=>"tabix",numcpus=>1});
+  };
+  if($@){
+    logmsg "Warning: Could not compress and index $vcf: $@";
+  }
+  return $j;
+}
+
 sub variantsToMSA{
   my ($ref,$bamdir,$vcfdir,$msadir,$settings)=@_;
   logmsg "Creating a core hqSNP MSA with ".$$settings{'msa-creation'};
   my $logdir=$$settings{logdir};
 
   my $outMsa="$msadir/out.aln.fas";
-  my $matrix="$outMsa.pos.tsv";
-  my $posFile="$outMsa.pos.txt";
+  my $matrix="$outMsa.matrix.tsv";
   if(-e $outMsa){
     logmsg "Found $outMsa -- already present. Not re-converting.";
     return 1;
   }
 
+  # input files
+  my @vcf=glob("$vcfdir/*.vcf $vcfdir/*.vcf.gz");
+  my @bam=glob("$bamdir/*.sorted.bam");
+  my @infile=(@bam,@vcf);
+  my $infile="'".join("' '",@infile)."'";
+
   # Find the distance that we'd expect SNP-linkage, so that they can be filtered out
   if($$settings{allowedFlanking} eq 'auto'){
-    my $allowedFlanking=`snpDistribution.pl $vcfdir/unfiltered/*.vcf`;
+    my $allowedFlanking=`snpDistribution.pl @vcf`;
     die if $?;
     chomp($allowedFlanking);
 
@@ -292,17 +300,9 @@ sub variantsToMSA{
   }
   logmsg "AllowedFlanking: $$settings{allowedFlanking}";
 
-  # find all "bad" sites
-  my $bad="$vcfdir/allsites.txt";
-  if(glob("$vcfdir/*.badsites.txt")){
-    system("sort $vcfdir/*.badsites.txt | uniq > $bad"); die if $?;
-  }else{
-    system("touch $bad"); die if $?;
-  }
-
   logmsg "Output files: $outMsa*";
 
-  $sge->pleaseExecute("vcfToMatrix.pl $bamdir/*.sorted.bam $vcfdir/*.vcf -r $ref --numcpus $$settings{numcpus} > $matrix",{jobname=>"vcfToMatrix",numcpus=>$$settings{numcpus}});
+  $sge->pleaseExecute("vcfToMatrix.pl $infile -r $ref --numcpus $$settings{numcpus} > $matrix",{jobname=>"vcfToMatrix",numcpus=>$$settings{numcpus}});
   $sge->pleaseExecute("matrixToAlignment.pl --min-distance $$settings{allowedFlanking} < $matrix > $outMsa",{jobname=>"matrixToMSA",qsubxopts=>"-hold_jid vcfToMatrix",numcpus=>1});
   # shorten the deflines to remove the directory names
   $sge->pleaseExecute("sed -i.bak 's|>.*/|>|g' '$msadir/out.aln.fas'",{qsubxopts=>"-hold_jid matrixToMSA",jobname=>"sedOnAln",numcpus=>1});
