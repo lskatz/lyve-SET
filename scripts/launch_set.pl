@@ -257,6 +257,11 @@ sub variantCalls{
         logmsg "Warning: Could not compress and index $vcfdir/$b.vcf: $@";
       } # END if eval warning
     } # END IF bgzip && tabix
+    else {
+      for($bgzip,$tabix){
+        logmsg "I could not find $_ in your path and so I will not compress and index VCFs" if(!$_);
+      }
+    }
   } # END bam while loop
   logmsg "All variant-calling jobs have been submitted. Waiting on them to finish";
   $sge->wrapItUp();
