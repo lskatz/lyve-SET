@@ -28,13 +28,9 @@ sub main{
   my(@VCF,@BAM);
   while(my $file=shift(@ARGV)){
     my($dir,$name,$ext)=fileparse($file,qw(.unfiltered.vcf .vcf .vcf.gz .bam));
-    if($ext=~/gz/){
-      #die "ERROR: gz files are not supported yet";
+    if($ext=~/vcf$/i || $ext=~/vcf\.gz$/){
       push(@VCF,$file);
-    }
-    if($ext=~/vcf/i){
-      push(@VCF,$file);
-    } elsif($ext=~/bam/i){
+    } elsif($ext=~/bam$/i){
       push(@BAM,$file);
     } else {
       die "ERROR: Could not understand what kind of file $file is";
@@ -91,7 +87,7 @@ sub vcfToTableWorker{
     # get the depth of this bam
     my $coverage=covDepth($bam,$settings);
 
-    logmsg "Printing the fasta entry for $vcf";
+    logmsg "Printing the entry for $vcf";
     my ($tableRow)=snpsEntry($vcf,$posArr,$coverage,$refBase,$settings);
     $printQ->enqueue($tableRow);
   }
@@ -215,18 +211,6 @@ sub findReferenceBases{
   return $base;
 }
 
-sub printPositions{
-  my($pos,$file,$settings)=@_;
-  # make a copy of positions so that it doesn't mess up the rest of the script
-  my @pos=@$pos;
-  open(POS,">",$file) or die "ERROR: Could not write to positions file $file: $!";
-  for(@pos){
-    print POS $_."\n";
-  }
-  close POS;
-  logmsg "Sorted positions have been printed to $file";
-  return 1;
-}
 
 sub usage{
   "Creates a matrix of SNPs, given a set of VCFs. Output is in tabular format with headers on the first row and first column.
