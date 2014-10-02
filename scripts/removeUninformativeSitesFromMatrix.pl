@@ -21,12 +21,12 @@ sub main{
   $$settings{sort}=lc($$settings{sort});
 
   ## read in the matrix into a hash of hashes
-  my ($posArr,$matrix)=readMatrix($settings);
-  removeSitesFromMatrix($matrix,$settings);
+  my $matrix=readMatrix($settings);
+  my $posIndex=removeSitesFromMatrix($matrix,$settings);
 
   # first row needs to be the loci; next rows are genomes/nts
   my $matrix_transposed=transposeMatrix($matrix,$settings);
-  printMatrix($matrix_transposed,$posArr,$settings);
+  printMatrix($matrix_transposed,$posIndex,$settings);
 
   return 0;
 }
@@ -54,11 +54,12 @@ sub readMatrix{
     }
   }
 
-  return (\@pos,\%matrix_transposed);
+  return \%matrix_transposed;
 }
 
 sub removeSitesFromMatrix{
   my($matrix,$settings)=@_;
+  my %newPosKey;
   while(my($contig,$posHash)=each(%$matrix)){
     while(my($pos,$genomeHash)=each(%$posHash)){
       my ($is_variant,$is_indel,$is_ambiguous)=(0,0,0);
@@ -80,12 +81,16 @@ sub removeSitesFromMatrix{
       delete($$matrix{$contig}{$pos}) if(!$$settings{'ambiguities-allowed'} && $is_ambiguous);
       delete($$matrix{$contig}{$pos}) if(!$is_variant);
 
+      # say whether it was kept or removed
       if($$settings{verbose}){
         logmsg "Deleted $contig:$pos" if(!$$matrix{$contig}{$pos});
         logmsg "Kept $contig:$pos" if($$matrix{$contig}{$pos});
       }
+      # index the site if it was kept
+      push(@{ $newPosKey{$contig} }, $pos) if($$matrix{$contig}{$pos});
     }
   }
+  return \%newPosKey;
 }
 
 sub transposeMatrix{
@@ -102,41 +107,33 @@ sub transposeMatrix{
 }
 
 sub printMatrix{
-  my($matrix,$posArr,$settings)=@_;
-  
-  # get a list of contigs and hashes
-  my %contig;
-  for my $posKey(@$posArr){
-    my($contig,$pos)=split(/:/,$posKey);
-    push(@{ $contig{$contig} },$pos);
-  }
-  #sort positions
-  for (values(%contig)){
-    my @sorted=sort {$a<=>$b} @$_;
-    $_=\@sorted;
-  }
+  my($matrix,$posIndex,$settings)=@_;
 
-  # Sort the header positional keys
-  my @sortedPosKey=sort {
-    my ($contigA,$posA)=split(/:/,$a);
-    my ($contigB,$posB)=split(/:/,$b);
-    return $contigA cmp $contigB if($contigA ne $contigB);
-    return $posA <=> $posB;
-  } @$posArr;
-  print join("\t",".",@sortedPosKey)."\n";
+  # Sort and print the header (positions)
+  my $headerStr=".\t";
+  my @sortedContig=sort { $a cmp $b } keys(%$posIndex);
+  for my $contig(@sortedContig){
+    my $posList=$$posIndex{$contig};
+    my @sorted=sort {$a<=>$b} @$posList;
+    $$posIndex{$contig}=\@sorted;
+    $headerStr.="$contig:$_\t" for(@sorted);
+  }
+  $headerStr=~s/\t$//; # remove trailing tab
+  print $headerStr."\n";
 
   # Body of matrix:
   # Do a sorted print.
   while(my($genome,$contigHash)=each(%$matrix)){
-    for my $contig(sort {$a cmp $b} keys(%$contigHash)){
+    my $line="$genome\t";
+    for my $contig(@sortedContig){
       my $posHash=$$matrix{$genome}{$contig};
-      my $line="$genome\t";
-      for my $pos(sort {$a <=> $b} keys(%$posHash)){
+      for my $pos(@{ $$posIndex{$contig} }){
         $line.=$$posHash{$pos}."\t";
+        #$line.="$contig:$pos\t";
       }
-      $line=~s/\t+$//;
-      print $line."\n";
     }
+    $line=~s/\t+$//;
+    print $line."\n";
   }
 
   return 1;
