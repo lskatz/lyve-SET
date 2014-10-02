@@ -43,8 +43,8 @@ exit(main());
 
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --noclean
-  my $settings={trees=>1,clean=>1, msa=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s clean! msa! mapper=s snpcaller=s msa-creation=s)) or die $!;
+  my $settings={trees=>1,clean=>1, msa=>1, matrix=>1};
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s clean! msa! matrix! mapper=s snpcaller=s msa-creation=s)) or die $!;
   # Lyve-SET
   $$settings{allowedFlanking}||=100;
   $$settings{keep}||=0;
@@ -102,16 +102,28 @@ sub main{
   mapReads($ref,$$settings{readsdir},$$settings{bamdir},$settings);
   variantCalls($ref,$$settings{bamdir},$$settings{vcfdir},$settings);
 
-  if($$settings{msa}){
-    variantsToMSA($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
-    if($$settings{trees}){
-      logmsg "Launching set_processMsa.pl";
-      $sge->pleaseExecute("set_processMsa.pl --auto --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus} 2>&1 | tee $$settings{logdir}/set_processMsa.log ",{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
-      $sge->wrapItUp();
-    }
+  if($$settings{matrix}){
+    variantsToMatrix($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
+  } else {
+    logmsg "The matrix was not requested; wrapping up";
+    return 0;
   }
 
-  logmsg "Done!";
+  if($$settings{msa}){
+    matrixToAlignment($settings);
+  } else {
+    logmsg "The alignment was not requested; wrapping up";
+    return 0;
+  }
+
+  if($$settings{trees}){
+    logmsg "Launching set_processMsa.pl";
+    $sge->pleaseExecute("set_processMsa.pl --auto --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus} 2>&1 | tee $$settings{logdir}/set_processMsa.log ",{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
+    $sge->wrapItUp();
+  } else {
+    logmsg "The phylogeny was not requested; wrapping up";
+    return 0;
+  }
 
   return 0;
 }
@@ -271,15 +283,15 @@ sub indexAndCompressVcf{
   return $j;
 }
 
-sub variantsToMSA{
+sub variantsToMatrix{
   my ($ref,$bamdir,$vcfdir,$msadir,$settings)=@_;
-  logmsg "Creating a core hqSNP MSA with ".$$settings{'msa-creation'};
+  logmsg "Creating a core hqSNP matrix";
   my $logdir=$$settings{logdir};
 
-  my $outMsa="$msadir/out.aln.fas";
-  my $matrix="$outMsa.matrix.tsv";
-  if(-e $outMsa){
-    logmsg "Found $outMsa -- already present. Not re-converting.";
+  my $matrix="$msadir/out.matrix.tsv";
+  my $informative="$msadir/informative.matrix.tsv";
+  if(-e $informative){
+    logmsg "Found $informative -- already present. Not re-converting.";
     return 1;
   }
 
@@ -300,16 +312,29 @@ sub variantsToMSA{
   }
   logmsg "AllowedFlanking: $$settings{allowedFlanking}";
 
-  logmsg "Output files: $outMsa*";
-
-  $sge->pleaseExecute("vcfToMatrix.pl $infile -r $ref --numcpus $$settings{numcpus} > $matrix",{jobname=>"vcfToMatrix",numcpus=>$$settings{numcpus}});
-  $sge->pleaseExecute("matrixToAlignment.pl --min-distance $$settings{allowedFlanking} < $matrix > $outMsa",{jobname=>"matrixToMSA",qsubxopts=>"-hold_jid vcfToMatrix",numcpus=>1});
+  my $j;
+  $j=$sge->pleaseExecute("vcfToMatrix.pl $infile -r $ref --numcpus $$settings{numcpus} > $matrix",{jobname=>"vcfToMatrix",numcpus=>$$settings{numcpus}});
   # shorten the deflines to remove the directory names
-  $sge->pleaseExecute("sed -i.bak 's|>.*/|>|g' '$msadir/out.aln.fas'",{qsubxopts=>"-hold_jid matrixToMSA",jobname=>"sedOnAln",numcpus=>1});
+  $j=$sge->pleaseExecute("sed -i.bak 's|^.*/||g' '$matrix'",{qsubxopts=>"-hold_jid $$j{jobid}",jobname=>"sedOnAln",numcpus=>1});
+  $j=$sge->pleaseExecute("removeUninformativeSitesFromMatrix.pl --min-distance $$settings{allowedFlanking} < $matrix > $informative",{qsubxopts=>"-hold_jid $$j{jobid}",numcpus=>1,jobname=>"removeUninformativeSitesFromMatrix"});
 
   $sge->wrapItUp();
+  return $informative;
+}
 
-  return 1;
+sub matrixToAlignment{
+  my($settings)=@_;
+  my $outMsa="$$settings{msadir}/out.aln.fas";
+  my $matrix="$$settings{msadir}/informative.matrix.tsv";
+  if(-e $outMsa){
+    logmsg "Found $outMsa and so I will not remake it";
+    return $outMsa;
+  }
+
+  $sge->pleaseExecute("matrixToAlignment.pl < $matrix > $outMsa",{jobname=>"matrixToAlignment",numcpus=>1});
+  $sge->wrapItUp();
+
+  return $outMsa;
 }
 
 sub usage{
@@ -350,12 +375,12 @@ sub usage{
     $help.="
     SKIP CERTAIN STEPS
     --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with; removes the requirement for CG-Pipeline)
+    --nomatrix to not create an hqSNP matrix
     --nomsa to not make a multiple sequence alignment
     --notrees to not make phylogenies
     MODULES
     --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap
     --snpcaller    $$settings{snpcaller}   Which SNP caller? Choices: freebayes, callsam
-    --msa-creation ".$$settings{'msa-creation'}."   Which method of making the multiple sequence alignment? lyve-set, lyve-set-lowmem 
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue     all.q         The default queue to use.
     --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
