@@ -99,21 +99,20 @@ sub printSeqs{
   my($matrix,$settings)=@_;
 
 
-  my @sortedPos;
   my @seqObj;
   while(my($genome,$contigHash)=each(%$matrix)){
+    my $sequence="";
     while(my($contig,$posHash)=each(%$contigHash)){
-      # Create a list of sorted positions if they haven't been defined already in this sub
+      # Create a list of sorted positions
       # The sorted positions assume that all sequences should have the same positions which is true! 
       # (but keep an eye on this just in case)
-      if(!@sortedPos){
-        @sortedPos=sort {$a<=>$b} keys(%$posHash);
+      my @sortedPos=sort {$a<=>$b} keys(%$posHash);
+      for(@sortedPos){
+        $sequence.=$$posHash{$_} || die "=>$_\n".Dumper [$contig,$posHash];
       }
-      my $sequence="";
-      $sequence.=$$posHash{$_} for(@sortedPos);
-      my $seqObj=Bio::LocatableSeq->new(-id=>$genome,-seq=>$sequence,-start=>1,-end=>scalar(@sortedPos));
-      push(@seqObj,$seqObj);
     }
+    my $seqObj=Bio::LocatableSeq->new(-id=>$genome,-seq=>$sequence,-start=>1,-end=>length($sequence));
+    push(@seqObj,$seqObj);
   }
 
   my $out=Bio::AlignIO->new(-format=>$$settings{format},-displayname_flat => 1);
