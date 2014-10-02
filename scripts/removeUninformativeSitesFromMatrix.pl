@@ -21,10 +21,12 @@ sub main{
   $$settings{sort}=lc($$settings{sort});
 
   ## read in the matrix into a hash of hashes
-  my $matrix=readMatrix($settings);
+  my ($posArr,$matrix)=readMatrix($settings);
   removeSitesFromMatrix($matrix,$settings);
-  #transposeMatrix()
-  #print Matrix
+
+  # first row needs to be the loci; next rows are genomes/nts
+  my $matrix_transposed=transposeMatrix($matrix,$settings);
+  printMatrix($matrix_transposed,$posArr,$settings);
 
   return 0;
 }
@@ -51,30 +53,101 @@ sub readMatrix{
       $matrix_transposed{$contig}{$pos}{$genome}=$nt[$i];
     }
   }
-  return \%matrix_transposed;
+
+  return (\@pos,\%matrix_transposed);
 }
 
 sub removeSitesFromMatrix{
   my($matrix,$settings)=@_;
   while(my($contig,$posHash)=each(%$matrix)){
     my ($refGenome,$refNt)=each(%$posHash);
+    my $REFNT=uc($refNt);
     while(my($pos,$genomeHash)=each(%$posHash)){
-      # see if it is an invariant site.  If so delete it
-      # see if it has a gap
-      # see if it has a non-ATCG
+      my ($is_variant,$is_indel,$is_ambiguous)=(0,0,0);
+      for my $nt(values(%$genomeHash)){
+        my $NT = uc($nt);
+        # see if it is an invariant site.
+        $is_variant=1 if($NT ne $REFNT);
+        # see if it has a gap
+        $is_indel=1 if($NT eq '*' || $NT eq '-' || length($NT) > 1 || $REFNT eq '*' || $REFNT eq '-' || length($REFNT) > 1);
+        # see if it has a non-ATCG
+        $is_ambiguous=1 if($NT=~/^\w+$/ && $NT !~/^[ATGC]$/);
+      }
 
+      # Remove or keep the NT based on the boolean logic and the settings requested
+      delete($$matrix{$contig}{$pos}) if(!$$settings{'gaps-allowed'} && $is_indel);
+      delete($$matrix{$contig}{$pos}) if(!$$settings{'ambiguities-allowed'} && $is_ambiguous);
+      delete($$matrix{$contig}{$pos}) if(!$is_variant);
+
+      if($$settings{verbose}){
+        logmsg "Deleted $contig:$pos" if(!$$matrix{$contig}{$pos});
+        logmsg "Kept $contig:$pos" if($$matrix{$contig}{$pos});
+      }
     }
   }
+}
+
+sub transposeMatrix{
+  my($matrix,$settings)=@_;
+  my %transposed;
+  while(my($contig,$posHash)=each(%$matrix)){
+    while(my($pos,$genomeHash)=each(%$posHash)){
+      while(my($genome,$nt)=each(%$genomeHash)){
+        $transposed{$genome}{$contig}{$pos}=$nt;
+      }
+    }
+  }
+  return \%transposed;
+}
+
+sub printMatrix{
+  my($matrix,$posArr,$settings)=@_;
+  
+  # get a list of contigs and hashes
+  my %contig;
+  for my $posKey(@$posArr){
+    my($contig,$pos)=split(/:/,$posKey);
+    push(@{ $contig{$contig} },$pos);
+  }
+  #sort positions
+  for (values(%contig)){
+    my @sorted=sort {$a<=>$b} @$_;
+    $_=\@sorted;
+  }
+
+  # Sort the header positional keys
+  my @sortedPosKey=sort {
+    my ($contigA,$posA)=split(/:/,$a);
+    my ($contigB,$posB)=split(/:/,$b);
+    return $contigA cmp $contigB if($contigA ne $contigB);
+    return $posA <=> $posB;
+  } @$posArr;
+  print join("\t",".",@sortedPosKey)."\n";
+
+  # Body of matrix:
+  # Do a sorted print.
+  while(my($genome,$contigHash)=each(%$matrix)){
+    for my $contig(sort {$a cmp $b} keys(%$contigHash)){
+      my $posHash=$$matrix{$genome}{$contig};
+      my $line="$genome\t";
+      for my $pos(sort {$a <=> $b} keys(%$posHash)){
+        $line.=$$posHash{$pos}."\t";
+      }
+      $line=~s/\t+$//;
+      print $line."\n";
+    }
+  }
+
+  return 1;
 }
 
 sub usage{
   "Removes all the uninformative sites in a multiple sequence alignment fasta file: Ns, gaps, and invariant sites
   Usage: $0 < aln.matrix.tsv > informative.matrix.tsv
-  -v for verbose (technically makes the script slower)
+  -v for verbose
 
-  Using the following two options will allow you to keep a master MSA list at-hand if you are converting all VCFs in a project
-  --gaps-allowed Allow gaps in the alignment
-  --ambiguities-allowed Allow ambiguous bases in the alignment
+  --gaps-allowed Allow gaps in the matrix
+  --ambiguities-allowed Allow ambiguous bases in the matrix (non-ATCG)
   "
 }
 
