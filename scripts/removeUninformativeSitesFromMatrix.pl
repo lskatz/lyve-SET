@@ -13,7 +13,7 @@ sub logmsg{$|++;print STDERR "@_\n"; $|--;}
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help verbose ambiguities-allowed gaps-allowed sort=s)) or die $!;
+  GetOptions($settings,qw(help verbose ambiguities-allowed gaps-allowed sort=s min-distance=i)) or die $!;
   die usage() if($$settings{help});
   $$settings{"ambiguities-allowed"} ||=0;
   $$settings{"gaps-allowed"} ||=0;
@@ -60,11 +60,12 @@ sub readMatrix{
 sub removeSitesFromMatrix{
   my($matrix,$settings)=@_;
   while(my($contig,$posHash)=each(%$matrix)){
-    my ($refGenome,$refNt)=each(%$posHash);
-    my $REFNT=uc($refNt);
     while(my($pos,$genomeHash)=each(%$posHash)){
       my ($is_variant,$is_indel,$is_ambiguous)=(0,0,0);
-      for my $nt(values(%$genomeHash)){
+      my($refGenome,$refNt)=each(%$genomeHash);
+      my $REFNT=uc($refNt);
+      while(my($genome,$nt)=each(%$genomeHash)){
+      #for my $nt(values(%$genomeHash))
         my $NT = uc($nt);
         # see if it is an invariant site.
         $is_variant=1 if($NT ne $REFNT);
@@ -145,6 +146,7 @@ sub usage{
   "Removes all the uninformative sites in a multiple sequence alignment fasta file: Ns, gaps, and invariant sites
   Usage: $0 < aln.matrix.tsv > informative.matrix.tsv
   -v for verbose
+  --min-distance 0 The minimum distance allowed between variant sites (not implemented yet)
 
   --gaps-allowed Allow gaps in the matrix
   --ambiguities-allowed Allow ambiguous bases in the matrix (non-ATCG)
