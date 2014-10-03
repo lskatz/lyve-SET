@@ -1,6 +1,7 @@
 #!/usr/bin/env perl
 
 # Removes uninformative sites from a matrix: Ns, gaps, and invariant sites
+# Removes uninformative sites
 # Author: Lee Katz
 
 use strict;
@@ -17,12 +18,13 @@ sub main{
   die usage() if($$settings{help});
   $$settings{"ambiguities-allowed"} ||=0;
   $$settings{"gaps-allowed"} ||=0;
-  $$settings{sort}||="";
-  $$settings{sort}=lc($$settings{sort});
+  $$settings{'min-distance'} ||=0;
 
   ## read in the matrix into a hash of hashes
   my $matrix=readMatrix($settings);
+  # remove sites but keep track of which sites are still here
   my $posIndex=removeSitesFromMatrix($matrix,$settings);
+  $posIndex=removeClusteredSites($matrix,$$settings{'min-distance'},$settings) if($$settings{'min-distance'} > 0);
 
   # first row needs to be the loci; next rows are genomes/nts
   my $matrix_transposed=transposeMatrix($matrix,$settings);
@@ -93,6 +95,37 @@ sub removeSitesFromMatrix{
   return \%newPosKey;
 }
 
+sub removeClusteredSites{
+  my($matrix,$distance,$settings)=@_;
+
+  # Mark what to delete
+  my %toDelete;
+  while(my($contig,$posHash)=each(%$matrix)){
+    my @sortedPos=sort {$a<=>$b} keys(%$posHash);
+    for(my $i=1;$i<@sortedPos;$i++){
+      my $neighboringDist=$sortedPos[$i] - $sortedPos[$i-1];
+      if($neighboringDist <= $distance){
+        $toDelete{$contig}{$sortedPos[$i]}=1;
+        if($$settings{verbose}){
+          logmsg "Deleted $contig:$sortedPos[$i] because it is $neighboringDist away from another SNP at $contig:".$sortedPos[$i-1];
+        }
+      }
+    }
+  }
+
+  # Do the deletion
+  my %newPosKey;
+  while(my($contig,$posHash)=each(%$matrix)){
+    while(my($pos,$genomeHash)=each(%$posHash)){
+      # Delete if it was marked
+      delete($$matrix{$contig}{$pos}) if($toDelete{$contig}{$pos});
+      # Remember if it was kept
+      push(@{ $newPosKey{$contig} }, $pos) if($$matrix{$contig}{$pos});
+    }
+  }
+  return \%newPosKey;
+}
+
 sub transposeMatrix{
   my($matrix,$settings)=@_;
   my %transposed;
@@ -143,7 +176,7 @@ sub usage{
   "Removes all the uninformative sites in a multiple sequence alignment fasta file: Ns, gaps, and invariant sites
   Usage: $0 < aln.matrix.tsv > informative.matrix.tsv
   -v for verbose
-  --min-distance 0 The minimum distance allowed between variant sites (not implemented yet)
+  --min-distance 0 The minimum distance allowed between variant sites
 
   --gaps-allowed Allow gaps in the matrix
   --ambiguities-allowed Allow ambiguous bases in the matrix (non-ATCG)
