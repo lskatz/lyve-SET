@@ -3,7 +3,7 @@
 
 PREFIX := $(PWD)
 PROFILE := $(HOME)/.bashrc
-VERSION := 0.8.5
+VERSION := 0.9.0
 PROJECT := "setTestProject"
 NUMCPUS := 1
 SHELL   := /bin/bash
@@ -30,7 +30,7 @@ help:
 	@echo $(T2) PREFIX=$(PREFIX) $(PREFIXNOTE)
 	@echo
 	@echo 2. ENVIRONMENT CHECK
-	@echo $(T) env - put all environmental variables into a profile file 
+	@echo $(T) env - put all environmental variables into a profile file
 	@echo $(T2) PROFILE=$(PROFILE)
 	@echo $(T) check - check to see if all prerequisites are installed
 	@echo $(T) test - create a test project using the test data found in the installation directory
@@ -82,7 +82,7 @@ install-vcftools:
     make --directory=$(PREFIX)/lib/vcftools_0.1.12b MAKEFLAGS=""
 	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/vcf-sort $(PREFIX)/scripts/
 	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/Vcf.pm $(PREFIX)/lib/
-	
+
 cuttingedge:
 	git clone --recursive https://github.com/lskatz/lyve-SET.git $(PREFIX)
 	$(MAKE) install-prerequisites
@@ -141,4 +141,4 @@ check-PERL:
 	@perl -I $(PREFIX)/lib -MString::Escape -e 1
 	@echo "Looking for Graph::Centrality::Pagerank"
 	@perl -I $(PREFIX)/lib -MGraph::Centrality::Pagerank -e 1
-	
+
