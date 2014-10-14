@@ -46,7 +46,7 @@ sub main{
   my $settings={trees=>1,clean=>1, msa=>1, matrix=>1};
   GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s clean! msa! matrix! mapper=s snpcaller=s msa-creation=s)) or die $!;
   # Lyve-SET
-  $$settings{allowedFlanking}||=100;
+  $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
   $$settings{min_alt_frac}||=0.75;
   $$settings{min_coverage}||=10;
@@ -363,10 +363,9 @@ sub usage{
     --msadir  $$settings{msadir} multiple sequence alignment and tree files (final output)
     --logdir  $$settings{logdir} Where to put log files. Qsub commands are also stored here.
     -asm      $$settings{asmdir} directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
-      NOTE: Set -all to 'auto' to let SET determine this distance using snpDistribution.pl
 
     SNP MATRIX OPTIONS
-    --allowedFlanking  $$settings{allowedFlanking} allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+    --allowedFlanking  $$settings{allowedFlanking} allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.  Set to -1 to let SET determine this distance using snpDistribution.pl
     --min_alt_frac     $$settings{min_alt_frac}  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
     --min_coverage     $$settings{min_coverage}  Minimum coverage needed before a SNP is called. Otherwise, 'N'
     ";
