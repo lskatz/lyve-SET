@@ -74,8 +74,8 @@ sub removeSitesFromMatrix{
         $is_variant=1 if($NT ne $REFNT);
         # see if it has a gap
         $is_indel=1 if($NT eq '*' || $NT eq '-' || length($NT) > 1 || $REFNT eq '*' || $REFNT eq '-' || length($REFNT) > 1);
-        # see if it has a non-ATCG
-        $is_ambiguous=1 if($NT=~/^\w+$/ && $NT !~/^[ATGC]$/);
+        # see if it has a non-ATCG (only if it's one nt)
+        $is_ambiguous=1 if( ($NT=~/^\w+$/ && $NT !~/^[ATGC]$/) || ($REFNT=~/^\w+$/ && $REFNT !~/^[ATGC]$/) );
       }
 
       # Remove or keep the NT based on the boolean logic and the settings requested
