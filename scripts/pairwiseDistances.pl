@@ -18,12 +18,13 @@ sub main{
   $$settings{numcpus}||=1;
   $$settings{samplingFrequency}||=0.25;
 
-  # TODO change this so that you can read stdin
-  my $alignment=$ARGV[0];
-  die usage() if(!$alignment);
-
-  my %seq;
-  my $in=Bio::AlignIO->new(-file=>$alignment,-idlength=>30);
+  my ($in,%seq);
+  if($ARGV[0]){
+    $in=Bio::AlignIO->new(-file=>$ARGV[0],-idlength=>30);
+  } else {
+    logmsg "No file given: reading the alignment from stdin";
+    $in=Bio::AlignIO->new(-fh=>\*STDIN,-format=>"fasta",-idlength=>30);
+  }
   while(my $aln=$in->next_aln){
     my @seq=$aln->each_seq;
     for(@seq){
