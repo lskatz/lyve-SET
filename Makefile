@@ -48,7 +48,7 @@ install: install-prerequisites
 	@echo "Don't forget to set up update PATH and PERL5LIB to $(PREFIX)/scripts and $(PREFIX)/lib"
 	@echo "'make env' performs this step for you"
 
-install-prerequisites: install-vcftools install-CGP install-callsam install-SGELK
+install-prerequisites: install-vcftools install-CGP install-callsam install-SGELK install-varscan
 	@echo DONE installing prerequisites
 
 install-callsam:
@@ -82,6 +82,9 @@ install-vcftools:
     make --directory=$(PREFIX)/lib/vcftools_0.1.12b MAKEFLAGS=""
 	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/vcf-sort $(PREFIX)/scripts/
 	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/Vcf.pm $(PREFIX)/lib/
+
+install-varscan:
+	wget 'http://downloads.sourceforge.net/project/varscan/VarScan.v2.3.7.jar?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fvarscan%2Ffiles%2F&ts=1413398147&use_mirror=ufpr' -O $(PREFIX)/lib/varscan.v2.3.7.jar
 
 cuttingedge:
 	git clone --recursive https://github.com/lskatz/lyve-SET.git $(PREFIX)
