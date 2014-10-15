@@ -74,6 +74,7 @@ sub filterMatrix{
   return $matrix;
 }
 
+# Filters a set of positions on a contig
 sub filterSortedPos{
   my($posHash,$settings)=@_;
   my @sorted=sort {$a<=>$b} keys(%$posHash);
@@ -81,6 +82,10 @@ sub filterSortedPos{
   my %filtered;
   my $numPos=@sorted;
 
+  # automatically accept the first position as not being close to anything else
+  $filtered{$sorted[0]}=$$posHash{$sorted[0]};
+
+  # look at the remaining positions
   for(my $i=1;$i<$numPos;$i++){
     my $pos=$sorted[$i];
     my $prevPos=$sorted[$i-1];
@@ -88,7 +93,7 @@ sub filterSortedPos{
     if($distance >= $$settings{'min-distance'}){
       $filtered{$pos}=$$posHash{$pos};
     } else {
-      #logmsg "filtered: $pos is too close to $prevPos";
+      logmsg "filtered: $pos is too close to $prevPos" if($$settings{verbose});
     }
   }
   return \%filtered;
@@ -129,5 +134,6 @@ sub usage{
          $0 < matrix.tsv | removeUninformativeSites.pl > informative.aln.fas
   --min-distance 0 The distance in bp between allowed SNPs. Does not count sites where all nt are the same.
   --format fasta   The output format (uses bioperl's aln format values, e.g., clustalw)
+  --verbose
   "
 }
