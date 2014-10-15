@@ -258,9 +258,7 @@ sub variantCalls{
       indexAndCompressVcf("$vcfdir/$b.vcf",$jobname,$settings);
     }
     else {
-      for($bgzip,$tabix){
-        logmsg "I could not find $_ in your path and so I will not compress and index VCFs" if(!$_);
-      }
+      logmsg "Either bgzip or tabix is not in your path, and so I will not compress and index VCFs";
     }
   } # END bam while loop
   logmsg "All variant-calling jobs have been submitted. Waiting on them to finish";
