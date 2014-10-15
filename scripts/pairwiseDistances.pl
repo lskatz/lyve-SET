@@ -18,10 +18,10 @@ sub main{
   $$settings{numcpus}||=1;
   $$settings{samplingFrequency}||=0.25;
 
+  # TODO change this so that you can read stdin
   my $alignment=$ARGV[0];
   die usage() if(!$alignment);
 
-  logmsg "Reading the aln";
   my %seq;
   my $in=Bio::AlignIO->new(-file=>$alignment,-idlength=>30);
   while(my $aln=$in->next_aln){
