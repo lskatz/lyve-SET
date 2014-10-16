@@ -271,9 +271,11 @@ sub indexAndCompressVcf{
   my($vcf,$holdjid,$settings)=@_;
   my $j={};
   eval{
-  $j=$sge->pleaseExecute("vcf-sort < '$vcf' > '$vcf.sorted.tmp' && mv '$vcf.sorted.tmp' '$vcf'",{qsubxopts=>"-hold_jid $holdjid",jobname=>"vcf-sort",numcpus=>1});
-  $j=$sge->pleaseExecute("bgzip -f '$vcf'",{qsubxopts=>"-hold_jid $$j{jobid}",jobname=>"bgzip",numcpus=>1});
-  $j=$sge->pleaseExecute("tabix '$vcf.gz'",{qsubxopts=>"-hold_jid $$j{jobid}",jobname=>"tabix",numcpus=>1});
+    $j=$sge->pleaseExecute("
+      vcf-sort < '$vcf' > '$vcf.sorted.tmp' && mv '$vcf.sorted.tmp' '$vcf' && \
+      bgzip -f '$vcf' && \
+      tabix '$vcf.gz'
+    ",{qsubxopts=>"-hold_jid $holdjid",jobname=>"sortAndCompress",numcpus=>1});
   };
   if($@){
     logmsg "Warning: Could not compress and index $vcf: $@";
