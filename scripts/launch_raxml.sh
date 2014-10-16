@@ -17,10 +17,10 @@ numcpus=${NSLOTS:-2}
 # parsing
 while getopts ":n:o:" o; do
   case "${o}" in
-    n) 
+    n)
       numcpus=$OPTARG
       ;;
-    o) 
+    o)
       outgroupParam="-o $OPTARG"
       ;;
     *)
@@ -55,6 +55,17 @@ fi;
 # Which raxml to use?
 which raxmlHPC 1>/dev/null 2>&1 && EXEC=raxmlHPC
 which raxmlHPC-PTHREADS 1>/dev/null 2>&1 && EXEC=raxmlHPC-PTHREADS
+
+# Raxml-pthreads must have >1 cpu and so fix it if that happens
+if [ $EXEC == "raxmlHPC-PTHREADS" ]; then
+  # attempt to switch back to regular raxml
+  which raxmlHPC 1>/dev/null 2>&1 && EXEC=raxmlHPC
+
+  # If it is still the pthreads version change the cpus
+  if [ $EXEC == "raxmlHPC-PTHREADS" ] && [ $numcpus -lt 2 ]; then
+    numcpus=2
+  fi
+fi
 
 # what version is raxml?
 VERSION=$($EXEC -v | grep -o 'version [0-9]' | grep -o [0-9]);
