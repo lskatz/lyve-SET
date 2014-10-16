@@ -3,7 +3,7 @@
 
 PREFIX := $(PWD)
 PROFILE := $(HOME)/.bashrc
-VERSION := 0.9.0
+VERSION := 0.9.1
 PROJECT := "setTestProject"
 NUMCPUS := 1
 SHELL   := /bin/bash
@@ -47,9 +47,13 @@ all: install env clean
 install: install-prerequisites
 	@echo "Don't forget to set up update PATH and PERL5LIB to $(PREFIX)/scripts and $(PREFIX)/lib"
 	@echo "'make env' performs this step for you"
+	@echo "DONE: installation of Lyve-SET v$(VERSION) complete."
 
-install-prerequisites: install-vcftools install-CGP install-callsam install-SGELK install-varscan
+install-prerequisites: install-mkdir install-vcftools install-CGP install-callsam install-SGELK install-varscan
 	@echo DONE installing prerequisites
+
+install-mkdir:
+	-mkdir $(PREFIX)/build $(PREFIX)/lib $(PREFIX)/scripts
 
 install-callsam:
 	rm -rf $(PREFIX)/lib/callsam # make sure it's removed
@@ -57,7 +61,9 @@ install-callsam:
 install-SGELK:
 	rm -rf $(TMPDIR)/Schedule # make sure it's removed
 	git clone https://github.com/lskatz/Schedule--SGELK.git $(TMPDIR)/Schedule
+	-mkdir -p $(PREFIX)/lib/Schedule
 	mv -v $(TMPDIR)/Schedule/SGELK.pm $(PREFIX)/lib/Schedule/
+	mv -v $(TMPDIR)/Schedule/README.md $(PREFIX)/lib/Schedule/
 install-CGP:
 	# make sure these scripts are removed
 	rm -f $(PREFIX)/scripts/run_assembly_isFastqPE.pl
@@ -86,9 +92,14 @@ install-vcftools:
 install-varscan:
 	wget 'http://downloads.sourceforge.net/project/varscan/VarScan.v2.3.7.jar?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fvarscan%2Ffiles%2F&ts=1413398147&use_mirror=ufpr' -O $(PREFIX)/lib/varscan.v2.3.7.jar
 
-cuttingedge:
-	git clone --recursive https://github.com/lskatz/lyve-SET.git $(PREFIX)
-	$(MAKE) install-prerequisites
+cuttingedge: install-mkdir cuttingedge-gitclone install-prerequisites
+	@echo "DONE installing the cutting edge version"
+
+cuttingedge-gitclone:
+	git clone --recursive https://github.com/lskatz/lyve-SET.git $(PREFIX)/build/Lyve-SET
+	rm -r $(PREFIX)/build/Lyve-SET/build # avoid directory-not-empty error
+	mv -vf $(PREFIX)/build/Lyve-SET/* $(PREFIX)/
+
 
 env:
 	echo "#Lyve-SET" >> $(PROFILE)
