@@ -66,9 +66,11 @@ sub removeSitesFromMatrix{
     while(my($pos,$genomeHash)=each(%$posHash)){
       my ($is_variant,$is_indel,$is_ambiguous)=(0,0,0);
       my($refGenome,$refNt)=each(%$genomeHash);
+      # compare everything in the upper case
       my $REFNT=uc($refNt);
+      # TODO do all the refnt comparisons outside of the inner loop, if it helps save significant computation time
       while(my($genome,$nt)=each(%$genomeHash)){
-      #for my $nt(values(%$genomeHash))
+        # compare it in the upper case
         my $NT = uc($nt);
         # see if it is an invariant site.
         $is_variant=1 if($NT ne $REFNT);
@@ -85,7 +87,7 @@ sub removeSitesFromMatrix{
 
       # say whether it was kept or removed
       if($$settings{verbose}){
-        logmsg "Deleted $contig:$pos" if(!$$matrix{$contig}{$pos});
+        logmsg "Deleted $contig:$pos because either gap, ambiguity, or not variant" if(!$$matrix{$contig}{$pos});
         logmsg "Kept $contig:$pos" if($$matrix{$contig}{$pos});
       }
       # index the site if it was kept
