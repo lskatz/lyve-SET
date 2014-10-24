@@ -43,8 +43,8 @@ exit(main());
 
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --noclean
-  my $settings={trees=>1,clean=>1, msa=>1, matrix=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s clean! msa! matrix! mapper=s snpcaller=s msa-creation=s)) or die $!;
+  my $settings={trees=>1,msa=>1, matrix=>1};
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s msa-creation=s)) or die $!;
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
@@ -204,9 +204,9 @@ sub mapReads{
     my $clean=($$settings{clean})?"--clean":"--noclean"; # the clean parameter or not
 
     if($$settings{mapper} eq 'smalt'){
-      $sge->pleaseExecute("$scriptsdir/launch_smalt.pl -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} $clean",{jobname=>"smalt$b"});
+      $sge->pleaseExecute("$scriptsdir/launch_smalt.pl -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} ",{jobname=>"smalt$b"});
     } elsif($$settings{mapper} eq 'snap'){
-      $sge->pleaseExecute("$scriptsdir/launch_snap.pl -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} $clean",{jobname=>"snap$b"});
+      $sge->pleaseExecute("$scriptsdir/launch_snap.pl -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} ",{jobname=>"snap$b"});
     } else {
       die "ERROR: I do not understand the mapper $$settings{mapper}";
     }
@@ -373,7 +373,6 @@ sub usage{
 
     $help.="
     SKIP CERTAIN STEPS
-    --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with; removes the requirement for CG-Pipeline)
     --nomatrix to not create an hqSNP matrix
     --nomsa to not make a multiple sequence alignment
     --notrees to not make phylogenies
