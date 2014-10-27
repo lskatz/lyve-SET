@@ -30,39 +30,38 @@ Installation
 
 Usage
 -----
-    launch_set.pl: main::main: launch_set.pl: Launches the Lyve-SET pipeline
     Usage: launch_set.pl [project] [-ref reference.fasta]
     If project is not given, then it is assumed to be the current working directory.
     If reference is not given, then it is assumed to be proj/reference/reference.fasta
-	    Where parameters with a / are directories
-	    -ref      proj/reference/reference.fasta   The reference genome assembly
-	    -reads    readsdir/       where fastq and fastq.gz files are located
-	    -bam      bamdir/         where to put bams
-	    -vcf      vcfdir/         where to put vcfs
-	    --tmpdir  tmpdir/         tmp/ Where to put temporary files
-	    --msadir  msadir/         multiple sequence alignment and tree files (final output)
-	    --logdir  logdir/         Where to put log files. Qsub commands are also stored here.
-	    -asm      asmdir/         directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
-	      NOTE: Set -all to 'auto' to let SET determine this distance using snpDistribution.pl
+    Where parameters with a / are directories
+    -ref      proj/reference/reference.fasta   The reference genome assembly
+    -reads    readsdir/       where fastq and fastq.gz files are located
+    -bam      bamdir/         where to put bams
+    -vcf      vcfdir/         where to put vcfs
+    --tmpdir  tmpdir/         tmp/ Where to put temporary files
+    --msadir  msadir/         multiple sequence alignment and tree files (final output)
+    --logdir  logdir/         Where to put log files. Qsub commands are also stored here.
+    -asm      asmdir/         directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
 
     SNP MATRIX OPTIONS
-	    --allowedFlanking  100             allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
-	    --min_alt_frac     0.75  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
-	    --min_coverage     10  Minimum coverage needed before a SNP is called. Otherwise, 'N'
+    --allowedFlanking  0               allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.  Set to -1 to let SET determine this distance using snpDistribution.pl
+    --min_alt_frac     0.75  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
+    --min_coverage     10  Minimum coverage needed before a SNP is called. Otherwise, 'N'
 
     SKIP CERTAIN STEPS
-	    --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with; removes the requirement for CG-Pipeline)
-	    --nomsa to not make a multiple sequence alignment
-	    --notrees to not make phylogenies
+    --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with; removes the requirement for CG-Pipeline)
+    --nomatrix to not create an hqSNP matrix
+    --nomsa to not make a multiple sequence alignment
+    --notrees to not make phylogenies
     MODULES
-	    --mapper       smalt             Which mapper? Choices: smalt, snap
-	    --snpcaller    freebayes         Which SNP caller? Choices: freebayes, callsam
-	    --msa-creation lyve-set-lowmem   Which method of making the multiple sequence alignment? lyve-set, lyve-set-lowmem
+    --mapper       smalt             Which mapper? Choices: smalt, snap
+    --snpcaller    freebayes         Which SNP caller? Choices: freebayes, callsam
     SCHEDULER AND MULTITHREADING OPTIONS
-	    --queue     all.q         The default queue to use.
-	    --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
-	    --numnodes  20  maximum number of nodes
-	    --numcpus   1  number of cpus
+    --queue     all.q         The default queue to use.
+    --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
+    --numnodes  20  maximum number of nodes
+    --numcpus   1  number of cpus
+
 
 
 
