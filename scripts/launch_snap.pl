@@ -12,7 +12,7 @@ sub logmsg{print STDERR "@_\n";}
 exit(main());
 
 sub main{
-  my $settings={clean=>1};
+  my $settings={clean=>0};
   GetOptions($settings,qw(help reference=s fastq=s bam=s tempdir=s clean! numcpus=i));
   for(qw(reference fastq bam)){
     die "ERROR: need option $_\n".usage() if(!$$settings{$_});
@@ -279,7 +279,6 @@ sub _is_fastqPECasava17{
 sub usage{
   "Maps a read set against a reference genome using snap. Output file will be file.bam and file.bam.depth
   Usage: $0 -f file.fastq -b file.bam -t tmp/ -r reference.fasta
-  --noclean if you don't want to clean the reads internally
   -t tmp to set the temporary directory as 'tmp'
   --numcpus 1 number of cpus to use
   "
