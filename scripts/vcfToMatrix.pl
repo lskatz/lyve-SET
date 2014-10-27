@@ -143,6 +143,12 @@ sub readVcf{
     my($contig,$pos,undef,$ref,$alt)=split /\t/;
     $$vcfHash{$contig}{$pos}=$alt;
 
+    if($alt eq '.'){
+      $$vcfHash{$contig}{$pos}=$ref;
+    } else {
+      $$vcfHash{$contig}{$pos}=$alt;
+    }
+
     # Indels will just be an N because it is too difficult to deal with those.
     if($ref eq '*' || $alt eq '*' || length($ref)>1 || length($alt)>1){
       # lowercase N to mask it later, when trying to recover other bases for 
