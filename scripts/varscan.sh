@@ -20,7 +20,7 @@ if [ "$1" == "" ]; then
   echo
   java -jar "$JAR" 2>&1 | grep -v 'java -jar' | grep .
   echo
-  exit 1
+  exit 0
 fi
 
 java -jar "$JAR" "$@"
