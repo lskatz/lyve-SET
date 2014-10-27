@@ -11,7 +11,7 @@ use Thread::Semaphore;
 use Thread::Queue;
 
 $0=basename $0;
-my $diskIoStick=Thread::Semaphore->new();
+my $diskIoStick;
 sub logmsg{print STDERR "$0: ".(caller(1))[3].": @_\n"}
 exit(main());
 
@@ -35,12 +35,13 @@ sub main{
       die "ERROR: Could not understand what kind of file $file is";
     }
   }
-  
 
-  logmsg "Discovering all defined VCF positions";
-  my $posArr=getVcfPositions(\@VCF,$settings);
+  $diskIoStick=Thread::Semaphore->new($$settings{numcpus});
+
   logmsg "Reading the reference genome";
   my $refBase=findReferenceBases($$settings{reference},$settings);
+  logmsg "Discovering all defined VCF positions";
+  my $posArr=getVcfPositions(\@VCF,$settings);
 
   # kick off VCF=>matrix threads
   my $Q=Thread::Queue->new;
