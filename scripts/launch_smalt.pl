@@ -14,7 +14,7 @@ sub logmsg{print STDERR "@_\n";}
 exit(main());
 
 sub main{
-  my $settings={clean=>1};
+  my $settings={clean=>0};
   GetOptions($settings,qw(help reference=s fastq=s bam=s tempdir=s clean! numcpus=i smaltxopts=s)) or die $!;
   $$settings{numcpus}||=1;
   $$settings{tempdir}||="tmp";
@@ -163,7 +163,6 @@ sub usage{
   my($settings)=@_;
   "Maps a read set against a reference genome using smalt. Output file will be file.bam and file.bam.depth
   Usage: $0 -f file.fastq -b file.bam -t tmp/ -r reference.fasta
-  --noclean if you don't want to clean the reads internally
   -t tmp to set the temporary directory as 'tmp'
   --numcpus 1 number of cpus to use
   -s '' Extra smalt map options (not validated). Default: $$settings{smaltxopts} 
