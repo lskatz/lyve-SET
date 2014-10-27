@@ -43,8 +43,8 @@ exit(main());
 
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --noclean
-  my $settings={trees=>1,msa=>1, matrix=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s msa-creation=s)) or die $!;
+  my $settings={trees=>1,msa=>1, matrix=>1, clean=>1};
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s msa-creation=s clean)) or die $!;
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
@@ -62,6 +62,11 @@ sub main{
   $$settings{queue}||="";
   # Some things need to just be lowercase to make things easier downstream
   $$settings{$_}=lc($$settings{$_}) for(qw(msa-creation snpcaller mapper));
+
+  # A warning about --noclean
+  if(!$$settings{clean}){
+    die "Warning: the --noclean option has been removed in Lyve-SET v0.9.2.  You should clean your reads before using Lyve-SET.";
+  }
 
   ##########################################################
   ### Other defaults: reference genome; default directories#
