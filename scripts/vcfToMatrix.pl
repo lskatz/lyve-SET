@@ -17,8 +17,7 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help outfile=s reference=s coverage=i numcpus=i)) or die;
-  $$settings{outfile}||="$0.out.fasta";
+  GetOptions($settings,qw(help reference=s coverage=i numcpus=i)) or die;
   $$settings{coverage}||=10;
   $$settings{numcpus}||=1;
   die usage($settings) if($$settings{help} || @ARGV<2);
@@ -216,7 +215,9 @@ sub usage{
   "Creates a matrix of SNPs, given a set of VCFs. Output is in tabular format with headers on the first row and first column.
   usage: $0 *.bam *.vcf [*.vcf.gz] -r reference.fasta > hqSNPs.tsv
     Note: multiple nucleotide polymorphic sites and indels are changed to 'n'. Use filterVcf.pl to help retain some of these positions.
-    -n numcpus (default: 1)
-    -coverage 10 The minimum coverage allowed to accept the snp. Or, the reference base, if the base caller didn't call a position.
+    -r file.fasta  The reference genome assembly
+    -n 1           The number of cpus to use
+    -c 10          The minimum coverage allowed to accept the snp. Or, the reference base, if the base caller didn't call a position.
+    -h             help menu
   "
 }
