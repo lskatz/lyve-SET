@@ -35,14 +35,16 @@ sub main{
 sub mpileup{
   my($bam,$reference,$settings)=@_;
   my $pileup="$$settings{tempdir}/".fileparse($bam).".mpileup";
-  return $pileup if(-e $pileup);
-  system("samtools mpileup -f '$reference' '$bam' 2>&1 1>$pileup");
+  return $pileup if(-e $pileup && -s $pileup > 0);
+  logmsg "Creating a pileup $pileup";
+  system("samtools mpileup -f '$reference' '$bam' 1>$pileup");
   die if $?;
   return $pileup;
 }
 
 sub varscan{
   my($pileup,$settings)=@_;
+  die "ERROR: the pileup is a zero-byte file\n  $pileup" if(-s $pileup < 1);
   system("varscan.sh mpileup2cns $pileup --min-coverage $$settings{coverage} --min-coverage 10 --min-var-freq 0.75 --output-vcf 1");
   die if $?;
 }

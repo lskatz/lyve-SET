@@ -52,7 +52,7 @@ sub main{
   $$settings{min_coverage}||=10;
   # modules defaults
   $$settings{mapper}||="smalt";
-  $$settings{snpcaller}||="freebayes";
+  $$settings{snpcaller}||="varscan";
   $$settings{'msa-creation'}||="lyve-set-lowmem";
   # queue stuff
   $$settings{vcfToAlignment_xopts}||="-l mem_free=100G -q highmem.q";
