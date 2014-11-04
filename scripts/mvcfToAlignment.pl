@@ -41,7 +41,7 @@ sub main{
 
     # assign the nts for each genome, at each contig/pos
     while(my($genome,$GT)=each(%F)){
-      die Dumper [$genome,\%F] if(!$GT);
+      die "ERROR: could not find the genotype field (GT)!\n". Dumper [$genome,\%F] if(!$GT);
       my $nt=$GT;
       if($nt=~/(.)[\/\|](.)/){
         $nt=$1;
@@ -81,7 +81,7 @@ sub main{
 
 sub usage{
   "Multiple VCF format to alignment
-  $0: reads a bcftools query output and creates a multiple sequence alignment file
+  $0: reads a bcftools query output and creates a multiple sequence alignment file. Required columns: GT (genotype), REF, CHROM, POS
   Usage: bcftools query [...] | $0 > aln.fasta
   "
 }
