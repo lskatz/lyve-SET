@@ -80,6 +80,12 @@ sub backfillVcfValues{
     $$x{gtypes}{Sample1}{AD}||=0;
     $$x{gtypes}{Sample1}{AC}||=$$x{gtypes}{Sample1}{AD};
 
+    # Put in exactly what the alternate call is
+    $$x{ALT}[0]=$$x{REF} if($$x{ALT}[0] eq '.');
+
+    # Figure out the genotype
+    #$$x{gtypes}{Sample1}{GT}=$$x{ALT}[0].'/'.$$x{ALT}[0];
+
     print $vcf->format_line($x);
   }
 
