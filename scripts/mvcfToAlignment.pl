@@ -20,6 +20,7 @@ sub main{
   $header=~s/^#\s*//; # remove the hash in front of the header
   my @header=split(/\t/,$header);
   $_=~s/\[\d+\]// for(@header); # remove [number] notations for the headers
+  $_=~s/:GT$//    for(@header); # remove :GT after each genotype field
 
   # genome names
   my @genome=@header[3..@header-1];
@@ -45,11 +46,11 @@ sub main{
       if($nt=~/(.)[\/\|](.)/){
         $nt=$1;
         $nt="N" if($1 ne $2);
-        $nt=$extra{REF} if($nt eq '.' || $nt eq ',');
         
         # take care of indels or ambiguities
         $nt="N" if(length($nt)!=1 || $nt!~/^[ATCG]$/i);
       }
+      $nt=$extra{REF} if($nt eq '.' || $nt eq ',');
       $matrix{$genome}{$extra{CHROM}}{$extra{POS}}=$nt;
     }
   }
@@ -79,7 +80,8 @@ sub main{
 }
 
 sub usage{
-  " $0: reads a bcftools query output and creates a multiple sequence alignment file
+  "Multiple VCF format to alignment
+  $0: reads a bcftools query output and creates a multiple sequence alignment file
   Usage: bcftools query [...] | $0 > aln.fasta
   "
 }
