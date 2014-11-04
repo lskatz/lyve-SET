@@ -107,15 +107,16 @@ sub main{
   mapReads($ref,$$settings{readsdir},$$settings{bamdir},$settings);
   variantCalls($ref,$$settings{bamdir},$$settings{vcfdir},$settings);
 
+  my $matrix;
   if($$settings{matrix}){
-    variantsToMatrix($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
+    $matrix=variantsToMatrix($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
   } else {
     logmsg "The matrix was not requested; wrapping up";
     return 0;
   }
 
   if($$settings{msa}){
-    matrixToAlignment($settings);
+    matrixToAlignment($matrix,$settings);
   } else {
     logmsg "The alignment was not requested; wrapping up";
     return 0;
@@ -304,9 +305,10 @@ sub variantsToMatrix{
   my $logdir=$$settings{logdir};
 
   my $matrix="$msadir/out.matrix.tsv";
-  my $informative="$msadir/informative.matrix.tsv";
-  if(-e $informative){
-    logmsg "Found $informative -- already present. Not re-converting.";
+  my $bcfMatrix="$msadir/out.bcfmatrix.tsv";
+  my $pooled="$msadir/out.pooled.vcf.gz";
+  if(-e $bcfMatrix){
+    logmsg "Found $bcfMatrix -- already present. Not re-converting.";
     return 1;
   }
 
@@ -315,6 +317,7 @@ sub variantsToMatrix{
   my @bam=glob("$bamdir/*.sorted.bam");
   my @infile=(@bam,@vcf);
   my $infile="'".join("' '",@infile)."'";
+  my $inVcf="'".join("' '",@vcf)."'";
 
   # Find the distance that we'd expect SNP-linkage, so that they can be filtered out
   if($$settings{allowedFlanking} eq 'auto'){
@@ -328,25 +331,26 @@ sub variantsToMatrix{
   logmsg "AllowedFlanking: $$settings{allowedFlanking}";
 
   my $j;
-  $j=$sge->pleaseExecute("vcfToMatrix.pl $infile -r $ref --numcpus $$settings{numcpus} > $matrix",{jobname=>"vcfToMatrix",numcpus=>$$settings{numcpus}});
-  # shorten the deflines to remove the directory names
-  $j=$sge->pleaseExecute("sed -i.bak 's|^.*/||g' '$matrix'",{qsubxopts=>"-hold_jid $$j{jobid}",jobname=>"sedOnAln",numcpus=>1});
-  $j=$sge->pleaseExecute("removeUninformativeSitesFromMatrix.pl --min-distance $$settings{allowedFlanking} < $matrix > $informative",{qsubxopts=>"-hold_jid $$j{jobid}",numcpus=>1,jobname=>"removeUninformativeSitesFromMatrix"});
-
+  $j=$sge->pleaseExecute("bcftools merge $inVcf -O z > $pooled",{jobname=>"poolVcfs",numcpus=>1});
+  my $poolJobid=$$j{jobid};
+  $j=$sge->pleaseExecute("tabix $pooled",{jobname=>"tabixPooled",numcpus=>1,qsubxopts=>"-hold_jid $poolJobid"});
+  # uncover all positions that are snps and that are at the min coverage
+  $j=$sge->pleaseExecute("bcftools query -i '%TYPE=\"snp\" && %MIN(DP)>=$$settings{min_coverage}' -f '%CHROM\t%POS\t%REF\t[%TGT\t]\n' --print-header $pooled > $bcfMatrix",{jobname=>"pooledToMatrix",numcpus=>1,qsubxopts=>"-hold_jid $poolJobid"});
   $sge->wrapItUp();
-  return $informative;
+
+  return $bcfMatrix;
 }
 
 sub matrixToAlignment{
-  my($settings)=@_;
+  my($matrix,$settings)=@_;
   my $outMsa="$$settings{msadir}/out.aln.fas";
-  my $matrix="$$settings{msadir}/informative.matrix.tsv";
   if(-e $outMsa){
     logmsg "Found $outMsa and so I will not remake it";
     return $outMsa;
   }
 
-  $sge->pleaseExecute("matrixToAlignment.pl < $matrix > $outMsa",{jobname=>"matrixToAlignment",numcpus=>1});
+  $sge->pleaseExecute("mvcfToAlignment.pl < $matrix > $outMsa",{jobname=>"matrixToAlignment",numcpus=>1});
+  #$sge->pleaseExecute("matrixToAlignment.pl < $matrix > $outMsa",{jobname=>"matrixToAlignment",numcpus=>1});
   $sge->wrapItUp();
 
   return $outMsa;
