@@ -253,6 +253,7 @@ sub variantCalls{
       $sge->pleaseExecute("$scriptsdir/filterVcf.pl $vcfdir/unfiltered/$b.vcf --noindels -d $$settings{min_coverage} -o $vcfdir/$b.vcf",{qsubxopts=>"-hold_jid sort$b",numcpus=>1,jobname=>"filter$b"});
       $jobname="filter$b";
     } elsif($$settings{snpcaller} eq 'callsam'){
+      die "ERROR: callsam is deprecated\n".usage();
       $jobname="callsam$b";
       # call snps
       $sge->pleaseExecute("$scriptsdir/../lib/callsam/bin/callsam_MT.pl $bam --numcpus $$settings{numcpus} --min-coverage $$settings{min_coverage} --min-frequency $$settings{min_alt_frac} --reference '$ref' > $vcfdir/unfiltered/$b.vcf",{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
@@ -397,7 +398,7 @@ sub usage{
     --notrees to not make phylogenies
     MODULES
     --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap
-    --snpcaller    $$settings{snpcaller}   Which SNP caller? Choices: freebayes, callsam, varscan
+    --snpcaller    $$settings{snpcaller}   Which SNP caller? Choices: freebayes, varscan
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue     all.q         The default queue to use.
     --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
