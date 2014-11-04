@@ -10,7 +10,8 @@ readSnpLimit=10;
 b=`basename $out_vcf .vcf`;
 
 if [ "$out_vcf" = "" ]; then
-  echo usage: $0 ref.fasta query.bam out.vcf min_alt_frac min_coverage;
+  script=`basename $0`;
+  echo usage: $script ref.fasta query.bam out.vcf min_alt_frac min_coverage;
   echo "  where min_al_frac can be 0.75 and min_coverage can be 10"
   exit 1;
 fi;
@@ -65,6 +66,10 @@ freebayes       \
                 --min-coverage $minCoverage `# Require at least this coverage to process a site.  default: 0`
 
 if [ $? -gt 0 ]; then exit 1; fi;
+
+# put in the correct sample name
+mv $unfiltered_vcf "$unfiltered_vcf.tmp" && \
+  sed '/^#CHROM/s/unknown/'$b'/' "$unfiltered_vcf.tmp" > $unfiltered_vcf
 
 echo "Filtering FreeBayes calls"
 filterVcf.pl $unfiltered_vcf --noindels -d $minCoverage -o $new_vcf -b $bad
