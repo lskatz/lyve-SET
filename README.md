@@ -11,6 +11,7 @@ Requirements
 * RAxML
 * PhyML
 * FreeBayes
+* Varscan
 * Smalt
 * Samtools
   * wgsim (part of samtools) if you are simulating reads
@@ -20,6 +21,7 @@ Requirements installed with "make install"
 * CG-Pipeline
 * Schedule::SGELK
 * CallSam 
+* VCF Tools and Vcf.pm
 
 Installation
 ------------
@@ -55,7 +57,7 @@ Usage
     --notrees to not make phylogenies
     MODULES
     --mapper       smalt             Which mapper? Choices: smalt, snap
-    --snpcaller    freebayes         Which SNP caller? Choices: freebayes, callsam
+    --snpcaller    freebayes         Which SNP caller? Choices: freebayes, varscan
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue     all.q         The default queue to use.
     --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
@@ -67,34 +69,8 @@ Usage
 
 Examples
 ------
-If you have version 0.8 or earlier, use the following sytax:
 
-    # Set up the directory with your reads and reference genome
-    $ set_create.pl setTest  # directory structure created
-    $ tree setTest           # View the new directory structure
-    setTest
-    ├── asm
-    ├── bam
-    ├── msa
-    ├── reads
-    ├── reference
-    ├── tmp
-    └── vcf
-        └── unfiltered
-
-    $ cd setTest/            
-    # copy over all your fastq files to the reads directory
-    $ cp -v ../path/to/fastq.gz/dir/*.fastq.gz reads/     
-    # OR symlink your fastq files
-    $ cd reads
-    $ ln -sv ../../path/to/fastq.gz/dir/*.fastq.gz .
-    $ cd ..
-    # copy over all assembled genomes that you want to include in the tree in the asm directory
-    $ cp -v ../path/to/fasta/dir/*.fasta asm/                 
-    # copy over your single reference genome (only one permitted)
-    $ cp -v ../path/to/fasta/dir/reference.fasta reference/  
-
-If you have a newer version >0.8 then you have the script set_manage.pl and you should use the following syntax:
+The script set_manage.pl sets up the project directory and adds reads, and you should use the following syntax:
     
     $ set_manage.pl --create setTest
     $ set_manage.pl setTest --add-reads file1.fastq.gz
@@ -105,32 +81,38 @@ If you have a newer version >0.8 then you have the script set_manage.pl and you 
     $ set_manage.pl setTest --add-assembly file1.fasta
     $ set_manage.pl setTest --add-assembly file2.fasta
     $ set_manage.pl setTest --change-reference file3.fasta
-    $ cd  setTest # get into the directory before running launch_set.pl
 
 NOTE: no underscores or dashes allowed in the reference genome fasta file headers
     
 Run Lyve-SET with as few options as possible
 
-    $ cd setProj && launch_set.pl -ref reference/reference.fasta  # < v0.8.1
-    $ launch_set.pl setProj                                       # >= v0.8.1
+    $ launch_set.pl setProj
 
 More complex
 
-    # < v0.8.1
-    $ cd setProj && launch_set.pl -ref reference/reference.fasta  --queue all.q --numnodes 20 --numcpus 16 --noclean --notrees
-    # >= v0.8.1
     $ launch_set.pl setProj --queue all.q --numnodes 20 --numcpus 16 --noclean --notrees
-    # Change some module steps, >= v0.7
-    $ launch_set setProj --snpcaller callsam --msa-creation lyve-set-lowmem
     
 If you specified notrees, then you can edit the multiple sequence alignment before analyzing it. See the next section on examples on how/why you would edit the alignment.
 
-    $ cd msa
+    $ cd setProj/msa
     $ gedit out.aln.fas  # alter the deflines or whatever you want before moving on
     # => out.aln.fas is here
     $ set_process_msa.pl --auto --numcpus 12
     # Optionally, qsub this script instead because it could be cpu-intensive
     $ qsub -pe smp 12 -cwd -V -o trees.log -j y -N msaLyveSET -S $(which perl) $(which set_process_msa.pl) --auto --numcpus 12
+
+If you make a mistake and need to redo something:
+
+    # remove all intermediate files
+    $ rm setProj/bam/genome*
+    $ rm setProj/vcf/genome* setProj/vcf/unfiltered/genome*
+    # OR, remove a genome entirely
+    $ set_manage.pl setProj --remove-reads genome.fastq.gz
+    $ set_manage.pl setProj --remove-assembly genome.fasta
+    # remove the last multiple sequence alignment files
+    $ rm -r setProj/msa/*
+    # redo the analysis (all untouched bams and vcfs will not be redone)
+    $ launch_set.pl setProj
 
 Why would you want to edit the out.aln.fas file?  Or what kinds of things can you observe here before making a tree?
     
