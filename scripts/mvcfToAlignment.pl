@@ -1,5 +1,7 @@
 #!/usr/bin/env perl
 
+# TODO put the bcftools query command into this script so that it actually reads from an multiple-genome vcf
+
 use strict;
 use warnings;
 use Data::Dumper;
