@@ -15,11 +15,18 @@ sub logmsg{print STDERR "$0: @_\n";}
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help ambiguities));
-  die usage() if($$settings{help});
+  GetOptions($settings,qw(help ambiguities min_coverage=i tempdir=s));
+  die usage() if($$settings{help} || !@ARGV);
+  $$settings{min_coverage}||=10;
+  $$settings{tempdir}||="tmp";
+  my $vcf=$ARGV[0];
+
+  # read in the file with bcftools query
+  my %matrix;
+  my @queryMatrix=bcftoolsQuery($vcf,$settings);
+  chomp(@queryMatrix);
   
-  my $header=<>;
-  chomp($header);
+  my $header=shift(@queryMatrix);
   $header=~s/^#\s*//; # remove the hash in front of the header
   my @header=split(/\t/,$header);
   $_=~s/\[\d+\]// for(@header); # remove [number] notations for the headers
@@ -28,10 +35,7 @@ sub main{
   # genome names
   my @genome=@header[3..@header-1];
 
-  # read the matrix into memory before printing the aln
-  my %matrix;
-  while(<>){
-    chomp;
+  for(@queryMatrix){
     my %F;
     @F{@header}=split /\t/;
 
@@ -122,10 +126,22 @@ sub rev_iub{
   return $ambiguity;
 }
 
+sub bcftoolsQuery{
+  my($file,$settings)=@_;
+  my $matrix="$$settings{tempdir}/$$.matrix";
+  my $bcfquery="bcftools query -i '%TYPE=\"snp\" && %MIN(DP)>=$$settings{min_coverage}' -f '%CHROM\\t%POS\\t%REF\\t[%TGT\\t]\\n' --print-header";
+  my $bcfMatrix=`$bcfquery < $file `;
+  return split(/\n/,$bcfMatrix) if(wantarray);
+  return $bcfMatrix;
+}
+
 sub usage{
   "Multiple VCF format to alignment
-  $0: reads a bcftools query output and creates a multiple sequence alignment file. Required columns: GT (genotype), REF, CHROM, POS
-  Usage: bcftools query [...] | $0 > aln.fasta
+  $0: reads a pooled vcf (from bcftools merge) and creates a multiple sequence alignment file.
+  Usage: 
+    bcftools *.vcf.gz -O z > pooled.fastq.gz # prerequisite
+    $0 pooled.fastq.gz > aln.fasta           # $0 command
   --ambiguities  to allow for ambiguity letter codes other than 'N'
+  --min_coverage 10 Minimum coverage per site before it can be considered
   "
 }

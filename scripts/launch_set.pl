@@ -107,16 +107,16 @@ sub main{
   mapReads($ref,$$settings{readsdir},$$settings{bamdir},$settings);
   variantCalls($ref,$$settings{bamdir},$$settings{vcfdir},$settings);
 
-  my $matrix;
+  my $pooled;
   if($$settings{matrix}){
-    $matrix=variantsToMatrix($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
+    $pooled=variantsToMatrix($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
   } else {
     logmsg "The matrix was not requested; wrapping up";
     return 0;
   }
 
   if($$settings{msa}){
-    matrixToAlignment($matrix,$settings);
+    pooledToAlignment($pooled,$settings);
   } else {
     logmsg "The alignment was not requested; wrapping up";
     return 0;
@@ -335,23 +335,20 @@ sub variantsToMatrix{
   $j=$sge->pleaseExecute("bcftools merge $inVcf -O z > $pooled",{jobname=>"poolVcfs",numcpus=>1});
   my $poolJobid=$$j{jobid};
   $j=$sge->pleaseExecute("tabix $pooled",{jobname=>"tabixPooled",numcpus=>1,qsubxopts=>"-hold_jid $poolJobid"});
-  # uncover all positions that are snps and that are at the min coverage
-  $j=$sge->pleaseExecute("bcftools query -i '%TYPE=\"snp\" && %MIN(DP)>=$$settings{min_coverage}' -f '%CHROM\t%POS\t%REF\t[%TGT\t]\n' --print-header $pooled > $bcfMatrix",{jobname=>"pooledToMatrix",numcpus=>1,qsubxopts=>"-hold_jid $poolJobid"});
   $sge->wrapItUp();
 
-  return $bcfMatrix;
+  return $pooled;
 }
 
-sub matrixToAlignment{
-  my($matrix,$settings)=@_;
+sub pooledToAlignment{
+  my($pooled,$settings)=@_;
   my $outMsa="$$settings{msadir}/out.aln.fas";
   if(-e $outMsa){
     logmsg "Found $outMsa and so I will not remake it";
     return $outMsa;
   }
 
-  $sge->pleaseExecute("mvcfToAlignment.pl < $matrix > $outMsa",{jobname=>"matrixToAlignment",numcpus=>1});
-  #$sge->pleaseExecute("matrixToAlignment.pl < $matrix > $outMsa",{jobname=>"matrixToAlignment",numcpus=>1});
+  $sge->pleaseExecute("mvcfToAlignment.pl $pooled > $outMsa",{jobname=>"matrixToAlignment",numcpus=>1});
   $sge->wrapItUp();
 
   return $outMsa;
