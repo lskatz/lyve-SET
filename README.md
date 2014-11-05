@@ -111,6 +111,8 @@ If you make a mistake and need to redo something:
     $ set_manage.pl setProj --remove-assembly genome.fasta
     # remove the last multiple sequence alignment files
     $ rm -r setProj/msa/*
+    # or save the MSA results for another time
+    $ mv setProj/msa setProj/msa.oldresults && mkdir setProj/msa
     # redo the analysis (all untouched bams and vcfs will not be redone)
     $ launch_set.pl setProj
 
