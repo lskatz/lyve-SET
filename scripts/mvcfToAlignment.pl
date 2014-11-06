@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-# TODO put the bcftools query command into this script so that it actually reads from an multiple-genome vcf
+# TODO remove closely clustered SNPs
 
 use strict;
 use warnings;
@@ -15,16 +15,20 @@ sub logmsg{print STDERR "$0: @_\n";}
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help ambiguities min_coverage=i tempdir=s));
+  GetOptions($settings,qw(help ambiguities min_coverage=i tempdir=s allowed=i positions=s)) or die $!;
   die usage() if($$settings{help} || !@ARGV);
   $$settings{min_coverage}||=10;
   $$settings{tempdir}||="tmp";
+  $$settings{allowed}||=0;
   my $vcf=$ARGV[0];
 
   # read in the file with bcftools query
   my %matrix;
   my @queryMatrix=bcftoolsQuery($vcf,$settings);
   chomp(@queryMatrix);
+
+  # Remove clustered SNPs, etc
+  @queryMatrix=filterSites(\@queryMatrix,$settings);
   
   my $header=shift(@queryMatrix);
   $header=~s/^#\s*//; # remove the hash in front of the header
@@ -89,6 +93,12 @@ sub main{
     my $seqObj=Bio::Seq->new(-seq=>$seq,-id=>$genome);
     $out->write_seq($seqObj);
   }
+  if($$settings{positions}){
+    logmsg "Sorted positions pertaining to the final (and possibly filtered) alignment are found in $$settings{positions}";
+    open(POS,">",$$settings{positions}) or die "ERROR: Could not open positions file $$settings{positions}: $!";
+    print POS join("\n",@POS)."\n";
+    close POS;
+  }
   
   return 0;
 }
@@ -130,9 +140,59 @@ sub bcftoolsQuery{
   my($file,$settings)=@_;
   my $matrix="$$settings{tempdir}/$$.matrix";
   my $bcfquery="bcftools query -i '%TYPE=\"snp\" && %MIN(DP)>=$$settings{min_coverage}' -f '%CHROM\\t%POS\\t%REF\\t[%TGT\\t]\\n' --print-header";
-  my $bcfMatrix=`$bcfquery < $file `;
+
+  # handle the input file depending on how it is compressed or not
+  my $streamInCommand="";
+  if($file=~/\.gz$/){
+    $streamInCommand="gunzip -c $file";
+  } else {
+    $streamInCommand="cat $file";
+  }
+
+  my $bcfMatrix=`$streamInCommand | $bcfquery`;
+  die "ERROR running command: $!\n  $bcfquery < $file" if $?;
+    
   return split(/\n/,$bcfMatrix) if(wantarray);
   return $bcfMatrix;
+}
+
+sub filterSites{
+  my($bcfMatrix,$settings)=@_;
+
+  my ($newMatrix,$currentPos,$currentChr);
+  my $numLines=@$bcfMatrix;
+  for(my $i=0;$i<$numLines;$i++){
+    if($$bcfMatrix[$i]=~/^#/){
+      push(@$newMatrix,$$bcfMatrix[$i]);
+      next;
+    }
+
+    # get the fields from the matrix
+    my($CONTIG,$POS,$REF,@GT)=split(/\t/,$$bcfMatrix[$i]);
+    
+    # get the values of the contig/pos if they aren't set
+    if(!defined($currentChr) || $CONTIG ne $currentChr){
+      # If the contig's value has switched, then undefine the position and start comparing on the new contig
+      undef($currentChr);
+      undef($currentPos);
+
+      # start anew with these coordinates
+      $currentChr=$CONTIG;
+      $currentPos=$POS;
+      next;
+    }
+
+    # If the SNP is far enough away, then accept it into the new matrix
+    if($POS - $currentPos >= $$settings{allowed}){
+      push(@$newMatrix,$$bcfMatrix[$i]);
+    }
+
+    # update the position
+    $currentPos=$POS;
+  }
+
+  return @$newMatrix if wantarray;
+  return $newMatrix;
 }
 
 sub usage{
@@ -141,7 +201,10 @@ sub usage{
   Usage: 
     bcftools *.vcf.gz -O z > pooled.fastq.gz # prerequisite
     $0 pooled.fastq.gz > aln.fasta           # $0 command
-  --ambiguities  to allow for ambiguity letter codes other than 'N'
-  --min_coverage 10 Minimum coverage per site before it can be considered
+  --ambiguities       to allow for ambiguity letter codes other than 'N'
+  --allowed 0         How close SNPs can be from each other before being thrown out
+  --min_coverage 10   Minimum coverage per site before it can be considered
+  --tempdir tmp       temporary directory
+  --positions pos.tsv File with position information
   "
 }

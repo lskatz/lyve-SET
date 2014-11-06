@@ -342,13 +342,14 @@ sub variantsToMatrix{
 
 sub pooledToAlignment{
   my($pooled,$settings)=@_;
+  $$settings{allowedFlanking}||=0;
   my $outMsa="$$settings{msadir}/out.aln.fas";
   if(-e $outMsa){
     logmsg "Found $outMsa and so I will not remake it";
     return $outMsa;
   }
 
-  $sge->pleaseExecute("mvcfToAlignment.pl $pooled > $outMsa",{jobname=>"matrixToAlignment",numcpus=>1});
+  $sge->pleaseExecute("mvcfToAlignment.pl $pooled --min_coverage $$settings{min_coverage} --positions $$settings{msadir}/positions.txt --allowed $$settings{allowedFlanking} > $outMsa",{jobname=>"matrixToAlignment",numcpus=>1});
   $sge->wrapItUp();
 
   return $outMsa;
@@ -382,7 +383,7 @@ sub usage{
     -asm      $$settings{asmdir} directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
 
     SNP MATRIX OPTIONS
-    --allowedFlanking  $$settings{allowedFlanking} allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.  Set to -1 to let SET determine this distance using snpDistribution.pl (currently a broken option)
+    --allowedFlanking  $$settings{allowedFlanking} allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.  Set to -1 to let SET determine this distance using snpDistribution.pl
     --min_alt_frac     $$settings{min_alt_frac}  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
     --min_coverage     $$settings{min_coverage}  Minimum coverage needed before a SNP is called. Otherwise, 'N'
     ";
