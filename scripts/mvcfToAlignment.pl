@@ -199,8 +199,7 @@ sub usage{
   "Multiple VCF format to alignment
   $0: reads a pooled vcf (from bcftools merge) and creates a multiple sequence alignment file.
   Usage: 
-    bcftools *.vcf.gz -O z > pooled.fastq.gz # prerequisite
-    $0 pooled.fastq.gz > aln.fasta           # $0 command
+    $0 pooled.fastq.gz > aln.fasta
   --ambiguities       to allow for ambiguity letter codes other than 'N'
   --allowed 0         How close SNPs can be from each other before being thrown out
   --min_coverage 10   Minimum coverage per site before it can be considered
