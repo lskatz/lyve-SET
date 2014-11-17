@@ -107,8 +107,8 @@ sub mapReads{
   my $sorted="$sPrefix.bam"; # samtools adds the bam later, so I want to keep track of it
 
   logmsg "Sorting the temporary bam file into $sorted";
-  system("samtools sort $tmpOut $sPrefix"); die if $?;
-  system("samtools index $sorted"); die if $?;
+  system("samtools sort $tmpOut $sPrefix"); die "ERROR with 'samtools sort'" if $?;
+  system("samtools index $sorted"); die "ERROR with 'samtols index'" if $?;
 
   logmsg "Getting the depth at each position in the sorted bam file";
   # read the depth, but unfortunately it skips over zero-depth sites
