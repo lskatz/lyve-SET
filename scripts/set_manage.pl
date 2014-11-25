@@ -9,10 +9,11 @@ use Getopt::Long;
 use File::Spec;
 use Cwd qw/realpath/;
 use File::Basename qw/basename/;
-use File::Copy qw/copy/;
+use File::Copy qw/copy move/;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
+$ENV{PATH}="$ENV{PATH}:$FindBin::RealBin/../lib/edirect";
 
 # The directories a project should have
 my @projectSubdir=qw(vcf vcf/unfiltered msa bam reads reference tmp asm log);
@@ -83,7 +84,6 @@ sub addReads{
   } else {
     logmsg "NOTE: could not find file $reads";
     logmsg "I will see if it's on NCBI";
-    #$ENV{PATH}="$ENV{PATH}:$FindBin::RealBin/../lib/edirect";
     my $b=basename($reads,qw(.sra .fastq .fastq.gz));
     my $three=substr($b,0,3);
     my $six=substr($b,0,6);
@@ -110,11 +110,23 @@ sub addReads{
 sub addAssembly{
   my($project,$settings)=@_;
   my $asm=File::Spec->rel2abs($$settings{'add-assembly'});
-  my $symlink="$project/asm/".basename($asm);
-  symlink($asm,$symlink);
-  logmsg "$asm => $symlink";
-  return 1;
+  if(-e $asm){
+    my $symlink="$project/asm/".basename($asm);
+    symlink($asm,$symlink);
+    logmsg "$asm => $symlink";
+  } else {
+    logmsg "NOTE: I could not find file $asm";
+    logmsg "I will see if it's on NCBI";
 
+    my $b=basename($asm,qw(.fasta .fna .fa));
+    system("efetch -db nucleotide -id $b -format fasta > $project/tmp/$b.ncbi.fasta");
+    die "ERROR with efetch" if $?;
+    move("$project/tmp/$b.ncbi.fasta","$project/asm/$b.fasta");
+    die "Could not move file: $!" if $?;
+
+    logmsg "Downloaded $b into $project/asm/$b.fasta";
+  }
+  return 1;
 }
 sub removeReads{
   my($project,$settings)=@_;
@@ -137,8 +149,19 @@ sub changeReference{
   my($project,$settings)=@_;
   my $ref=$$settings{'change-reference'};
   my $newPath="$project/reference/".basename($ref);
-  copy($ref,$newPath) or die "ERROR: could not copy $ref to $newPath";
-  logmsg "cp $ref => $newPath";
+  if(-e $ref){
+    copy($ref,$newPath) or die "ERROR: could not copy $ref to $newPath\n  $!";
+    logmsg "cp $ref => $newPath";
+  } else {
+    my $b=basename($ref,qw(.fasta .fna .fa));
+    system("efetch -db nucleotide -id $b -format fasta > $project/tmp/$b.ncbi.fasta");
+    die "ERROR with efetch" if ($?);
+    die "ERROR: downloaded a zero-byte file for $b. Is it the correct identifier?\n" if (-s "$project/tmp/$b.ncbi.fasta" < 1);
+    move("$project/tmp/$b.ncbi.fasta",$newPath);
+    die "Could not move file: $!" if $?;
+
+    logmsg "Downloaded $b into $newPath";
+  }
 
   unlink("$project/reference/reference.fasta");
   symlink(basename($newPath),"$project/reference/reference.fasta");
@@ -164,6 +187,7 @@ sub usage{
   --add-reads SRR0123456          Add reads to your project (using NCBI/SRA/wget)
   --remove-reads file.fastq.gz    Remove reads from your project (using rm on reads, vcf, and bam directories)
   --add-assembly file.fasta       Add an assembly to your project (using symlink)
+  --add-assembly NC_0123456       Add an assembly to your project (using NCBI/nucleotide/edirect)
   --remove-assembly file.fasta    Remove an assembly from your project (using rm)
   --change-reference file.fasta   Add a reference assembly to your project and remove any existing one (using cp)
   Examples
