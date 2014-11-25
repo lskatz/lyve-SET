@@ -1,0 +1,11 @@
+#!/bin/sh
+dir=`dirname "$0"`
+case "`uname -s`" in
+ CYGWIN_NT*)
+   # Use a negative match here because the shell treats 0 as success.
+   if perl -e 'exit $^O !~ /^MSWin/'; then
+      dir=`cygpath -w "$dir"`
+   fi
+   ;;
+esac
+exec perl "$dir"/edirect.pl -link "$@"
