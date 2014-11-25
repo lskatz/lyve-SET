@@ -69,7 +69,7 @@ sub mapReads{
     die;
   }
 
-  my $tmpOut="$bam.tmp.bam";
+  my $tmpOut="$bam.sam";
   logmsg "$bam not found. I'm really doing the mapping now!\n  Outfile: $tmpOut";
 
   # PE reads or not?  Mapping differently for different types.
@@ -86,7 +86,7 @@ sub mapReads{
     # mapping ###
     # SNAP gives weird permissions to the output file. Avoid it by
     # creating the file yourself first.
-    system("touch $tmpOut $tmpOut.bai");
+    system("touch $tmpOut");
     die if $?;
     system("snap paired $ref.snap '$prefix.1.fastq' '$prefix.2.fastq' -t $$settings{numcpus} -so -o $tmpOut");
     die if $?;
@@ -110,7 +110,11 @@ sub mapReads{
 
     system("rm -v '$prefix.SE.fastq'"); die if $?;
   }
-  my $sorted=$tmpOut; # because I am too lazy to rename variables
+
+  my $sorted="$bam.sorted.bam";
+  system("samtools sort $tmpOut $bam.sorted"); die "ERROR with samtools sort" if $?;
+  system("samtools index $sorted"); die "ERROR with samtools index" if $?;
+  system("rm -v $tmpOut"); die "ERROR could not delete $tmpOut" if $?;
 
   logmsg "Getting the depth at each position in the sorted bam file";
   # read the depth, but unfortunately it skips over zero-depth sites
