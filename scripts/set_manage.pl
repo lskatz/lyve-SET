@@ -11,6 +11,9 @@ use Cwd qw/realpath/;
 use File::Basename qw/basename/;
 use File::Copy qw/copy/;
 
+use FindBin;
+use lib "$FindBin::RealBin/../lib";
+
 # The directories a project should have
 my @projectSubdir=qw(vcf vcf/unfiltered msa bam reads reference tmp asm log);
 
@@ -29,6 +32,8 @@ sub main{
     my(undef,$dirs)=is_project($project,$settings);
     die "$project is not a SET project! Missing $dirs";
   }
+  $$settings{tempdir}||="$project/tmp";
+
   addReads($project,$settings) if($$settings{'add-reads'});
   addAssembly($project,$settings) if($$settings{'add-assembly'});
   changeReference($project,$settings) if($$settings{'change-reference'});
@@ -71,9 +76,35 @@ sub is_project{
 sub addReads{
   my($project,$settings)=@_;
   my $reads=File::Spec->rel2abs($$settings{'add-reads'});
-  my $symlink="$project/reads/".basename($reads);
-  symlink($reads,$symlink);
-  logmsg "$reads => $symlink";
+  if(-e $reads){
+    my $symlink="$project/reads/".basename($reads);
+    symlink($reads,$symlink);
+    logmsg "$reads => $symlink";
+  } else {
+    logmsg "NOTE: could not find file $reads";
+    logmsg "I will see if it's on NCBI";
+    #$ENV{PATH}="$ENV{PATH}:$FindBin::RealBin/../lib/edirect";
+    my $b=basename($reads,qw(.sra .fastq .fastq.gz));
+    my $three=substr($b,0,3);
+    my $six=substr($b,0,6);
+    system("wget --continue -O $$settings{tempdir}/$b.sra 'ftp-private.ncbi.nlm.nih.gov:/sra/sra-instant/reads/ByRun/sra/$three/$six/$b/$b.sra'");
+    die "ERROR with wget, or maybe $b is not on NCBI" if $?;
+
+    if(!-e "$$settings{tempdir}/$b.fastq"){
+      logmsg "Converting sra file to fastq with fastq-dump";
+      system("fastq-dump -v -v -v --legacy-report -I --split-files -O $$settings{tempdir}/$b.fastq.tmp $$settings{tempdir}/$b.sra && mv $$settings{tempdir}/$b.fastq.tmp $$settings{tempdir}/$b.fastq");
+      die "ERROR with fastq-dump" if $?;
+    }
+
+    if(!-e "$project/reads/$b.fastq.gz"){
+      logmsg "Shuffling the reads";
+      system("run_assembly_shuffleReads.pl $$settings{tempdir}/$b.fastq/*_1.fastq $$settings{tempdir}/$b.fastq/*_2.fastq | gzip -c > $project/reads/$b.fastq.gz.tmp && mv -v $project/reads/$b.fastq.gz.tmp $project/reads/$b.fastq.gz");
+      die "ERROR with either run_assembly_shuffleReads.pl, gzip, or mv" if $?;
+    }
+
+    system("rm -rvf $$settings{tempdir}/$b.fastq/ $$settings{tempdir}/$b.sra");
+    die "ERROR in removing these files" if $?;
+  }
   return 1;
 }
 sub addAssembly{
