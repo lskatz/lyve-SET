@@ -52,7 +52,7 @@ sub varscan{
   my($pileup,$settings)=@_;
   die "ERROR: the pileup is a zero-byte file\n  $pileup" if(-s $pileup < 1);
   my $vcf="$$settings{tempdir}/".fileparse($pileup).".tmp.vcf.gz";
-  system("varscan.sh mpileup2cns $pileup --min-coverage $$settings{coverage} --min-coverage 10 --min-var-freq 0.75 --output-vcf 1 |\
+  system("varscan.sh mpileup2cns $pileup --min-coverage $$settings{coverage} --min-var-freq $$settings{altFreq} --output-vcf 1 |\
     perl -lane 's/Sample1/\Q$samplename\E/; print;' |\
     bgzip -c > $vcf
   ");
