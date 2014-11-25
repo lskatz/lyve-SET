@@ -161,6 +161,7 @@ sub usage{
   --create Create a set project
   --delete Delete a set project
   --add-reads file.fastq.gz       Add reads to your project (using symlink)
+  --add-reads SRR0123456          Add reads to your project (using NCBI/SRA/wget)
   --remove-reads file.fastq.gz    Remove reads from your project (using rm on reads, vcf, and bam directories)
   --add-assembly file.fasta       Add an assembly to your project (using symlink)
   --remove-assembly file.fasta    Remove an assembly from your project (using rm)
