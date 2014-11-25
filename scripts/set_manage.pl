@@ -10,6 +10,7 @@ use File::Spec;
 use Cwd qw/realpath/;
 use File::Basename qw/basename/;
 use File::Copy qw/copy move/;
+use File::Slurp qw/read_file/;
 use Bio::Perl;
 
 use FindBin;
@@ -19,15 +20,21 @@ $ENV{PATH}="$ENV{PATH}:$FindBin::RealBin/../lib/edirect";
 # The directories a project should have
 my @projectSubdir=qw(vcf vcf/unfiltered msa bam reads reference tmp asm log);
 
+# get project test data
+my $testDir="$FindBin::RealBin/../testdata";
+my @test=_uniq(map({basename($_) if(-d $_)} glob("$testDir/*")));
+my $testdata=join(", ",@test);
+
 sub logmsg{local $0=basename $0; print STDERR "$0: @_\n";}
 exit main();
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help create delete add-reads=s remove-reads=s add-assembly=s remove-assembly=s change-reference=s)) or die $!;
+  GetOptions($settings,qw(help create test=s delete add-reads=s remove-reads=s add-assembly=s remove-assembly=s change-reference=s)) or die $!;
   die usage() if($$settings{help});
   die "ERROR: need a SET project\n".usage() if(!@ARGV);
   my $project=shift(@ARGV);
+  $$settings{create}=1 if($$settings{test});
 
   createProjectDir($project,$settings) if($$settings{create});
   if(!is_project($project,$settings)){
@@ -36,6 +43,7 @@ sub main{
   }
   $$settings{tempdir}||="$project/tmp";
 
+  addSampleData($project,$settings) if($$settings{test});
   addReads($project,$settings) if($$settings{'add-reads'});
   addAssembly($project,$settings) if($$settings{'add-assembly'});
   changeReference($project,$settings) if($$settings{'change-reference'});
@@ -58,6 +66,41 @@ sub createProjectDir{
     die $! if $?;
   }
   return $dir;
+}
+
+sub addSampleData{
+  my($project,$settings)=@_;
+  
+  my $testdir="$testDir/$$settings{test}";
+
+  # check for files
+  my @readsLocal=glob("$testdir/reads/*.fastq.gz");
+  my @referenceLocal=glob("$testdir/reference/*.fasta");
+  # assembly files?
+  my @readsRemote=read_file("$testdir/SRA",{err_mode=>"quiet"});
+  my @referenceRemote=read_file("$testdir/reference",{err_mode=>"quiet"});
+
+  my @reads=(@readsLocal,@readsRemote);
+  my @reference=_uniq(@referenceLocal,@referenceRemote);
+
+  die "ERROR: no reads found in $testdir\n" if(!@reads);
+  die "ERROR: no reference found in $testdir" if(!@reference);
+  chomp(@reads,@reference);
+
+  # get the reads
+  for(@readsLocal){
+    local $$settings{'add-reads'}=$_;
+    addReads($project,$settings);
+  }
+
+  # get the reference
+  local $$settings{'change-reference'}=$reference[0];
+  changeReference($project,$settings);
+
+  # assemblies?
+
+  logmsg "Done! To test these data, please execute\n launch_set.pl $project";
+  return 1;
 }
 
 sub is_project{
@@ -198,11 +241,25 @@ sub deleteProject{
   return 1;
 }
 
+# Return unique and non-empty array of elements
+sub _uniq{
+  my %seen;
+  my @arr=grep { !$seen{$_}++} @_;
+  my @nonEmpty;
+  for(@arr){
+    push(@nonEmpty,$_) if($_);
+  }
+  return @nonEmpty;
+}
+
 sub usage{
+
   "Manages a Lyve-SET project and confirms that a directory is a Lyve-SET project.
   Usage: $0 setProject [options]
-  --create Create a set project
-  --delete Delete a set project
+  --create                        Create a set project
+  --test DATASET                  Create a set project with test data (invokes --create). Options are:
+                                    $testdata
+  --delete                        Delete a set project
   --add-reads file.fastq.gz       Add reads to your project (using symlink)
   --add-reads SRR0123456          Add reads to your project (using NCBI/SRA/wget)
   --remove-reads file.fastq.gz    Remove reads from your project (using rm on reads, vcf, and bam directories)
