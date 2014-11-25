@@ -10,6 +10,7 @@ use File::Spec;
 use Cwd qw/realpath/;
 use File::Basename qw/basename/;
 use File::Copy qw/copy move/;
+use Bio::Perl;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
@@ -119,9 +120,8 @@ sub addAssembly{
     logmsg "I will see if it's on NCBI";
 
     my $b=basename($asm,qw(.fasta .fna .fa));
-    system("efetch -db nucleotide -id $b -format fasta > $project/tmp/$b.ncbi.fasta");
-    die "ERROR with efetch" if $?;
-    move("$project/tmp/$b.ncbi.fasta","$project/asm/$b.fasta");
+    my $fasta=_downloadAssembly($b,$project,$settings);
+    move($fasta,"$project/asm/$b.fasta");
     die "Could not move file: $!" if $?;
 
     logmsg "Downloaded $b into $project/asm/$b.fasta";
@@ -154,10 +154,8 @@ sub changeReference{
     logmsg "cp $ref => $newPath";
   } else {
     my $b=basename($ref,qw(.fasta .fna .fa));
-    system("efetch -db nucleotide -id $b -format fasta > $project/tmp/$b.ncbi.fasta");
-    die "ERROR with efetch" if ($?);
-    die "ERROR: downloaded a zero-byte file for $b. Is it the correct identifier?\n" if (-s "$project/tmp/$b.ncbi.fasta" < 1);
-    move("$project/tmp/$b.ncbi.fasta",$newPath);
+    my $fasta=_downloadAssembly($b,$project,$settings);
+    move($fasta,$newPath);
     die "Could not move file: $!" if $?;
 
     logmsg "Downloaded $b into $newPath";
@@ -167,6 +165,28 @@ sub changeReference{
   symlink(basename($newPath),"$project/reference/reference.fasta");
   logmsg "symlink $newPath => $project/reference/reference.fasta";
   return 1;
+}
+
+sub _downloadAssembly{
+  my($ID,$project,$settings)=@_;
+  my $b=basename($ID,qw(.fasta .fna .fa));
+  my $tmpFile="$project/$b.tmp.fasta";
+  my $filteredFile="$project/$b.fasta";
+  system("esearch -db nucleotide -query $b | efetch -format fasta > $tmpFile");
+  die "ERROR with efetch or esearch" if $?;
+  die "ERROR: downloaded a zero-byte file for $b. Is it the correct identifier?\n" if (-s "$project/$b.tmp.fasta" < 1);
+  
+  # filter the sequence
+  my $in=Bio::SeqIO->new(-format=>"fasta",-file=>$tmpFile);
+  my $out=Bio::SeqIO->new(-format=>"fasta",-file=>">$filteredFile");
+  while(my $seq=$in->next_seq){
+    next if($seq->length < 1);
+    $out->write_seq($seq);
+  }
+  $in->close;
+  $out->close;
+
+  return $filteredFile;
 }
 
 sub deleteProject{
