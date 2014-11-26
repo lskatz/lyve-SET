@@ -88,16 +88,21 @@ sub addSampleData{
   chomp(@reads,@reference);
 
   # get the reads
-  for(@readsLocal){
-    local $$settings{'add-reads'}=$_;
-    addReads($project,$settings);
+  for(@reads){
+    my ($r,$realname)=split(/\t/,$_);
+    local $$settings{'add-reads'}=$r;
+    my $path=addReads($project,$settings);
+    move($path,"$project/reads/$realname.fastq.gz");
+    die "ERROR could not rename $path to $project/reads/$realname.fastq.gz: $!" if $?;
   }
 
   # get the reference
   local $$settings{'change-reference'}=$reference[0];
+  logmsg "Using ".$$settings{'change-reference'}." as the reference genome";
   changeReference($project,$settings);
 
   # assemblies?
+  copy($_,"$project/asm/") for(@reference);
 
   logmsg "Done! To test these data, please execute\n launch_set.pl $project";
   return 1;
@@ -121,14 +126,16 @@ sub is_project{
 sub addReads{
   my($project,$settings)=@_;
   my $reads=File::Spec->rel2abs($$settings{'add-reads'});
+  my $newPath="$project/reads/".basename($reads);
   if(-e $reads){
-    my $symlink="$project/reads/".basename($reads);
+    my $symlink=$newPath;
     symlink($reads,$symlink);
     logmsg "$reads => $symlink";
   } else {
     logmsg "NOTE: could not find file $reads";
     logmsg "I will see if it's on NCBI";
     my $b=basename($reads,qw(.sra .fastq .fastq.gz));
+    $newPath="$project/reads/$b.fastq.gz";
     my $three=substr($b,0,3);
     my $six=substr($b,0,6);
     system("wget --continue -O $$settings{tempdir}/$b.sra 'ftp-private.ncbi.nlm.nih.gov:/sra/sra-instant/reads/ByRun/sra/$three/$six/$b/$b.sra'");
@@ -149,7 +156,7 @@ sub addReads{
     system("rm -rvf $$settings{tempdir}/$b.fastq/ $$settings{tempdir}/$b.sra");
     die "ERROR in removing these files" if $?;
   }
-  return 1;
+  return $newPath;
 }
 sub addAssembly{
   my($project,$settings)=@_;
