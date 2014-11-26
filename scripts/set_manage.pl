@@ -74,35 +74,31 @@ sub addSampleData{
   my $testdir="$testDir/$$settings{test}";
 
   # check for files
-  my @readsLocal=glob("$testdir/reads/*.fastq.gz");
-  my @referenceLocal=glob("$testdir/reference/*.fasta");
-  # assembly files?
-  my @readsRemote=read_file("$testdir/SRA",{err_mode=>"quiet"});
-  my @referenceRemote=read_file("$testdir/reference",{err_mode=>"quiet"});
-
-  my @reads=(@readsLocal,@readsRemote);
-  my @reference=_uniq(@referenceLocal,@referenceRemote);
+  my @reads=glob("$testdir/reads/*.fastq.gz");
+  my @reference=glob("$testdir/reference/*.fasta");
+  my @assembly=glob("$testdir/asm/*.fasta");
 
   die "ERROR: no reads found in $testdir\n" if(!@reads);
   die "ERROR: no reference found in $testdir" if(!@reference);
-  chomp(@reads,@reference);
+  logmsg "WARNING: no assemblies found in $testdir" if(!@assembly);
+  chomp(@reads,@reference,@assembly);
 
   # get the reads
   for(@reads){
-    my ($r,$realname)=split(/\t/,$_);
-    local $$settings{'add-reads'}=$r;
+    local $$settings{'add-reads'}=$_;
     my $path=addReads($project,$settings);
-    move($path,"$project/reads/$realname.fastq.gz");
-    die "ERROR could not rename $path to $project/reads/$realname.fastq.gz: $!" if $?;
+  }
+
+  # add assemblies
+  for(@assembly){
+    local $$settings{'add-assembly'}=$_;
+    addAssembly($project,$settings);
   }
 
   # get the reference
   local $$settings{'change-reference'}=$reference[0];
   logmsg "Using ".$$settings{'change-reference'}." as the reference genome";
   changeReference($project,$settings);
-
-  # assemblies?
-  copy($_,"$project/asm/") for(@reference);
 
   logmsg "Done! To test these data, please execute\n launch_set.pl $project";
   return 1;
