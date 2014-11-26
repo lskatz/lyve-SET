@@ -22,12 +22,15 @@ PREFIXNOTE="Must be an absolute path directory. Default: $(PWD)"
 default: help
 
 help:
+	@echo 0. COMMON VARIABLES
+	@echo $(T) PREFIX=$(PREFIX) $(PREFIXNOTE)
+	@echo $(T) NUMCPUS=$(NUMCPUS)
+	@echo $(T) PROJECT=$(PROJECT)
+	@echo
 	@echo 1. INSTALL CHOICES
 	@echo $(T) all - Perform install, env, and clean. All parameters are valid to use here.
 	@echo $(T) install - copy all files over to an installation directory. Installs most prerequisites.
-	@echo $(T2) PREFIX=$(PREFIX) $(PREFIXNOTE)
 	@echo $(T) cuttingedge - download and install the most up to date code. Does not include 'make env' or any prerequisites. Can be used instead of 'make install'
-	@echo $(T2) PREFIX=$(PREFIX) $(PREFIXNOTE)
 	@echo
 	@echo 2. ENVIRONMENT CHECK
 	@echo $(T) env - put all environmental variables into a profile file
@@ -37,10 +40,6 @@ help:
 	@echo
 	@echo 3. OTHER
 	@echo $(T) clean - delete the temporary files. Does not remove the result of 'make env.'
-	@echo $(T2) PREFIX=$(PREFIX) $(PREFIXNOTE)
-	@echo $(T2) NUMCPUS=$(NUMCPUS)
-	@echo $(T2) PREFIX=$(PREFIX) $(PREFIXNOTE)
-	@echo $(T2) PROJECT=$(PROJECT)
 
 all: install env clean
 
