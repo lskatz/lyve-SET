@@ -121,6 +121,10 @@ test:
 	set_manage.pl $(PROJECT) --add-assembly $(PREFIX)/testdata/reference/lambda_virus.fasta
 	launch_set.pl $(PROJECT) --numcpus $(NUMCPUS)
 
+test-download-data:
+	@echo "Downloading test data sets"
+	set_downloadTestData.pl all
+
 check: check-sys check-Lyve-SET-PATH check-CGP-assembly check-Lyve-SET check-PERL check-smalt check-freebayes check-raxml check-freebayes check-phyml
 	@echo --OK
 check-sys:
