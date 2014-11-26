@@ -170,11 +170,11 @@ sub indexReference{
   my($ref,$settings)=@_;
   logmsg "Indexing the reference for read mapping";
 
-  # sanity check: see if the reference has dashes in its defline
+  # sanity check: see if the reference has reserved characters
   my $in=Bio::SeqIO->new(-file=>$ref);
   while(my $seq=$in->next_seq){
     my $defline=$seq->id." ".$seq->desc;
-    die "Dashes are not allowed in the defline\n Offending defline: $defline" if($defline=~/\-/);
+    die "Offending character found in the defline\n $defline\n $1" if($defline=~/([\:])/);
   }
 
   logmsg "Indexing with $$settings{mapper}";
