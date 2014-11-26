@@ -69,15 +69,15 @@ sub mapReads{
   my $b=fileparse $query;
   my $prefix="$$settings{tempdir}/$b";
   
-  # don't allow underscores in the reference
-  my $numUnderscores=`grep '>' $ref | grep -c _`; chomp($numUnderscores);
-  if($numUnderscores > 0){
-    logmsg "ERROR: You cannot have deflines with underscores in them because of the way this script handles deflines internally.";
-    logmsg "Suggestion: change all underscores to dashes";
-    logmsg "  sed -ip 's/_/-/g' $ref # an example ";
-    logmsg "TODO: automate this step";
-    die;
-  }
+  ## don't allow underscores in the reference
+  #my $numUnderscores=`grep '>' $ref | grep -c _`; chomp($numUnderscores);
+  #if($numUnderscores > 0){
+  #  logmsg "ERROR: You cannot have deflines with underscores in them because of the way this script handles deflines internally.";
+  #  logmsg "Suggestion: change all underscores to dashes";
+  #  logmsg "  sed -ip 's/_/-/g' $ref # an example ";
+  #  logmsg "TODO: automate this step";
+  #  die;
+  #}
 
   my $RANDOM=rand(999999);
   my $tmpOut="$bam.$RANDOM.tmp";
