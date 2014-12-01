@@ -313,7 +313,7 @@ sub variantsToMatrix{
   }
 
   # input files
-  my @vcf=glob("$vcfdir/*.vcf $vcfdir/unfiltered/*.vcf.gz");
+  my @vcf=glob("$vcfdir/unfiltered/*.vcf.gz");
   my @bam=glob("$bamdir/*.sorted.bam");
   my @infile=(@bam,@vcf);
   my $infile="'".join("' '",@infile)."'";
