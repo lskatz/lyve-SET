@@ -155,7 +155,7 @@ sub bcftoolsQuery{
   # Write the bcf query to a file
   # TODO return the file instead of a large string
   open(BCFQUERY,">",$$settings{bcfOutput}) or die "ERROR: could not open $$settings{bcfOutput} for writing: $!";
-  print BCFQUERY $bcfquery;
+  print BCFQUERY $bcfMatrix;
   close BCFQUERY;
 
   return $bcfquery;
