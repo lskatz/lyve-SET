@@ -85,16 +85,16 @@ sub downloadDataset{
   mkdir("$testdir/asm");
   for(@assemblyRemote){
     my ($r,$realname)=split(/\t/,$_);
-    $_=~s/^\s+|\s+$//g for($r,$realname);
     $realname=$r if(!$realname);
+    $_=~s/^\s+|\s+$//g for($r,$realname);
     _downloadAssembly($r,$realname,$testdir,$settings);
   }
 
   # reference genome
   mkdir("$testdir/reference");
   my ($r,$realname)=split(/\t/,$assemblyRemote[0]);
-  $_=~s/^\s+|\s+$//g for($r,$realname);
   $realname=$r if(!$realname);
+  $_=~s/^\s+|\s+$//g for($r,$realname);
   logmsg "Establishing the first nucleic acid sequence $r ($realname) as the reference genome";
   copy("$testdir/asm/$realname.fasta","$testdir/reference");
   die "ERROR: could not copy $realname.fasta to $testdir/reference: $!" if $?;
