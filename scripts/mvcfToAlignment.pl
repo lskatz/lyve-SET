@@ -15,20 +15,20 @@ sub logmsg{print STDERR "$0: @_\n";}
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help ambiguities min_coverage=i tempdir=s allowed=i positions=s)) or die $!;
+  GetOptions($settings,qw(help ambiguities min_coverage=i tempdir=s allowed=i positions=s bcfOutput=s)) or die $!;
   die usage() if($$settings{help} || !@ARGV);
   $$settings{min_coverage}||=10;
   $$settings{tempdir}||="tmp";
   $$settings{allowed}||=0;
+  $$settings{bcfOutput}||="$$settings{tempdir}/bcfquery";
   my $vcf=$ARGV[0];
 
   # read in the file with bcftools query
   my %matrix;
-  my @queryMatrix=bcftoolsQuery($vcf,$settings);
-  chomp(@queryMatrix);
+  my $bcfqueryFile=bcftoolsQuery($vcf,$settings);
 
   # Remove clustered SNPs, etc
-  @queryMatrix=filterSites(\@queryMatrix,$settings);
+  my @queryMatrix=filterSites($bcfqueryFile,$settings);
   
   my $header=shift(@queryMatrix);
   $header=~s/^#\s*//; # remove the hash in front of the header
@@ -151,24 +151,33 @@ sub bcftoolsQuery{
 
   my $bcfMatrix=`$streamInCommand | $bcfquery`;
   die "ERROR running command: $!\n  $bcfquery < $file" if $?;
+
+  # Write the bcf query to a file
+  # TODO return the file instead of a large string
+  open(BCFQUERY,">",$$settings{bcfOutput}) or die "ERROR: could not open $$settings{bcfOutput} for writing: $!";
+  print BCFQUERY $bcfquery;
+  close BCFQUERY;
+
+  return $bcfquery;
     
-  return split(/\n/,$bcfMatrix) if(wantarray);
-  return $bcfMatrix;
+  #return split(/\n/,$bcfMatrix) if(wantarray);
+  #return $bcfMatrix;
 }
 
 sub filterSites{
-  my($bcfMatrix,$settings)=@_;
+  my($bcfqueryFile,$settings)=@_;
+
 
   my ($newMatrix,$currentPos,$currentChr);
-  my $numLines=@$bcfMatrix;
-  for(my $i=0;$i<$numLines;$i++){
-    if($$bcfMatrix[$i]=~/^#/){
-      push(@$newMatrix,$$bcfMatrix[$i]);
+  open(BCFQUERY,"<",$bcfqueryFile) or die "ERROR: could not open bcftools query file $bcfqueryFile for reading: $!";
+  while(my $bcfMatrixLine=<BCFQUERY>){
+    if($bcfMatrixLine=~/^#/){
+      push(@$newMatrix,$bcfMatrixLine);
       next;
     }
 
     # get the fields from the matrix
-    my($CONTIG,$POS,$REF,@GT)=split(/\t/,$$bcfMatrix[$i]);
+    my($CONTIG,$POS,$REF,@GT)=split(/\t/,$bcfMatrixLine);
     
     # get the values of the contig/pos if they aren't set
     if(!defined($currentChr) || $CONTIG ne $currentChr){
@@ -184,7 +193,7 @@ sub filterSites{
 
     # If the SNP is far enough away, then accept it into the new matrix
     if($POS - $currentPos >= $$settings{allowed}){
-      push(@$newMatrix,$$bcfMatrix[$i]);
+      push(@$newMatrix,$bcfMatrixLine);
     }
 
     # update the position
@@ -204,6 +213,7 @@ sub usage{
   --allowed 0         How close SNPs can be from each other before being thrown out
   --min_coverage 10   Minimum coverage per site before it can be considered
   --tempdir tmp       temporary directory
-  --positions pos.tsv File with position information
+  --positions pos.tsv Output file with position information
+  --bcfOutput out.bcf Output file with the bcftools query matrix
   "
 }
