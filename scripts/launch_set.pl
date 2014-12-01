@@ -306,10 +306,9 @@ sub variantsToMatrix{
   my $logdir=$$settings{logdir};
 
   my $matrix="$msadir/out.matrix.tsv";
-  my $bcfMatrix="$msadir/out.bcfmatrix.tsv";
   my $pooled="$msadir/out.pooled.vcf.gz";
-  if(-e $bcfMatrix){
-    logmsg "Found $bcfMatrix -- already present. Not re-converting.";
+  if(-e $pooled){
+    logmsg "Found $pooled -- already present. Not re-converting.";
     return 1;
   }
 
