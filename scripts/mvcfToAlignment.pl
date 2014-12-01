@@ -158,7 +158,7 @@ sub bcftoolsQuery{
   print BCFQUERY $bcfMatrix;
   close BCFQUERY;
 
-  return $bcfquery;
+  return $$settings{bcfOutput};
     
   #return split(/\n/,$bcfMatrix) if(wantarray);
   #return $bcfMatrix;
