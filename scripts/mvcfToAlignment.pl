@@ -32,6 +32,7 @@ sub main{
   
   my $header=shift(@queryMatrix);
   $header=~s/^#\s*//; # remove the hash in front of the header
+  $header=~s/^\s+|\s+$//g; # trim whitespace
   my @header=split(/\t/,$header);
   $_=~s/\[\d+\]// for(@header); # remove [number] notations for the headers
   $_=~s/:GT$//    for(@header); # remove :GT after each genotype field
@@ -40,6 +41,7 @@ sub main{
   my @genome=@header[3..@header-1];
 
   for(@queryMatrix){
+    s/^\s+|\s+$//g; # trim whitespace
     my %F;
     @F{@header}=split /\t/;
 
