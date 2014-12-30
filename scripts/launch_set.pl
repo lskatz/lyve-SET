@@ -158,7 +158,7 @@ sub simulateReads{
     #   2. Shuffle
     #   3. Gzip
     #   4. Remove simulated unshuffled reads (depends on the shuffle step and not gzip)
-    $sge->pleaseExecute("$exec -d 400 -N 100000 -1 250 -2 250 -e 0.02 -r 0.0009 -R 0.0001 -h '$asm' $out1 $out2",{jobname=>"wgsim$b",numcpus=>1});
+    $sge->pleaseExecute("$exec -d 400 -N 100000 -1 250 -2 250 -e 0.0 -r 0.0 -R 0.0000 -h '$asm' $out1 $out2",{jobname=>"wgsim$b",numcpus=>1});
     $sge->pleaseExecute("run_assembly_shuffleReads.pl $out1 $out2 > $outFastq",{jobname=>"shuffle$b",qsubxopts=>"-hold_jid wgsim$b",numcpus=>1});
     $sge->pleaseExecute("gzip -v '$outFastq' 2>&1",{jobname=>"gzip$b",qsubxopts=>"-hold_jid shuffle$b",numcpus=>1});
     $sge->pleaseExecute("rm -v $out1 $out2",{jobname=>"rmTmp$b",qsubxopts=>"-hold_jid shuffle$b",numcpus=>1});
