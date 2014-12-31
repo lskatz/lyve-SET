@@ -64,13 +64,27 @@ Usage
     --numnodes  20  maximum number of nodes
     --numcpus   1  number of cpus
 
+Run a test dataset
+------------------
 
+The script `set_test.pl` will run an actual test on a given dataset
+
+    Runs a test dataset with Lyve-SET
+    Usage: set_test.pl dataset [project]
+    dataset names could be one of the following:
+      escherichia_coli, lambda, listeria_monocytogenes, salmonella_enterica_agona
+    NOTE: project will be the name of the dataset, if it is not given
+
+    --numcpus 1  How many cpus you want to use
+    --do-nothing To print the commands but do not run system calls
+
+`$ set_test.pl lambda  # will run the entire lambda phage dataset and produce meaningful results in ./lambda/msa/`
 
 
 Examples
 ------
 
-The script set_manage.pl sets up the project directory and adds reads, and you should use the following syntax:
+The script `set_manage.pl` sets up the project directory and adds reads, and you should use the following syntax:
     
     $ set_manage.pl --create setTest
     $ set_manage.pl setTest --add-reads file1.fastq.gz
