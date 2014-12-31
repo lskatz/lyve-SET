@@ -35,6 +35,9 @@ sub main{
   my $vcf=varscan($pileup,$settings);
   backfillVcfValues($vcf,$bam,$settings);
 
+  # remove temporary files
+  unlink($_) for($pileup,$vcf);
+
   return 0;
 }
 
