@@ -246,12 +246,12 @@ sub variantCalls{
       # terminate called after throwing an instance of 'std::out_of_range'
     } elsif($$settings{snpcaller} eq 'varscan'){
       $jobname="varscan$b";
-      $sge->pleaseExecute("$scriptsdir/launch_varscan.pl $bam --reference $ref > $vcfdir/unfiltered/$b.vcf",{numcpus=>1,jobname=>$jobname,qsubxopts=>""});
+      $sge->pleaseExecute("$scriptsdir/launch_varscan.pl $bam --tempdir $$settings{tmpdir} --reference $ref > $vcfdir/unfiltered/$b.vcf",{numcpus=>1,jobname=>$jobname,qsubxopts=>""});
       # sort VCF
-      $sge->pleaseExecute("mv $vcfdir/unfiltered/$b.vcf $vcfdir/unfiltered/$b.vcf.tmp && vcf-sort < $vcfdir/unfiltered/$b.vcf.tmp > $vcfdir/unfiltered/$b.vcf",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
+      $sge->pleaseExecute("mv $vcfdir/unfiltered/$b.vcf $vcfdir/unfiltered/$b.vcf.tmp && vcf-sort < $vcfdir/unfiltered/$b.vcf.tmp > $vcfdir/unfiltered/$b.vcf && rm -v $vcfdir/unfiltered/$b.vcf.tmp",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
       # filter VCF
       $sge->pleaseExecute("$scriptsdir/filterVcf.pl $vcfdir/unfiltered/$b.vcf --noindels -d $$settings{min_coverage} -o $vcfdir/$b.vcf",{qsubxopts=>"-hold_jid sort$b",numcpus=>1,jobname=>"filter$b"});
-      $jobname="filter$b";
+      $jobname="filter$b"; # the thing that bgzip waits on to finish
     } elsif($$settings{snpcaller} eq 'callsam'){
       die "ERROR: callsam is deprecated\n".usage();
       $jobname="callsam$b";
@@ -267,6 +267,7 @@ sub variantCalls{
     }
 
     # TODO move filtering here
+    # TODO can bcftools query take care of filtering instead?
 
     # bgzip and tabix indexing
     # TODO enable this if statement or put it into the launch_* scripts
