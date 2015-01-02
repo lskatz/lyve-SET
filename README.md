@@ -99,8 +99,6 @@ The script `set_manage.pl` sets up the project directory and adds reads, and you
     $ set_manage.pl setTest --add-assembly file2.fasta
     $ set_manage.pl setTest --change-reference file3.fasta
 
-NOTE: no underscores or dashes allowed in the reference genome fasta file headers
-    
 Run Lyve-SET with as few options as possible
 
     $ launch_set.pl setProj

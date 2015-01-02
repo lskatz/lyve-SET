@@ -4,9 +4,7 @@ Examples
 Run a test dataset
 ------------------
 
-See: [examples.md](docs/EXAMPLES.md) for more details.
-
-The script `set_test.pl` will run an actual test on a given dataset
+The script `set_test.pl` will run an actual test on a given dataset. It uses `set_downloadTestData.pl` to get any bacterial genomes and then runs `launch_set.pl`.  However, the lambda dataset is small enough to fit on GIT and does not need to be downloaded.
 
     Runs a test dataset with Lyve-SET
     Usage: set_test.pl dataset [project]
@@ -20,14 +18,15 @@ The script `set_test.pl` will run an actual test on a given dataset
 `$ set_test.pl lambda  # will run the entire lambda phage dataset and produce meaningful results in ./lambda/msa/`
 
 
-Examples
-------
-
-See: [examples.md](docs/EXAMPLES.md) for more details.
+Prepare the project directory
+-----------------------------
 
 The script `set_manage.pl` sets up the project directory and adds reads, and you should use the following syntax:
     
     $ set_manage.pl --create setTest
+
+Depending on your knowledge of Linux, you might choose to set up the rest of the project using `set_manage.pl` or using symlinks.  This is the `set_manage.pl` way:
+
     $ set_manage.pl setTest --add-reads file1.fastq.gz
     $ set_manage.pl setTest --add-reads file2.fastq.gz
     $ set_manage.pl setTest --add-reads file3.fastq.gz
@@ -37,19 +36,27 @@ The script `set_manage.pl` sets up the project directory and adds reads, and you
     $ set_manage.pl setTest --add-assembly file2.fasta
     $ set_manage.pl setTest --change-reference file3.fasta
 
-NOTE: no underscores or dashes allowed in the reference genome fasta file headers
-    
+This is the symlink way:
+
+    $ cd setTest/reads
+    $ ln -sv path/to/reads/*.fastq.gz .   # symlink reads
+    $ cd ../asm
+    $ ln -sv path/to/assemblies/*.fasta . # symlink the assemblies
+    $ cd ../reference
+    # copy the assembly in case you need to alter it (e.g., remove small contigs or edit deflines)
+    $ cp -v path/to/assemblies/reference.fasta .
+
 Run Lyve-SET with as few options as possible
 
-    $ launch_set.pl setProj
+    $ launch_set.pl setTest
 
 More complex
 
-    $ launch_set.pl setProj --queue all.q --numnodes 20 --numcpus 16 --noclean --notrees
+    $ launch_set.pl setTest --queue all.q --numnodes 20 --numcpus 12 --noclean --notrees
     
 If you specified notrees, then you can edit the multiple sequence alignment before analyzing it. See the next section on examples on how/why you would edit the alignment.
 
-    $ cd setProj/msa
+    $ cd setTest/msa
     $ gedit out.aln.fas  # alter the deflines or whatever you want before moving on
     # => out.aln.fas is here
     $ set_process_msa.pl --auto --numcpus 12
@@ -75,22 +82,28 @@ Why would you want to edit the out.aln.fas file?  Or what kinds of things can yo
     
     # Alter the identifiers of your genomes, so that they look nice in the phylogeny(ies)
     $ sed -i.bak 's/\.fastq\.gz.*//' out.aln.fas
+    # OR maybe to just remove the reference genome name:
+    $ sed -i.bak 's/\-reference.*//' out.aln.fas
+
+    # Be sure that the taxa names are unique still.
+    # If there is any output, then you have duplicated names which need to be fixed.
+    $ grep ">" out.aln.fas | sort | uniq -d # nothing should show up
 
     # After the taxon names are edited nicely,
-    # make a new file from which you can extract your taxa of choice (out2.aln.fas).
-    $ cp -v out.aln.fas out2.aln.fas
+    # back up the out.aln.fas file before any entries are removed
+    $ cp -v out.aln.fas out.aln.fas.bak
 
     # => All extensions are removed in taxon names; a backup of the file was named out.aln.fas.bak
     # find the genomes with the most number of Ns (ie masked SNP calls)
-    $ perl -lane 'chomp; if(/^>/){s/>//;$id=$_;}else{$num=(s/(N)/$1/gi); print "$id\t$num";}' < out2.aln.fas|sort -k2,2n|column -t
-    # => consider removing any genome with too many masked bases
+    $ perl -lane 'chomp; if(/^>/){s/>//;$id=$_;}else{$num=(s/(N)/$1/gi); print "$id\t$num";}' < out.aln.fas|sort -k2,2n|column -t
+    # => consider removing any genome with too many masked bases by manually editing the file.
 
-    # Run SET on your new set of genomes out2.aln.fas.
-    $ set_process_msa.pl out2.aln.fas --auto --numcpus 12
+    # Run SET on your new set of genomes out.aln.fas.
+    $ set_process_msa.pl out.aln.fas --auto --numcpus 12
     
-    # Create a new subset as needed, but you should always read from your master record,
-    # which is the original out.aln.fas.
-    $ cp -v out.aln.fas out3.aln.fas
-    $ ...
-    $ set_process_msa.pl out3.aln.fas --auto --numcpus 12
+    # Create a new subset as needed, but you should always read from your master record and not the informative.aln.fas file
+    # which is now out.aln.fas.bak
+    $ cp -v out.aln.fas.bak out.aln.fas
+    $ ... # more editing here
+    $ set_process_msa.pl out.aln.fas --auto --numcpus 12
 
