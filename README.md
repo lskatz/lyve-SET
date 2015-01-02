@@ -20,7 +20,6 @@ Requirements installed with "make install"
 ------------
 * CG-Pipeline
 * Schedule::SGELK
-* CallSam 
 * VCF Tools and Vcf.pm
 
 Installation
@@ -67,6 +66,8 @@ Usage
 Run a test dataset
 ------------------
 
+See: [examples.md](docs/examples.md) for more details.
+
 The script `set_test.pl` will run an actual test on a given dataset
 
     Runs a test dataset with Lyve-SET
@@ -83,6 +84,8 @@ The script `set_test.pl` will run an actual test on a given dataset
 
 Examples
 ------
+
+See: [examples.md](docs/examples.md) for more details.
 
 The script `set_manage.pl` sets up the project directory and adds reads, and you should use the following syntax:
     
