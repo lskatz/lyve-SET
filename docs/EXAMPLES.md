@@ -107,3 +107,22 @@ Why would you want to edit the out.aln.fas file?  Or what kinds of things can yo
     $ ... # more editing here
     $ set_process_msa.pl out.aln.fas --auto --numcpus 12
 
+
+Specific ways to regenerate files
+---------------------------------
+
+Lyve-SET is very modular and so there are specific scripts to regenerate files.  Since you might edit the msa files, you might want to know how to recover in case you make a mistake.
+
+Need to remake out.aln.fas?
+
+    $ mvcfToAlignment.pl out.pooled.vcf.gz --bcfOutput bcfquery.out > out.aln.fas
+
+Need to remake out.pooled.vcf.gz? Use bcftools.
+
+    $ bcftools merge vcf/unfiltered/*.vcf.gz -O -z > msa/out.pooled.vcf.gz
+    $ tabix -f msa/out.pooled.vcf.gz # Always index your compressed vcf files
+
+Need to remake all the other msa files after you recreated out.aln.fas?
+  
+    $ set_processMsa.pl --auto out.aln.fas --numcpus 12 --force
+
