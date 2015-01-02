@@ -73,8 +73,10 @@ sub command{
   my $exit_code=system($cmd) if(!$$settings{'do-nothing'});
   if($exit_code){
     logmsg "ERROR: died while trying to run COMMAND\n  $cmd";
+    logmsg "See if you have the correct software installed for this command.";
     die $exit_code;
   }
+  return $exit_code;
 }
 
 sub usage{
