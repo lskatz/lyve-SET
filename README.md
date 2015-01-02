@@ -153,6 +153,17 @@ Why would you want to edit the out.aln.fas file?  Or what kinds of things can yo
     $ ...
     $ set_process_msa.pl out3.aln.fas --auto --numcpus 12
 
+Output files
+------------
+|File    |   Description  | Notes |
+|--------|----------------|-------|
+|`msa/`  | The "multiple sequence alignment" directory | |
+|`out.pooled.vcf.gz` | the pooled VCF file created from `bcftools merge` | |
+|`out.pooled.vcf.gz.tbi` | the tabix index file | |
+|`out.aln.fas` | the output alignment file in fasta format. | Make any changes to this file before running a phylogeny program.  Do not use `informative.aln.fas` to make edits because positions might come and go and therefore you might lose resolution. After any edits, use `removeUninformativeSites.pl` to re-create `informative.aln.fas`  |
+| `informative.aln.fas` | The alignment after removing uninformative columns (ambiguities, invariants, gaps) | Do not make any changes to this file before running a phylogeny. Make the changes in `out.aln.fas` |
+| `RAxML.RAxML_bipartitions` | RAxML-generated tree | |
+
 Citing lyve-SET
 -----
 To cite lyve-SET, please reference this site and cite the Haiti Anniversary paper. Lyve-SET also makes use of the tools shown above in the prerequisites.  If you feel like your study relied heavily on any of those tools, please don't forget to cite them!
