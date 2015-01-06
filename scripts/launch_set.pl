@@ -180,7 +180,7 @@ sub indexReference{
   logmsg "Indexing with $$settings{mapper}";
   if($$settings{mapper} eq 'smalt'){
     return $ref if(-e "$ref.sma" && -e "$ref.smi");
-    system("smalt index -k 5 -s 3 $ref $ref 2>&1");
+    system("smalt index -k 13 -s 2 $ref $ref 2>&1");
     die if $?;
   } elsif($$settings{mapper} eq 'snap'){
     return $ref if(-d "$ref.snap" && -e "$ref.snap/GenomeIndex");
