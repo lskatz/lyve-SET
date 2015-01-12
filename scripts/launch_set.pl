@@ -103,6 +103,7 @@ sub main{
   my $ref=$$settings{ref};
 
   simulateReads($settings);
+  maskReference($ref,$settings);
   indexReference($ref,$settings);
   mapReads($ref,$$settings{readsdir},$$settings{bamdir},$settings);
   variantCalls($ref,$$settings{bamdir},$$settings{vcfdir},$settings);
@@ -164,6 +165,21 @@ sub simulateReads{
     $sge->pleaseExecute("rm -v $out1 $out2",{jobname=>"rmTmp$b",qsubxopts=>"-hold_jid shuffle$b",numcpus=>1});
   }
   $sge->wrapItUp();
+}
+
+sub maskReference{
+  my($ref,$settings)=@_;
+  
+  # Don't do this if there is already an unmasked file, aka if it's already done
+  return if(-e "$ref.unmasked"); 
+
+  logmsg "Masking the reference genome for phages";
+  system("set_findPhages.pl --numcpus $$settings{numcpus} $ref > $$settings{tempdir}/reference.masked.fasta");
+  die if $?;
+
+  system("mv -v $ref $ref.unmasked"); die if $?;
+  system("mv -v $$settings{tempdir}/reference.masked.fasta $ref");
+  die if $?;
 }
 
 sub indexReference{
