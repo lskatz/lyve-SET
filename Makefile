@@ -48,7 +48,7 @@ install: install-prerequisites
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET v$(VERSION) complete."
 
-install-prerequisites: install-mkdir install-vcftools install-CGP install-callsam install-SGELK install-varscan
+install-prerequisites: install-mkdir install-vcftools install-CGP install-callsam install-SGELK install-varscan install-phast install-phispy
 	@echo DONE installing prerequisites
 
 install-mkdir:
@@ -90,6 +90,18 @@ install-vcftools:
 
 install-varscan:
 	wget 'http://downloads.sourceforge.net/project/varscan/VarScan.v2.3.7.jar?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fvarscan%2Ffiles%2F&ts=1413398147&use_mirror=ufpr' -O $(PREFIX)/lib/varscan.v2.3.7.jar
+
+install-phast:
+	mkdir -p $(PREFIX)/lib/phast
+	wget http://phast.wishartlab.com/phage_finder/DB/prophage_virus.db -O $(PREFIX)/lib/phast/phast.faa
+	makeblastdb -in $(PREFIX)/lib/phast/phast.faa -dbtype prot
+
+install-phispy:
+	mkdir -p $(PREFIX)/lib/phispy
+	wget http://downloads.sourceforge.net/project/phispy/phiSpyNov11_v2.3.zip -O $(PREFIX)/lib/phispy/phiSpyNov11_v2.3.zip
+	unzip $(PREFIX)/lib/phispy/phiSpyNov11_v2.3.zip
+	rm $(PREFIX)/lib/phispy/phiSpyNov11_v2.3.zip
+	cd $(PREFIX)/lib/phispy/phiSpyNov11_v2.3 && make
 
 cuttingedge: install-mkdir cuttingedge-gitclone install-prerequisites
 	@echo "DONE installing the cutting edge version"
