@@ -99,7 +99,7 @@ install-phast:
 install-phispy:
 	mkdir -p $(PREFIX)/lib/phispy
 	wget http://downloads.sourceforge.net/project/phispy/phiSpyNov11_v2.3.zip -O $(PREFIX)/lib/phispy/phiSpyNov11_v2.3.zip
-	unzip $(PREFIX)/lib/phispy/phiSpyNov11_v2.3.zip
+	cd $(PREFIX)/lib/phispy && unzip -o phiSpyNov11_v2.3.zip
 	rm $(PREFIX)/lib/phispy/phiSpyNov11_v2.3.zip
 	cd $(PREFIX)/lib/phispy/phiSpyNov11_v2.3 && make
 
