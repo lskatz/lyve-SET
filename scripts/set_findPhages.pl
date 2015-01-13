@@ -51,16 +51,17 @@ sub phispy{
 sub phast{
   my($fasta,$settings)=@_;
 
-  #blastx -query 2014L-6068.fasta -db ~/bin/lyve-SET/lib/phast/phast.faa -evalue 0.05 -outfmt 6 -num_threads 8
   my $db="$FindBin::RealBin/../lib/phast/phast.faa";
+  logmsg "Running blastx against $db";
   my $allResults=`blastx -query '$fasta' -db $db -evalue 0.05 -outfmt 6 -num_threads $$settings{numcpus}`;
   die "ERROR with blastx: $!" if $?;
 
+  logmsg "Parsing results";
   my(@range);
   for my $result(split(/\n/,$allResults)){
     $result=~s/^\s+|\s+$//g; # trim
     my ($contig,$hit,$identity,$length,$gaps,$mismatches,$sstart,$send,$qstart,$qend,$e,$score)=split /\t/, $result;
-    next if($score < 50);
+    next if($score < 50 || $length < 20);
     
     push(@range,"$contig:$qstart-$qend");
   }
