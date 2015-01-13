@@ -38,7 +38,7 @@ sub main{
   while(my ($id,$seq)=each(%seq)){
     $seq=~s/(.{60})/$1\n/g;
     chomp($seq);
-    print "$id\n$seq\n";
+    print ">$id\n$seq\n";
   }
 
   return 0;
