@@ -171,15 +171,17 @@ sub maskReference{
   my($ref,$settings)=@_;
   
   # Don't do this if there is already an unmasked file, aka if it's already done
-  return if(-e "$ref.unmasked"); 
+  my $unmasked=dirname($ref).'/'.basename($ref,qw(.fasta .fa .fna .fsa .mfa)).'.unmasked.fasta';
+  return if(-e $unmasked); 
 
   logmsg "Masking the reference genome for phages";
-  system("set_findPhages.pl --numcpus $$settings{numcpus} $ref > $$settings{tempdir}/reference.masked.fasta");
-  die if $?;
+  # Find phages into a temporary file,
+  # rename the reference to 'unmasked' to get it out of the way and back it up,
+  # and rename the temporary masked file as the reference file name
+  my $tmpMasked="$$settings{tmpdir}/".basename($ref);
+  $sge->pleaseExecute("set_findPhages.pl --numcpus $$settings{numcpus} $ref > $tmpMasked && mv -v $ref $unmasked && mv -v $tmpMasked $ref",{numcpus=>$$settings{numcpus},jobname=>"set_findPhages"});
 
-  system("mv -v $ref $ref.unmasked"); die if $?;
-  system("mv -v $$settings{tempdir}/reference.masked.fasta $ref");
-  die if $?;
+  $sge->wrapItUp();
 }
 
 sub indexReference{
