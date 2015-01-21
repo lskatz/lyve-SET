@@ -14,7 +14,7 @@ Output files
 |project/log|| All the log files | |
 || `launch_set.log`    | Most of the SET log files are here | |
 || `set_processMsa.log`| The MSA and phylogeny log files are here | |
-|project / asm, reads, reference || The assemblies, reads, and reference directories | These input directories are described elsewhere. |
+|project/asm, project/reads, project/reference || The assemblies, reads, and reference directories | These input directories are described elsewhere. |
 |project/bam|| Output bam files are here|
 ||`*.sorted.bam` | sorted bam files | The query and reference name are encoded in the filename; many times the reference name will just be called "reference." |
 ||`*.sorted.bam.bai` | samtools index file || 
