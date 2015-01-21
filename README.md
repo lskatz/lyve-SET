@@ -156,7 +156,7 @@ Why would you want to edit the out.aln.fas file?  Or what kinds of things can yo
 
 Output files
 ------------
-See [output.md](docs/OUTPUT.md) for a detailed table.
+Most output files that you will want to see are under project/msa.  However for more details please see [docs/output.md](docs/OUTPUT.md).
 
 Citing lyve-SET
 -----
