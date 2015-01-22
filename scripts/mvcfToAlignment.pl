@@ -1,7 +1,5 @@
 #!/usr/bin/env perl
 
-# TODO remove closely clustered SNPs
-
 use strict;
 use warnings;
 use Data::Dumper;
@@ -155,11 +153,11 @@ sub bcftoolsQuery{
   die "ERROR running command: $!\n  $bcfquery < $file" if $?;
 
   # Write the bcf query to a file
-  # TODO return the file instead of a large string
   open(BCFQUERY,">",$$settings{bcfOutput}) or die "ERROR: could not open $$settings{bcfOutput} for writing: $!";
   print BCFQUERY $bcfMatrix;
   close BCFQUERY;
 
+  # return the file instead of a large string
   return $$settings{bcfOutput};
     
   #return split(/\n/,$bcfMatrix) if(wantarray);
