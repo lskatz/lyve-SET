@@ -20,6 +20,8 @@ sub main{
   die "ERROR: need bam file!\n".usage() if(!$bam);
 
   bamDepth($bam,$settings);
+
+  return 0;
 }
 
 sub bamDepth{
