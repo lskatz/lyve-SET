@@ -126,3 +126,7 @@ Need to remake all the other msa files after you recreated out.aln.fas?
   
     $ set_processMsa.pl --auto out.aln.fas --numcpus 12 --force
 
+Need to make a backup of your current results? Just rename the directory but make sure that the msa directory still exists.
+
+    $ mv msa/ msa.bak/ && mkdir msa
+

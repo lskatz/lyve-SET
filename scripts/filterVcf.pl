@@ -80,7 +80,7 @@ sub filterVcf{
     for(my $i=0;$i<$numBases;$i++){
       $posId=join(":",$rseq,($pos+$i));
       # find out if it passes other attributes like depth
-      if($info{DP}<$$settings{depth}){
+      if(!defined($info{DP}) || $info{DP}<$$settings{depth}){
         push(@badSites,$posId);
         next;
       }
