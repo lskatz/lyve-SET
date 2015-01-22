@@ -66,7 +66,8 @@ Usage
 Run a test dataset
 ------------------
 
-See: [examples.md](docs/EXAMPLES.md) for more details.
+See: [examples.md](docs/EXAMPLES.md) for more details.  
+Also see: [testdata.md](docs/TESTDATA.md) for more details on making your own test data set.
 
 The script `set_test.pl` will run an actual test on a given dataset
 
