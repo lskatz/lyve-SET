@@ -61,8 +61,8 @@ sub cleanReads{
 
 sub mapReads{
   my($query,$bam,$ref,$settings)=@_;
-  if(-s "$bam.depth"){
-    logmsg "Found $bam.depth\n  I will not re-map.";
+  if(-s "$bam.depth" || -s "$bam.depth.gz"){
+    logmsg "Found $bam depth\n  I will not re-map.";
     return 1;
   }
 
@@ -110,35 +110,13 @@ sub mapReads{
   system("samtools sort $tmpOut $sPrefix 2>&1"); die "ERROR with 'samtools sort $tmpOut $sPrefix'" if $?;
   system("samtools index $sorted 2>&1"); die "ERROR with 'samtools index $sorted'" if $?;
 
-  logmsg "Getting the depth at each position in the sorted bam file";
-  # read the depth, but unfortunately it skips over zero-depth sites
-  my %depth;
-  open(BAMDEPTH,"samtools depth $sorted | ") or die "ERROR: could not open the bam file with samtools: $!";
-  while(<BAMDEPTH>){
-    chomp;
-    my @F=split /\t/;
-    $depth{$F[0]}{$F[1]}=$F[2];
-  }
-  close BAMDEPTH;
- 
-  # get zero-depth information in there too. First find the total length of each contig.
-  open(FIXEDDEPTH,">","$sorted.depth") or die "ERROR: could not write to $sorted.depth: $!";
-  my %max;
-  my $in=Bio::SeqIO->new(-file=>$ref);
-  while(my $seq=$in->next_seq){
-    $max{$seq->id}=$seq->length;
-  }
-  for my $contig(keys(%max)){
-    for my $i(1..$max{$contig}){
-      $depth{$contig}{$i}||=0; 
-      print FIXEDDEPTH join("\t",$contig,$i,$depth{$contig}{$i})."\n";
-    }
-  }
-  close FIXEDDEPTH;
-  
+  system("set_samtools_depth.pl $sorted 2>&1");
+  die if $?;
+
+  # cleanup
   system("mv -v $sorted $bam"); die if $?;
   system("mv -v $sorted.bai $bam.bai"); die if $?;
-  system("mv -v $sorted.depth $bam.depth"); die if $?;
+  system("mv -v $sorted.depth.gz $bam.depth.gz"); die if $?;
   system("rm -v $tmpOut"); die if $?;
 
   return 1;
