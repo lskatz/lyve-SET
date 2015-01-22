@@ -8,6 +8,9 @@ use Data::Dumper;
 use Getopt::Long;
 use File::Basename qw/basename fileparse/;
 use Bio::Perl;
+
+use FindBin;
+use lib "$FindBin::RealBin/../lib/vcftools_0.1.12b/perl";
 use Vcf;
 
 my $samplename="Sample1"; # to be changed later
