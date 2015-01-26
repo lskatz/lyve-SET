@@ -130,3 +130,17 @@ Need to make a backup of your current results? Just rename the directory but mak
 
     $ mv msa/ msa.bak/ && mkdir msa
 
+Special cases
+-------------
+
+Q: What if you have a non-Illumina file that you would like to use?
+
+A: You can still map your reads separately into a sorted bam file and then run SET after that bam file has been created.  For example, if you have a 454 or Ion Torrent file, you can map it using bwa-sw with the following steps.  Keep the file naming system intact.
+
+    bwa index -a bwtsw reference/2010EL-1786.fasta
+    bwa bwasw -t 12 reference/2010EL-1786.fasta reads/example.fastq.gz > tmp/example.fastq.gz.sam
+    samtools view -bS tmp/example.fastq.gz.sam > tmp/example.fastq.gz.bam
+    samtools sort tmp/example.fastq.gz.bam bam/example.fastq.gz-2010EL-1786.sorted # produces the bam extension
+    samtools index bam/example.fastq.gz-2010EL-1786.sorted.bam
+    rm -v tmp/example*
+
