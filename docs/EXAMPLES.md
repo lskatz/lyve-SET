@@ -143,4 +143,5 @@ A: You can still map your reads separately into a sorted bam file and then run S
     samtools sort tmp/example.fastq.gz.bam bam/example.fastq.gz-2010EL-1786.sorted # produces the bam extension
     samtools index bam/example.fastq.gz-2010EL-1786.sorted.bam
     rm -v tmp/example*
-
+    
+    launch_set.pl ...
