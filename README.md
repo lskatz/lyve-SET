@@ -100,7 +100,7 @@ The script `set_manage.pl` sets up the project directory and adds reads, and you
     $ set_manage.pl setTest --add-assembly file2.fasta
     $ set_manage.pl setTest --change-reference file3.fasta
 
-NOTE: paired end reads should be in interleved format. Scripts that interleve include run_assembly_shuffleReads.pl in the CG-Pipleline package and also shuffleSequences_fastq.pl in the Velvet package.
+NOTE: paired end reads should be in interleaved format. Scripts that interleaved include run_assembly_shuffleReads.pl in the CG-Pipleline package and also shuffleSequences_fastq.pl in the Velvet package.
 
 Run Lyve-SET with as few options as possible
 
