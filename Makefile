@@ -63,6 +63,7 @@ install-SGELK:
 	-mkdir -p $(PREFIX)/lib/Schedule
 	mv -v $(TMPDIR)/Schedule/SGELK.pm $(PREFIX)/lib/Schedule/
 	mv -v $(TMPDIR)/Schedule/README.md $(PREFIX)/lib/Schedule/
+	mv -v $(TMPDIR)/Schedule/.git $(PREFIX)/lib/Schedule/
 install-CGP:
 	# make sure these scripts are removed
 	rm -f $(PREFIX)/scripts/run_assembly_isFastqPE.pl
