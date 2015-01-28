@@ -44,12 +44,13 @@ exit(main());
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --noclean
   my $settings={trees=>1,msa=>1, matrix=>1, clean=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s msa-creation=s clean)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s msa-creation=s clean info=s@)) or die $!;
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
   $$settings{min_alt_frac}||=0.75;
   $$settings{min_coverage}||=10;
+  $$settings{info}||=['version']; #info that the user requests to see
   # modules defaults
   $$settings{mapper}||="smalt";
   $$settings{snpcaller}||="varscan";
@@ -102,6 +103,7 @@ sub main{
   die "ERROR: Could not find the reference file at $$settings{ref}\n".usage($settings) if(!-f $$settings{ref});
   my $ref=$$settings{ref};
 
+  printSetInfo($settings);
   simulateReads($settings);
   maskReference($ref,$settings);
   indexReference($ref,$settings);
@@ -133,6 +135,37 @@ sub main{
   }
 
   return 0;
+}
+
+# Pick information about SET from the Makefile where it is stored
+sub printSetInfo{
+  my($settings)=@_;
+  my $makefile="$FindBin::RealBin/../Makefile";
+  if(!-e $makefile){
+    logmsg "ERROR: I could not find the makefile at $makefile and so I could not display information about SET";
+    return 0;
+  }
+
+  # Get the contents of the makefile
+  open(MAKEFILE,$makefile) or die "ERROR: I could not open the makefile ($makefile): $!";
+  my @contents=<MAKEFILE>;
+  chomp(@contents);
+  close MAKEFILE;
+
+  # For each bit of requested information, see if it's in the makefile under some variable
+  for my $info(@{$$settings{info}}){
+    my @infoLine=grep {/\Q$info\E/i} @contents;
+    my($var,$value);
+    for(my $i=0;$i<@infoLine;$i++){
+      if($infoLine[$i]=~/(\w+)\s*:=\s*(.+)/){
+        ($var,$value)=($1,$2);
+      }
+    }
+    next if(!$var);
+    logmsg "LYVE-SET $var = $value";
+
+  }
+  return 1;
 }
 
 sub simulateReads{
@@ -409,17 +442,19 @@ sub usage{
 
     $help.="
     SKIP CERTAIN STEPS
-    --nomatrix to not create an hqSNP matrix
-    --nomsa to not make a multiple sequence alignment
-    --notrees to not make phylogenies
+    --nomatrix                       Do not create an hqSNP matrix
+    --nomsa                          Do not make a multiple sequence alignment
+    --notrees                        Do not make phylogenies
     MODULES
     --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap
     --snpcaller    $$settings{snpcaller}   Which SNP caller? Choices: freebayes, varscan
     SCHEDULER AND MULTITHREADING OPTIONS
-    --queue     all.q         The default queue to use.
-    --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
-    --numnodes  20  maximum number of nodes
-    --numcpus   $$settings{numcpus}  number of cpus
+    --queue        all.q             The default queue to use.
+    --qsubxopts    '-N lyve-set'     Extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
+    --numnodes     20                maximum number of nodes
+    --numcpus      $$settings{numcpus}                 number of cpus
+    OTHER
+    --info         version           Display information about Lyve-SET. The only option right now is 'version' and it is turned on by default
   ";
   return $help;
 }
