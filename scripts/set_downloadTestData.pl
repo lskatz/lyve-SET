@@ -76,6 +76,7 @@ sub downloadDataset{
   mkdir("$testdir/reads");
   for(@readsRemote){
     my ($r,$realname)=split(/\t/,$_);
+    $r||=""; $realname||="";
     $_=~s/^\s+|\s+$//g for($r,$realname);
     $realname=$r if(!$realname);
     downloadReads($r,$realname,$testdir,$settings);
