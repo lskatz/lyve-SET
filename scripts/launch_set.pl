@@ -38,19 +38,20 @@ END{
   close $logmsgFh if(defined($logmsgFh) && fileno($logmsgFh) > 0);
 }
 
-my $sge=Schedule::SGELK->new(-verbose=>1,-numnodes=>20,-numcpus=>8);
+my $sge=Schedule::SGELK->new(-verbose=>1,-numnodes=>20,-numcpus=>1);
 exit(main());
 
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --noclean
   my $settings={trees=>1,msa=>1, matrix=>1, clean=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s msa-creation=s clean info=s@)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s msa-creation=s clean info=s@ mask-phages)) or die $!;
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
   $$settings{min_alt_frac}||=0.75;
   $$settings{min_coverage}||=10;
   $$settings{info}||=['version']; #info that the user requests to see
+  $$settings{'mask-phages'}=1 if(!defined($$settings{'mask-phages'}));
   # modules defaults
   $$settings{mapper}||="smalt";
   $$settings{snpcaller}||="varscan";
@@ -207,12 +208,14 @@ sub maskReference{
   my $unmasked=dirname($ref).'/'.basename($ref,qw(.fasta .fa .fna .fsa .mfa)).'.unmasked.fasta';
   return if(-e $unmasked); 
 
-  logmsg "Masking the reference genome for phages";
-  # Find phages into a temporary file,
-  # rename the reference to 'unmasked' to get it out of the way and back it up,
-  # and rename the temporary masked file as the reference file name
-  my $tmpMasked="$$settings{tmpdir}/".basename($ref);
-  $sge->pleaseExecute("set_findPhages.pl --numcpus $$settings{numcpus} $ref > $tmpMasked && mv -v $ref $unmasked && mv -v $tmpMasked $ref",{numcpus=>$$settings{numcpus},jobname=>"set_findPhages"});
+  if($$settings{'mask-phages'}){
+    logmsg "Masking the reference genome for phages";
+    # Find phages into a temporary file,
+    # rename the reference to 'unmasked' to get it out of the way and back it up,
+    # and rename the temporary masked file as the reference file name
+    my $tmpMasked="$$settings{tmpdir}/".basename($ref);
+    $sge->pleaseExecute("set_findPhages.pl --numcpus $$settings{numcpus} $ref > $tmpMasked && mv -v $ref $unmasked && mv -v $tmpMasked $ref",{numcpus=>$$settings{numcpus},jobname=>"set_findPhages"});
+  }
 
   $sge->wrapItUp();
 }
@@ -442,6 +445,7 @@ sub usage{
 
     $help.="
     SKIP CERTAIN STEPS
+    --nomask-phages                  Do not search for and mask phages in the reference genome
     --nomatrix                       Do not create an hqSNP matrix
     --nomsa                          Do not make a multiple sequence alignment
     --notrees                        Do not make phylogenies
