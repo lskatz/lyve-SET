@@ -7,27 +7,24 @@ NML, part of PHAC, has the original version of SET (https://github.com/apetkau).
 
 Requirements
 ------------
-* Perl, multithreaded
-* RAxML
-* Smalt
-
-Requirements installed with "make install"
-------------------------------------------
-* CG-Pipeline
-* Schedule::SGELK
-* VCF Tools and Vcf.pm
-* Samtools
-  * wgsim if you are simulating reads
-  * bgzip
-  * tabix
-* PHAST
-* Varscan
-
-Optional "requirements"
------------------------
-* PhyML
-* FreeBayes
-* SNAP
+* Must-have
+  * Perl, multithreaded
+  * RAxML
+  * Smalt
+* Requirements installed with "make install"
+  * CG-Pipeline
+  * Schedule::SGELK
+  * VCF Tools and Vcf.pm
+  * Samtools
+    * wgsim if you are simulating reads
+    * bgzip
+    * tabix
+  * PHAST
+  * Varscan
+* Optional "requirements"
+  * PhyML
+  * FreeBayes
+  * SNAP
 
 Installation
 ------------
