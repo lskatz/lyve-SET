@@ -387,7 +387,7 @@ sub variantsToMatrix{
   logmsg "AllowedFlanking: $$settings{allowedFlanking}";
 
   my $j;
-  $j=$sge->pleaseExecute("bcftools merge $inVcf -O z > $pooled",{jobname=>"poolVcfs",numcpus=>1});
+  $j=$sge->pleaseExecute("bcftools merge $inVcf -O z > $pooled.tmp && mv -v $pooled.tmp $pooled",{jobname=>"poolVcfs",numcpus=>1});
   my $poolJobid=$$j{jobid};
   $j=$sge->pleaseExecute("tabix $pooled",{jobname=>"tabixPooled",numcpus=>1,qsubxopts=>"-hold_jid $poolJobid"});
   $sge->wrapItUp();
