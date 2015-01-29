@@ -54,7 +54,7 @@ sub mpileup{
   return $pileup if(-e $pileup && -s $pileup > 0);
   logmsg "Creating a pileup $pileup";
   system("samtools mpileup -f '$reference' '$bam' 1>$pileup");
-  die if $?;
+  die "ERROR: problem with\n  samtools mpileup -f '$reference' '$bam'" if $?;
   return $pileup;
 }
 
