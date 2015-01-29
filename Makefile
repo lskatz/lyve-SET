@@ -106,13 +106,18 @@ install-samtools:
 	cd $(TMPDIR) && tar jxvf samtools-1.1.tar.bz2
 	mv $(TMPDIR)/samtools-1.1 $(PREFIX)/lib
 	cd $(PREFIX)/lib/samtools-1.1 && make
-	cd $(PREFIX)/lib/samtools-1.1/htslib-1.1 && make && mv -v bgzip tabix ..
+	cd $(PREFIX)/lib/samtools-1.1/htslib-1.1 && make
+	ln -s $(PREFIX)/lib/samtools-1.1/samtools $(PREFIX)/scripts/
+	ln -s $(PREFIX)/lib/samtools-1.1/htslib-1.1/bgzip $(PREFIX)/scripts
+	ln -s $(PREFIX)/lib/samtools-1.1/htslib-1.1/tabix $(PREFIX)/scripts
 
 install-bcftools:
 	wget 'http://downloads.sourceforge.net/project/samtools/samtools/1.1/bcftools-1.1.tar.bz2' -O $(TMPDIR)/bcftools-1.1.tar.bz2
 	cd $(TMPDIR) && tar jxvf bcftools-1.1.tar.bz2
 	mv $(TMPDIR)/bcftools-1.1 $(PREFIX)/lib
 	cd $(PREFIX)/lib/bcftools-1.1 && make
+	ln -s $(PREFIX)/lib/bcftools-1.1/bcftools $(PREFIX)/scripts
+	ln -s $(PREFIX)/lib/bcftools-1.1/vcfutils.pl $(PREFIX)/scripts
 
 cuttingedge: install-mkdir cuttingedge-gitclone install-prerequisites
 	@echo "DONE installing the cutting edge version"
