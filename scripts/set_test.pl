@@ -24,7 +24,7 @@ for my $path(glob("$datadir/*")){
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help do-nothing numcpus=i));
+  GetOptions($settings,qw(help do-nothing numcpus=i)) or die $!;
   $$settings{numcpus}||=1;
 
   my ($dataset,$project)=@ARGV;
