@@ -9,20 +9,25 @@ Requirements
 ------------
 * Perl, multithreaded
 * RAxML
-* PhyML
-* FreeBayes
-* Varscan
 * Smalt
+
+Requirements installed with "make install"
+------------------------------------------
+* CG-Pipeline
+* Schedule::SGELK
+* VCF Tools and Vcf.pm
 * Samtools
   * wgsim if you are simulating reads
   * bgzip
   * tabix
+* PHAST
+* Varscan
 
-Requirements installed with "make install"
-------------
-* CG-Pipeline
-* Schedule::SGELK
-* VCF Tools and Vcf.pm
+Optional "requirements"
+-----------------------
+* PhyML
+* FreeBayes
+* SNAP
 
 Installation
 ------------
