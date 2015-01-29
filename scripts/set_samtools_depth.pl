@@ -7,12 +7,6 @@ use Getopt::Long;
 use File::Basename;
 use Bio::Perl;
 
-use FindBin;
-# Include samtools and bcftools
-$ENV{PATH}=$ENV{PATH}.":$FindBin::RealBin/../lib/samtools-1.1:$FindBin::RealBin/../lib/samtools-1.1/misc";
-$ENV{PATH}=$ENV{PATH}.":$FindBin::RealBin/../lib/bcftools-1.1";
-
-
 local $0=fileparse $0;
 sub logmsg{print STDERR "$0: @_\n";}
 exit(main());

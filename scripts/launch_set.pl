@@ -16,10 +16,6 @@ use Schedule::SGELK;
 #use ExtUtils::Command;
 
 use FindBin;
-# Include samtools and bcftools
-$ENV{PATH}=$ENV{PATH}.":$FindBin::RealBin/../lib/samtools-1.1:$FindBin::RealBin/../lib/samtools-1.1/misc";
-$ENV{PATH}=$ENV{PATH}.":$FindBin::RealBin/../lib/bcftools-1.1";
-
 
 my ($name,$scriptsdir,$suffix)=fileparse($0);
 $scriptsdir=File::Spec->rel2abs($scriptsdir);

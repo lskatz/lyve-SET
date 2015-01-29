@@ -9,12 +9,6 @@ use File::Basename;
 use threads;
 use Thread::Queue;
 
-use FindBin;
-# Include samtools and bcftools
-$ENV{PATH}=$ENV{PATH}.":$FindBin::RealBin/../lib/samtools-1.1:$FindBin::RealBin/../lib/samtools-1.1/misc";
-$ENV{PATH}=$ENV{PATH}.":$FindBin::RealBin/../lib/bcftools-1.1";
-
-
 my $time=time;
 sub logmsg{my $duration=time-$time; $|++;print STDERR "$duration\t@_\n";$|--;}
 exit(main());
