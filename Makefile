@@ -119,6 +119,11 @@ install-bcftools:
 	ln -s $(PREFIX)/lib/bcftools-1.1/bcftools $(PREFIX)/scripts
 	ln -s $(PREFIX)/lib/bcftools-1.1/vcfutils.pl $(PREFIX)/scripts
 
+install-smalt:
+	wget 'http://downloads.sourceforge.net/project/smalt/smalt-0.7.6-static.tar.gz' -O $(TMPDIR)/smalt-0.7.6-static.tar.gz
+	cd $(TMPDIR) && tar zxvf smalt-0.7.6-static.tar.gz
+	# TODO: unpackage this
+
 cuttingedge: install-mkdir cuttingedge-gitclone install-prerequisites
 	@echo "DONE installing the cutting edge version"
 
