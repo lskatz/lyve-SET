@@ -66,7 +66,7 @@ sub varscan{
     perl -lane 's/Sample1/\Q$samplename\E/; print;' |\
     bgzip -c > $vcf
   ");
-  die if $?;
+  die "ERROR: problem with either varscan.sh, bgzip, or perl one-liner for regex" if $?;
 
   return $vcf;
 }
