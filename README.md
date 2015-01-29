@@ -7,11 +7,11 @@ NML, part of PHAC, has the original version of SET (https://github.com/apetkau).
 
 Requirements
 ------------
-* Must-have
-  * Perl, multithreaded
-  * RAxML
-  * Smalt
-* Requirements installed with "make install"
+* **Must-have** and not installed with `make install`
+  * **Perl, multithreaded**
+  * **RAxML**
+  * **Smalt**
+* **Requirements installed with `make install`**
   * CG-Pipeline
   * Schedule::SGELK
   * VCF Tools and Vcf.pm
