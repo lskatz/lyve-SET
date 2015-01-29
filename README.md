@@ -10,7 +10,7 @@ Requirements
 * **Must-have** and not installed with `make install`
   * **Perl, multithreaded**
   * **RAxML**
-  * **Smalt** (in latest release but not cutting edge version)
+  * **Smalt** (must get separately when using the latest release but not cutting edge version)
 * **Requirements installed with `make install`**
   * CG-Pipeline
   * Schedule::SGELK
