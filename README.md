@@ -36,6 +36,7 @@ Installation
 For the impatient
 -----------------
 Here is a way to just try out the test dataset.
+
     set_test.pl lambda --numcpus 8 # or however many cpus you want
     set_test.pl listeria_monocytogenes --numcpus 8 # or another dataset
 
