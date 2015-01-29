@@ -13,6 +13,10 @@ use FindBin;
 use lib "$FindBin::RealBin/../lib/vcftools_0.1.12b/perl";
 use Vcf;
 
+# Including samtools and bcftools
+$ENV{PATH}=$ENV{PATH}.":$FindBin::RealBin/../lib/samtools-1.1:$FindBin::RealBin/../lib/samtools-1.1/misc";
+$ENV{PATH}=$ENV{PATH}.":$FindBin::RealBin/../lib/bcftools-1.1";
+
 my $samplename="Sample1"; # to be changed later
 $0=fileparse $0;
 sub logmsg{print STDERR "$0: @_\n";}

@@ -48,15 +48,12 @@ install: install-prerequisites
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET v$(VERSION) complete."
 
-install-prerequisites: install-mkdir install-vcftools install-CGP install-callsam install-SGELK install-varscan install-phast install-phispy
+install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-phispy install-samtools install-bcftools
 	@echo DONE installing prerequisites
 
 install-mkdir:
 	-mkdir $(PREFIX)/build $(PREFIX)/lib $(PREFIX)/scripts
 
-install-callsam:
-	rm -rf $(PREFIX)/lib/callsam # make sure it's removed
-	git clone https://github.com/lskatz/callsam.git $(PREFIX)/lib/callsam
 install-SGELK:
 	rm -rf $(TMPDIR)/Schedule # make sure it's removed
 	git clone https://github.com/lskatz/Schedule--SGELK.git $(TMPDIR)/Schedule
@@ -103,6 +100,19 @@ install-phispy:
 	cd $(PREFIX)/lib/phispy && unzip -o phiSpyNov11_v2.3.zip
 	rm $(PREFIX)/lib/phispy/phiSpyNov11_v2.3.zip
 	cd $(PREFIX)/lib/phispy/phiSpyNov11_v2.3 && make
+
+install-samtools:
+	wget 'http://downloads.sourceforge.net/project/samtools/samtools/1.1/samtools-1.1.tar.bz2' -O $(TMPDIR)/samtools-1.1.tar.bz2
+	cd $(TMPDIR) && tar jxvf samtools-1.1.tar.bz2
+	mv $(TMPDIR)/samtools-1.1 $(PREFIX)/lib
+	cd $(PREFIX)/lib/samtools-1.1 && make
+	cd $(PREFIX)/lib/samtools-1.1/htslib-1.1 && make && mv -v bgzip tabix ..
+
+install-bcftools:
+	wget 'http://downloads.sourceforge.net/project/samtools/samtools/1.1/bcftools-1.1.tar.bz2' -O $(TMPDIR)/bcftools-1.1.tar.bz2
+	cd $(TMPDIR) && tar jxvf bcftools-1.1.tar.bz2
+	mv $(TMPDIR)/bcftools-1.1 $(PREFIX)/lib
+	cd $(PREFIX)/lib/bcftools-1.1 && make
 
 cuttingedge: install-mkdir cuttingedge-gitclone install-prerequisites
 	@echo "DONE installing the cutting edge version"

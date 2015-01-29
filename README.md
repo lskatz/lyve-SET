@@ -14,7 +14,9 @@ Requirements
 * Varscan
 * Smalt
 * Samtools
-  * wgsim (part of samtools) if you are simulating reads
+  * wgsim if you are simulating reads
+  * bgzip
+  * tabix
 
 Requirements installed with "make install"
 ------------

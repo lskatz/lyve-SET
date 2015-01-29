@@ -7,6 +7,11 @@ use Getopt::Long;
 use List::Util qw/max/;
 use File::Basename qw/basename/;
 
+use FindBin;
+# Include samtools and bcftools
+$ENV{PATH}=$ENV{PATH}.":$FindBin::RealBin/../lib/samtools-1.1:$FindBin::RealBin/../lib/samtools-1.1/misc";
+$ENV{PATH}=$ENV{PATH}.":$FindBin::RealBin/../lib/bcftools-1.1";
+
 $0=basename $0;
 exit(main());
 
