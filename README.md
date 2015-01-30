@@ -12,7 +12,7 @@ Requirements
   * **RAxML**
   * **BLAST+**
   * **Smalt** (must get separately when using the latest release but not cutting edge version)
-  * **GIT**, **SVN** (for installation)
+  * **GIT**, **SVN** (for installation and updating)
 * **Requirements installed with `make install`**
   * CG-Pipeline
   * Schedule::SGELK
