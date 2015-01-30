@@ -108,6 +108,7 @@ install-samtools:
 	cd $(PREFIX)/lib/samtools-1.1 && make
 	cd $(PREFIX)/lib/samtools-1.1/htslib-1.1 && make
 	ln -s $(PREFIX)/lib/samtools-1.1/samtools $(PREFIX)/scripts/
+	ln -s $(PREFIX)/lib/samtools-1.1/misc/wgsim $(PREFIX)/scripts/
 	ln -s $(PREFIX)/lib/samtools-1.1/htslib-1.1/bgzip $(PREFIX)/scripts
 	ln -s $(PREFIX)/lib/samtools-1.1/htslib-1.1/tabix $(PREFIX)/scripts
 
