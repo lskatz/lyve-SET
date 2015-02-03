@@ -51,32 +51,42 @@ install: install-prerequisites
 install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-phispy install-samtools install-bcftools install-smalt
 	@echo DONE installing prerequisites
 
+clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-phispy clean-samtools clean-bcftools clean-smalt
+	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
+
 install-mkdir:
 	-mkdir $(PREFIX)/build $(PREFIX)/lib $(PREFIX)/scripts
 
+clean-tmp:
+	rm -rfv $(TMPDIR)/*
+
+clean-symlinks:
+	find $(PREFIX)/scripts -maxdepth 1 -type l -exec rm -vf {} \;
+
 install-SGELK:
-	rm -rf $(TMPDIR)/Schedule # make sure it's removed
 	git clone https://github.com/lskatz/Schedule--SGELK.git $(TMPDIR)/Schedule
 	-mkdir -p $(PREFIX)/lib/Schedule
 	mv -v $(TMPDIR)/Schedule/SGELK.pm $(PREFIX)/lib/Schedule/
 	mv -v $(TMPDIR)/Schedule/README.md $(PREFIX)/lib/Schedule/
 	mv -v $(TMPDIR)/Schedule/.git $(PREFIX)/lib/Schedule/
+
+clean-SGELK:
+	rm -rfv $(PREFIX)/lib/Schedule
+
 install-CGP:
-	# make sure these scripts are removed
-	rm -f $(PREFIX)/scripts/run_assembly_isFastqPE.pl
-	rm -f $(PREFIX)/scripts/run_assembly_trimClean.pl
-	rm -f $(PREFIX)/scripts/run_assembly_shuffleReads.pl
-	rm -rvf $(PREFIX)/lib/cg-pipeline-code
 	# CGP scripts that are needed and that don't depend on CGP libraries
 	svn checkout https://svn.code.sf.net/p/cg-pipeline/code/ $(PREFIX)/lib/cg-pipeline-code
 	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_isFastqPE.pl $(PREFIX)/scripts/
 	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_trimClean.pl $(PREFIX)/scripts/
 	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_shuffleReads.pl $(PREFIX)/scripts/
 
+clean-CGP:
+	rm -f $(PREFIX)/scripts/run_assembly_isFastqPE.pl
+	rm -f $(PREFIX)/scripts/run_assembly_trimClean.pl
+	rm -f $(PREFIX)/scripts/run_assembly_shuffleReads.pl
+	rm -rvf $(PREFIX)/lib/cg-pipeline-code
+
 install-vcftools:
-	rm -rvf $(PREFIX)/lib/vcftools_0.1.12b
-	rm -vf $(PREFIX)/scripts/vcf-sort
-	rm -vf $(PREFIX)/lib/Vcf.pm
 	wget 'http://downloads.sourceforge.net/project/vcftools/vcftools_0.1.12b.tar.gz?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fvcftools%2Ffiles%2F&ts=1409260024&use_mirror=ufpr' -O $(TMPDIR)/vcftools_0.1.12b.tar.gz
 	cd $(TMPDIR) && \
 	tar zxvf vcftools_0.1.12b.tar.gz
@@ -86,13 +96,25 @@ install-vcftools:
 	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/vcf-sort $(PREFIX)/scripts/
 	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/Vcf.pm $(PREFIX)/lib/
 
+clean-vcftools:
+	rm -rvf $(PREFIX)/lib/vcftools_0.1.12b
+	rm -vf $(PREFIX)/scripts/vcf-sort
+	rm -vf $(PREFIX)/lib/Vcf.pm
+
+
 install-varscan:
-	wget 'http://downloads.sourceforge.net/project/varscan/VarScan.v2.3.7.jar?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fvarscan%2Ffiles%2F&ts=1413398147&use_mirror=ufpr' -O $(PREFIX)/lib/varscan.v2.3.7.jar
+	wget 'http://downloads.sourceforge.net/project/varscan/VarScan.v2.3.7.jar' -O $(PREFIX)/lib/varscan.v2.3.7.jar
+
+clean-varscan:
+	rm -vf $(PREFIX)/lib/varscan.v2.3.7.jar
 
 install-phast:
 	mkdir -p $(PREFIX)/lib/phast
 	wget http://phast.wishartlab.com/phage_finder/DB/prophage_virus.db -O $(PREFIX)/lib/phast/phast.faa
 	makeblastdb -in $(PREFIX)/lib/phast/phast.faa -dbtype prot
+
+clean-phast:
+	rm -rvf $(PREFIX)/lib/phast
 
 install-phispy:
 	mkdir -p $(PREFIX)/lib/phispy
@@ -100,6 +122,9 @@ install-phispy:
 	cd $(PREFIX)/lib/phispy && unzip -o phiSpyNov11_v2.3.zip
 	rm $(PREFIX)/lib/phispy/phiSpyNov11_v2.3.zip
 	cd $(PREFIX)/lib/phispy/phiSpyNov11_v2.3 && make
+
+clean-phispy:
+	rm -rvf $(PREFIX)/lib/phispy
 
 install-samtools:
 	wget 'http://downloads.sourceforge.net/project/samtools/samtools/1.1/samtools-1.1.tar.bz2' -O $(TMPDIR)/samtools-1.1.tar.bz2
@@ -112,6 +137,9 @@ install-samtools:
 	ln -s $(PREFIX)/lib/samtools-1.1/htslib-1.1/bgzip $(PREFIX)/scripts
 	ln -s $(PREFIX)/lib/samtools-1.1/htslib-1.1/tabix $(PREFIX)/scripts
 
+clean-samtools:
+	rm -rvf $(PREFIX)/lib/samtools*
+
 install-bcftools:
 	wget 'http://downloads.sourceforge.net/project/samtools/samtools/1.1/bcftools-1.1.tar.bz2' -O $(TMPDIR)/bcftools-1.1.tar.bz2
 	cd $(TMPDIR) && tar jxvf bcftools-1.1.tar.bz2
@@ -120,12 +148,18 @@ install-bcftools:
 	ln -s $(PREFIX)/lib/bcftools-1.1/bcftools $(PREFIX)/scripts
 	ln -s $(PREFIX)/lib/bcftools-1.1/vcfutils.pl $(PREFIX)/scripts
 
+clean-bcftools:
+	rm -rfv $(PREFIX)/lib/bcftools-1.1/bcftools $(PREFIX)/lib/bcftools-1.1/vcfutils.pl $(PREFIX)/lib/bcftools*
+
 install-smalt:
 	wget --continue 'http://downloads.sourceforge.net/project/smalt/smalt-0.7.6-static.tar.gz' -O $(TMPDIR)/smalt-0.7.6-static.tar.gz
 	cd $(TMPDIR) && tar zxvf smalt-0.7.6-static.tar.gz
 	mv $(TMPDIR)/smalt-0.7.6 $(PREFIX)/lib/
 	cd $(PREFIX)/lib/smalt-0.7.6 && ./configure --prefix $(PREFIX)/lib/smalt-0.7.6 && make && make install
 	ln -sv $(PREFIX)/lib/smalt-0.7.6/bin/* $(PREFIX)/scripts/
+
+clean-smalt:
+	rm -rvf $(PREFIX)/lib/smalt*
 
 cuttingedge: install-mkdir cuttingedge-gitclone install-prerequisites
 	@echo "DONE installing the cutting edge version"
@@ -140,10 +174,6 @@ env:
 	echo "#Lyve-SET" >> $(PROFILE)
 	echo "export PATH=\$$PATH:$(PREFIX)/scripts" >> $(PROFILE)
 	echo "export PERL5LIB=\$$PERL5LIB:$(PREFIX)/lib" >> $(PROFILE)
-
-clean:
-	rm -vrf $(TMPDIR)/*
-	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
 
 test:
 	@echo "Test data set given by CFSAN's snp-pipeline package found at https://github.com/CFSAN-Biostatistics/snp-pipeline"
