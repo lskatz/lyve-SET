@@ -72,9 +72,8 @@ sub backfillVcfValues{
   logmsg "Backfilling values in $vcfFile and printing to stdout";
   my $vcf=Vcf->new(file=>$vcfFile);
 
-  # alternate count column must be there (AC)
-  $vcf->add_header_line({key=>'INFO', ID=>'AC',Number=>"A",Type=>'Integer',Description=>'Allele count in genotypes'});
-  $vcf->add_header_line({key=>'FORMAT', ID=>'AC',Number=>"A",Type=>'Integer',Description=>'Allele count in genotypes'});
+  $vcf->add_header_line({key=>'FORMAT', ID=>'AF', Number=>'A', Type=>'Float', Description=>"Allele Frequency"});
+  $vcf->add_header_line({key=>'FORMAT', ID=>'RF', Number=>'A', Type=>'Float', Description=>"Reference Frequency"});
   # Figure out the coverage depth
   my $depth=covDepth($bam,$settings);
 
@@ -86,18 +85,48 @@ sub backfillVcfValues{
   while(my $x=$vcf->next_data_hash()){
     my $posId=$$x{CHROM}.':'.$$x{POS};
     my $pos=$$x{POS};
-    $$x{gtypes}{$samplename}{DP}=$$depth{$posId};
+    $$x{gtypes}{$samplename}{DP}=$$depth{$posId} || 0;
 
-    # Alternate calls are in the AD field for varscan
-    $vcf->add_format_field($x,"AC");
-    $$x{gtypes}{$samplename}{AD}||=0;
-    $$x{gtypes}{$samplename}{AC}||=$$x{gtypes}{$samplename}{AD};
+    # Only one call is allowed for ALT
+    $$x{ALT}=[$$x{ALT}[0]];
+    $$x{FILTER}=[$$x{FILTER}[0]];
 
     # Put in exactly what the alternate call is
     $$x{ALT}[0]=$$x{REF} if($$x{ALT}[0] eq '.');
+    my $is_snp=0;
+    if($$x{ALT}[0] ne $$x{REF}){
+      $is_snp=1;
+    }
 
-    # Figure out the genotype
-    #$$x{gtypes}{$samplename}{GT}=$$x{ALT}[0].'/'.$$x{ALT}[0];
+    # Put in allele frequency for the one accepted ALT
+    # Alternate calls are in the AD field for varscan
+    $$x{gtypes}{$samplename}{AD}||=0;
+    $$x{gtypes}{$samplename}{RD}||=0;
+    $$x{gtypes}{$samplename}{AF}||=0;
+    $$x{gtypes}{$samplename}{RF}||=0;
+    if($$x{gtypes}{$samplename}{AD} > 0){
+      $$x{gtypes}{$samplename}{AF}=$$x{gtypes}{$samplename}{AD}/$$x{gtypes}{$samplename}{DP};
+      $$x{gtypes}{$samplename}{RF}=$$x{gtypes}{$samplename}{RD}/$$x{gtypes}{$samplename}{DP};
+    }
+
+    #$vcf->add_format_field($x,"AC");
+    #$$x{gtypes}{$samplename}{AC}||=$$x{gtypes}{$samplename}{AD};
+
+    # Mask low-quality sites
+    if( $$depth{$posId} < $$settings{coverage} ||             # low coverage
+        (length($$x{ALT}[0]) > 1 || length($$x{REF}) > 1)     # indel
+      ){
+      $$x{ALT}[0]="N";
+    }
+
+    # Mask unsupported base calls
+    #if( 
+    #    ($is_snp && $$x{gtypes}{$samplename}{AF} < $$settings{altFreq})
+    #    ||
+    #    (!$is_snp && $$x{gtypes}{$samplename}{RF} < $$settings{altFreq})
+    #  ){
+    #  $$x{ALT}[0]="N";
+    #}
 
     print $vcf->format_line($x);
   }

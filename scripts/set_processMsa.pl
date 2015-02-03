@@ -20,8 +20,8 @@ exit main();
 
 sub main{
   local $0=basename $0;
-  my $settings={};
-  GetOptions($settings,qw(auto groups=s@ treePrefix=s alnPrefix=s pairwisePrefix=s fstPrefix=s eigenPrefix=s numcpus=i msaDir=s tempdir=s force help)) or die $!;
+  my $settings={informative=>1};
+  GetOptions($settings,qw(auto groups=s@ treePrefix=s informative! alnPrefix=s pairwisePrefix=s fstPrefix=s eigenPrefix=s numcpus=i msaDir=s tempdir=s force help)) or die $!;
   $$settings{treePrefix}||="";
   $$settings{alnPrefix}||="";
   $$settings{pairwisePrefix}||="";
@@ -135,10 +135,19 @@ sub phylogenies{
 sub removeUninformativeSites{
   my($inAln,$outPrefix,$settings)=@_;
   my $informative="$outPrefix.aln.fas";
+
   if(-f $informative && !$$settings{force}){
     logmsg "$informative was found.  I will not recalculate without --force.";
     return $informative;
   }
+
+  # If the user does not want to use the informative alignment, then copy over the actual alignment
+  if($$settings{informative}){
+    system("cp -v $inAln $informative");
+    die "ERROR with copying $inAln to $informative" if $?;
+    return $informative;
+  }
+
   logmsg "Removing uninformative sites from the alignment and putting it into $informative";
   logmsg "  removeUninformativeSites.pl < '$inAln' > '$informative'";
   system("removeUninformativeSites.pl < '$inAln' > '$informative'");
@@ -218,6 +227,8 @@ sub usage{
   -n   numcpus
   --force               Files will be overwritten even if they exist
   --tempdir tmp/        Place to put temporary files
+  --no-informative      Do not use an informative alignment. 
+                        The output alignment will be the same as the 'informative' one in the MSA directory.
 
 OUTPUT
   -tre treePrefix
