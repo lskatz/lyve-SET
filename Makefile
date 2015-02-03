@@ -75,16 +75,13 @@ clean-SGELK:
 
 install-CGP:
 	# CGP scripts that are needed and that don't depend on CGP libraries
-	svn checkout https://svn.code.sf.net/p/cg-pipeline/code/ $(PREFIX)/lib/cg-pipeline-code
-	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_isFastqPE.pl $(PREFIX)/scripts/
-	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_trimClean.pl $(PREFIX)/scripts/
-	ln -s $(PREFIX)/lib/cg-pipeline-code/cg_pipeline/branches/lkatz/scripts/run_assembly_shuffleReads.pl $(PREFIX)/scripts/
+	git clone https://github.com/lskatz/cg-pipeline $(PREFIX)/lib/cg-pipeline
+	ln -s $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_isFastqPE.pl $(PREFIX)/scripts/
+	ln -s $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_trimClean.pl $(PREFIX)/scripts/
+	ln -s $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_shuffleReads.pl $(PREFIX)/scripts/
 
 clean-CGP:
-	rm -f $(PREFIX)/scripts/run_assembly_isFastqPE.pl
-	rm -f $(PREFIX)/scripts/run_assembly_trimClean.pl
-	rm -f $(PREFIX)/scripts/run_assembly_shuffleReads.pl
-	rm -rvf $(PREFIX)/lib/cg-pipeline-code
+	rm -rvf $(PREFIX)/lib/cg-pipeline
 
 install-vcftools:
 	wget 'http://downloads.sourceforge.net/project/vcftools/vcftools_0.1.12b.tar.gz?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fvcftools%2Ffiles%2F&ts=1409260024&use_mirror=ufpr' -O $(TMPDIR)/vcftools_0.1.12b.tar.gz
