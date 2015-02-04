@@ -72,8 +72,26 @@ sub backfillVcfValues{
   logmsg "Backfilling values in $vcfFile and printing to stdout";
   my $vcf=Vcf->new(file=>$vcfFile);
 
+  # Reasons a SNP doesn't pass
+  my $fail_lowCoverage="DP$$settings{coverage}";
+  my $fail_lowRefFreq ="RF$$settings{altFreq}";
+  my $fail_lowAltFreq ="AF$$settings{altFreq}";
+  my $fail_indel      ="isIndel";
+  
+  # Add new headers
+  $vcf->add_header_line({key=>'FILTER', ID=>$fail_lowCoverage, Description=>"Depth is less than $$settings{coverage}, the user-set coverage threshold"});
+  $vcf->add_header_line({key=>'FILTER', ID=>$fail_lowRefFreq, Description=>"Reference variant consensus is less than $$settings{altFreq}, the user-set threshold"});
+  $vcf->add_header_line({key=>'FILTER', ID=>$fail_lowAltFreq, Description=>"Allele variant consensus is less than $$settings{altFreq}, the user-set threshold"});
+  $vcf->add_header_line({key=>'FILTER', ID=>$fail_indel, Description=>"Indels are not used for analysis in Lyve-SET"});
+
+  # Genotype fields
   $vcf->add_header_line({key=>'FORMAT', ID=>'AF', Number=>'A', Type=>'Float', Description=>"Allele Frequency"});
   $vcf->add_header_line({key=>'FORMAT', ID=>'RF', Number=>'A', Type=>'Float', Description=>"Reference Frequency"});
+  $vcf->add_header_line({key=>'FORMAT', ID=>'ADP', Number=>'A', Type=>'Integer', Description=>"Depth of bases with Phred score >= 15"});
+
+  # Remove unwanted headers
+  $vcf->remove_header_line(key=>'INFO',ID=>'ADP');
+
   # Figure out the coverage depth
   my $depth=covDepth($bam,$settings);
 
@@ -98,35 +116,49 @@ sub backfillVcfValues{
       $is_snp=1;
     }
 
+    # some info fields belong in format fields (deleted in the next step from INFO)
+    for(qw(ADP)){
+      $$x{gtypes}{$samplename}{$_}=$$x{INFO}{$_};
+    }
+    # I just don't think some fields even belong here
+    for(qw(ADP HET NC HOM WT)){
+      delete($$x{INFO}{$_});
+    }
+
     # Put in allele frequency for the one accepted ALT
     # Alternate calls are in the AD field for varscan
     $$x{gtypes}{$samplename}{AD}||=0;
     $$x{gtypes}{$samplename}{RD}||=0;
     $$x{gtypes}{$samplename}{AF}||=0;
     $$x{gtypes}{$samplename}{RF}||=0;
-    if($$x{gtypes}{$samplename}{AD} > 0){
-      $$x{gtypes}{$samplename}{AF}=$$x{gtypes}{$samplename}{AD}/$$x{gtypes}{$samplename}{DP};
-      $$x{gtypes}{$samplename}{RF}=$$x{gtypes}{$samplename}{RD}/$$x{gtypes}{$samplename}{DP};
+    if($$x{gtypes}{$samplename}{ADP} > 0){
+      $$x{gtypes}{$samplename}{AF}=$$x{gtypes}{$samplename}{AD}/$$x{gtypes}{$samplename}{ADP};
+      $$x{gtypes}{$samplename}{RF}=$$x{gtypes}{$samplename}{RD}/$$x{gtypes}{$samplename}{ADP};
+    }
+    # round the frequencies
+    $_=sprintf("%0.3f",$_) for($$x{gtypes}{$samplename}{AF},$$x{gtypes}{$samplename}{RF});
+
+    ###########
+    # MASKING
+    # Mask low coverage
+    if( $$depth{$posId} < $$settings{coverage} ){
+      vcf_markAmbiguous($x,$fail_lowCoverage,$settings);
     }
 
-    #$vcf->add_format_field($x,"AC");
-    #$$x{gtypes}{$samplename}{AC}||=$$x{gtypes}{$samplename}{AD};
-
-    # Mask low-quality sites
-    if( $$depth{$posId} < $$settings{coverage} ||             # low coverage
-        (length($$x{ALT}[0]) > 1 || length($$x{REF}) > 1)     # indel
-      ){
-      $$x{ALT}[0]="N";
+    # Mask indels
+    if(length($$x{ALT}[0]) > 1 || length($$x{REF}) > 1){
+      vcf_markAmbiguous($x,$fail_indel,$settings);
     }
 
-    # Mask unsupported base calls
-    #if( 
-    #    ($is_snp && $$x{gtypes}{$samplename}{AF} < $$settings{altFreq})
-    #    ||
-    #    (!$is_snp && $$x{gtypes}{$samplename}{RF} < $$settings{altFreq})
-    #  ){
-    #  $$x{ALT}[0]="N";
-    #}
+    # Mask low frequency
+    if($is_snp && $$x{gtypes}{$samplename}{AF} < $$settings{altFreq}){
+      vcf_markAmbiguous($x,$fail_lowRefFreq,$settings);
+    }
+    if(!$is_snp && $$x{gtypes}{$samplename}{RF} < $$settings{altFreq}){
+      vcf_markAmbiguous($x,$fail_lowAltFreq,$settings);
+    }
+    # END MASKING
+    ###############
 
     print $vcf->format_line($x);
   }
@@ -147,6 +179,15 @@ sub covDepth{
   }
   close IN;
   return \%depth;
+}
+
+# VCF line manipulations
+sub vcf_markAmbiguous{
+  my($x,$reason,$settings)=@_;
+  $$x{ALT}[1]="N";
+  $$x{gtypes}{$samplename}{GT}="2/2";
+  @{$$x{FILTER}}=() if($$x{FILTER}[0] eq "PASS");
+  push(@{$$x{FILTER}},$reason);
 }
 
 
