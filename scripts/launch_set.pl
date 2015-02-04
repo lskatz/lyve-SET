@@ -301,7 +301,7 @@ sub variantCalls{
       # terminate called after throwing an instance of 'std::out_of_range'
     } elsif($$settings{snpcaller} eq 'varscan'){
       $jobname="varscan$b";
-      $sge->pleaseExecute("$scriptsdir/launch_varscan.pl $bam --tempdir $$settings{tmpdir} --reference $ref > $vcfdir/unfiltered/$b.vcf",{numcpus=>1,jobname=>$jobname,qsubxopts=>""});
+      $sge->pleaseExecute("$scriptsdir/launch_varscan.pl $bam --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} > $vcfdir/unfiltered/$b.vcf",{numcpus=>1,jobname=>$jobname,qsubxopts=>""});
       # sort VCF
       $sge->pleaseExecute("mv $vcfdir/unfiltered/$b.vcf $vcfdir/unfiltered/$b.vcf.tmp && vcf-sort < $vcfdir/unfiltered/$b.vcf.tmp > $vcfdir/unfiltered/$b.vcf && rm -v $vcfdir/unfiltered/$b.vcf.tmp",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
       # filter VCF
