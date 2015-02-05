@@ -52,9 +52,10 @@ if [ "$suffix" != "phy" ]; then
   aln="$aln.phy";
 fi;
 
-# Which raxml to use?
-which raxmlHPC 1>/dev/null 2>&1 && EXEC=raxmlHPC
-which raxmlHPC-PTHREADS 1>/dev/null 2>&1 && EXEC=raxmlHPC-PTHREADS
+# Which raxml to use? In order of lesser priority
+# so that higher priority overrides the previous choice.
+which raxmlHPC 1>/dev/null 2>&1 && EXEC=$(which raxmlHPC)
+which raxmlHPC-PTHREADS 1>/dev/null 2>&1 && EXEC=$(which raxmlHPC-PTHREADS)
 
 # Raxml-pthreads must have >1 cpu and so fix it if that happens
 if [ $EXEC == "raxmlHPC-PTHREADS" ]; then
@@ -71,13 +72,19 @@ fi
 VERSION=$($EXEC -v | grep -o 'version [0-9]' | grep -o [0-9]);
 echo "I detect that you are using version $VERSION of raxml."
 
+XOPTS=""
 if [ $VERSION = 8 ]; then
   MODEL=ASC_GTRGAMMA
+  XOPTS="$XOPTS --asc-corr=lewis "
 else
   MODEL=GTRGAMMA
 fi
 
 ## time to run the program!
-$EXEC -f a -s $aln -n $prefix -T $numcpus -p $RANDOM -x $RANDOM -N 100 -m $MODEL $outgroupParam
-if [ $? -gt 0 ]; then exit 1; fi;
+COMMAND="$EXEC -f a -s $aln -n $prefix -T $numcpus -p $RANDOM -x $RANDOM -N 100 -m $MODEL $outgroupParam $XOPTS"
+eval $COMMAND
+if [ $? -gt 0 ]; then
+  echo -e "ERROR with command:\n  $COMMAND";
+  exit 1;
+fi
 
