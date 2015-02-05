@@ -142,15 +142,14 @@ sub removeUninformativeSites{
   }
 
   # If the user does not want to use the informative alignment, then copy over the actual alignment
-  if($$settings{informative}){
+  if(!$$settings{informative}){
     system("cp -v $inAln $informative");
     die "ERROR with copying $inAln to $informative" if $?;
     return $informative;
   }
 
   logmsg "Removing uninformative sites from the alignment and putting it into $informative";
-  logmsg "  removeUninformativeSites.pl < '$inAln' > '$informative'";
-  system("removeUninformativeSites.pl < '$inAln' > '$informative'");
+  system("removeUninformativeSites.pl --ambiguities-allowed < '$inAln' > '$informative'");
   die if $?;
   return $informative;
 }
