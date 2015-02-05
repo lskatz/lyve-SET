@@ -54,10 +54,17 @@ sub main{
     for(my $i=0;$i<$numOtherSeq;$i++){
       my $nt=substr($seq[$i],$j,1); 
       die "ERROR: Sequence $i does not have a nucleotide at position $j! Is the MSA flush?" if(!$nt);
-      $informative=1 if($nt ne $refNt);  # It's informative, but you have to continue reviewing
-                                         # the other sequences if you are ignoring N or gap columns.
-      next POSITION if($removeAmbiguities && uc($nt) eq 'N'); # no chance of redemption here
-      next POSITION if($removeGaps && $nt eq '-');            # no chance of redemption here
+      # It's informative, but you have to continue reviewing
+      # the other sequences if you are ignoring N or gap columns.
+      # Also, do not consider ambiguities when deciding if this is an invariant site or not
+      if(uc($nt) ne 'N' && uc($nt) ne uc($refNt)){
+        $informative=1;
+      }
+
+      # Check to make sure it doesn't have an N anywhere
+      next POSITION if($removeAmbiguities && uc($nt) eq 'N');
+      # Check to make sure there is no gap at all
+      next POSITION if($removeGaps && $nt eq '-');
     } 
     next if(!$informative);
     push(@pos,$j); # retain this informative position
@@ -108,6 +115,7 @@ sub main{
 
 sub usage{
   "Removes all the uninformative sites in a multiple sequence alignment fasta file: Ns, gaps, and invariant sites
+  An invariant site will also be defined as a site with only ambiguities and no other variations
   Usage: $0 < aln.fasta > informative.fasta
   -v for verbose (technically makes the script slower)
 
