@@ -39,30 +39,37 @@ sub main{
   # compare each sequence to the reference sequence (the first sequence)
   my $removeAmbiguities=!$$settings{"ambiguities-allowed"};
   my $removeGaps=!$$settings{"gaps-allowed"};
-  my $refSeq=shift(@seq); 
-  my $refId=shift(@defline); 
   my (%aln,@pos);
-  my $numOtherSeq=@seq;
+  #my $numOtherSeq=@seq;
+  my $numSeq=@seq;
   my $informativeCount=0;
   POSITION:for(my $j=0;$j<$length;$j++){ 
-    my $refNt=substr($refSeq,$j,1);
-    next if($removeAmbiguities && uc($refNt) eq 'N'); # if it's informative, but the ref base isn't good, then skip
-    next if($removeGaps && $refNt eq '-');            # if it's informative, but the ref base isn't good, then skip
+    # Find a good reference base to compare against
+    my $refNt='N'; # a dummy reference base to start
+    for(my $i=0;$i<$numSeq;$i++){
+      $refNt=uc(substr($seq[$i],$j,1)); # uppercase for comparison
+      last if($refNt ne 'N');
+    }
 
-    # see if the rest of this column shows that it is informative
+    # Start checking if the site is informative or not
+    next if($removeAmbiguities && $refNt eq 'N'); # if it's informative, but the ref base isn't good, then skip
+    next if($removeGaps && $refNt eq '-');        # if it's informative, but the ref base isn't good, then skip
+
+    # See if the rest of this column shows that it is informative.
+    # Cycle through the rest of the members of this column to check.
     my $informative=0; # guilty until proven innocent
-    for(my $i=0;$i<$numOtherSeq;$i++){
-      my $nt=substr($seq[$i],$j,1); 
+    for(my $i=0;$i<$numSeq;$i++){
+      my $nt=uc(substr($seq[$i],$j,1)); # compare everything on the uppercase level
       die "ERROR: Sequence $i does not have a nucleotide at position $j! Is the MSA flush?" if(!$nt);
       # It's informative, but you have to continue reviewing
       # the other sequences if you are ignoring N or gap columns.
       # Also, do not consider ambiguities when deciding if this is an invariant site or not
-      if(uc($nt) ne 'N' && uc($nt) ne uc($refNt)){
+      if($nt ne 'N' && $nt ne $refNt){
         $informative=1;
       }
 
       # Check to make sure it doesn't have an N anywhere
-      next POSITION if($removeAmbiguities && uc($nt) eq 'N');
+      next POSITION if($removeAmbiguities && $nt eq 'N');
       # Check to make sure there is no gap at all
       next POSITION if($removeGaps && $nt eq '-');
     } 
@@ -74,9 +81,6 @@ sub main{
   }
 
   ## Print all nucleotides found at informative positions.
-  # Bring back the reference sequence.
-  unshift(@seq,$refSeq);
-  unshift(@defline,$refId);
   my %seq;
   @seq{@defline}=@seq;
   # sort the sequences by identifier
