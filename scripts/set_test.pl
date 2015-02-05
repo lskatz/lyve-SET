@@ -27,12 +27,12 @@ sub main{
   GetOptions($settings,qw(help do-nothing numcpus=i)) or die $!;
   $$settings{numcpus}||=1;
 
-  my ($dataset,$project)=@ARGV;
+  my ($dataset,$project,@setArgv)=@ARGV;
   die "ERROR: need a dataset name\n".usage() if(!$dataset);
   $project||=$dataset;
 
   getData($dataset,$project,$settings);
-  launchSet($project,$settings);
+  launchSet($project,\@setArgv,$settings);
 
   return 0;
 }
@@ -63,8 +63,9 @@ sub getData{
 }
 
 sub launchSet{
-  my($project,$settings)=@_;
-  command("launch_set.pl $project --numcpus $$settings{numcpus} --numnodes 50",$settings);
+  my($project,$setArgv,$settings)=@_;
+  my $setArgv=join(" ",@$setArgv);
+  command("launch_set.pl $project --numcpus $$settings{numcpus} $setArgv",$settings);
 }
 
 sub command{
@@ -87,5 +88,6 @@ sub usage{
 
   --numcpus 1  How many cpus you want to use
   --do-nothing To print the commands but do not run system calls
+  -- [......]  Put any parameters for launch_set.pl after a double dash and a space
   "
 }
