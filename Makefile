@@ -48,7 +48,7 @@ install: install-prerequisites
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET v$(VERSION) complete."
 
-install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-phispy install-samtools install-bcftools install-smalt
+install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-phispy install-samtools install-bcftools install-smalt install-raxml
 	@echo DONE installing prerequisites
 
 clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-phispy clean-samtools clean-bcftools clean-smalt
@@ -157,6 +157,16 @@ install-smalt:
 
 clean-smalt:
 	rm -rvf $(PREFIX)/lib/smalt*
+
+install-raxml:
+	wget 'https://github.com/stamatak/standard-RAxML/archive/v8.1.16.tar.gz' -O $(TMPDIR)/raxml_v8.1.16.tar.gz
+	cd $(TMPDIR) && tar zxvf raxml_v8.1.16.tar.gz
+	mv $(TMPDIR)/standard-RAxML-8.1.16 $(PREFIX)/lib
+	cd $(PREFIX)/lib/standard-RAxML-8.1.16 && (for i in Makefile.*; do make -f $$i; rm -vf *.o; done;)
+	find $(PREFIX)/lib/standard-RAxML-8.1.16 -type f -executable -exec ln -sv {} $(PREFIX)/scripts \;
+
+clean-raxml:
+	rm -rvf $(PREFIX)/lib/standard-RAxML-8.1.16
 
 cuttingedge: install-mkdir cuttingedge-gitclone install-prerequisites
 	@echo "DONE installing the cutting edge version"
