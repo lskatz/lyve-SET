@@ -30,11 +30,15 @@ exit main();
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help create test=s delete add-reads=s remove-reads=s add-assembly=s remove-assembly=s change-reference=s)) or die $!;
+  GetOptions($settings,qw(help create test=s delete add-reads=s remove-reads=s add-assembly=s remove-assembly=s change-reference=s numnodes=i numcpus=i)) or die $!;
   die usage() if($$settings{help});
   die "ERROR: need a SET project\n".usage() if(!@ARGV);
   my $project=shift(@ARGV);
   $$settings{create}=1 if($$settings{test});
+
+  # parameters for compatibility reasons
+  $$settings{numnodes}||=1;
+  $$settings{numcpus}||=1;
 
   createProjectDir($project,$settings) if($$settings{create});
   if(!is_project($project,$settings)){

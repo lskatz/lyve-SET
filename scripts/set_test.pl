@@ -28,6 +28,7 @@ sub main{
   $$settings{numcpus}||=1;
 
   my ($dataset,$project,@setArgv)=@ARGV;
+  die usage() if(!@ARGV || $$settings{help});
   die "ERROR: need a dataset name\n".usage() if(!$dataset);
   $project||=$dataset;
 
@@ -64,8 +65,8 @@ sub getData{
 
 sub launchSet{
   my($project,$setArgv,$settings)=@_;
-  my $setArgv=join(" ",@$setArgv);
-  command("launch_set.pl $project --numcpus $$settings{numcpus} $setArgv",$settings);
+  my $setArgvStr=join(" ",@$setArgv);
+  command("launch_set.pl $project --numcpus $$settings{numcpus} $setArgvStr",$settings);
 }
 
 sub command{
@@ -86,8 +87,8 @@ sub usage{
   dataset names could be one of the following:\n    ".join(", ",@dataname)."
   NOTE: project will be the name of the dataset, if it is not given
 
-  --numcpus 1  How many cpus you want to use
-  --do-nothing To print the commands but do not run system calls
-  -- [......]  Put any parameters for launch_set.pl after a double dash and a space
+  --numcpus 1  # How many cpus you want to use
+  --do-nothing # To print the commands but do not run system calls
+  -- [......]  # Put any parameters for launch_set.pl after a double dash and a space
   "
 }
