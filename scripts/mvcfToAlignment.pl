@@ -13,8 +13,8 @@ sub logmsg{my $time=time-our $startTime; print STDERR "$0 ($time): @_\n";}
 
 exit main();
 sub main{
-  my $settings={};
-  GetOptions($settings,qw(help ambiguities! tempdir=s allowed=i prefix=s)) or die $!;
+  my $settings={filter=>1};
+  GetOptions($settings,qw(help ambiguities! tempdir=s allowed=i prefix=s filter!)) or die $!;
   die usage() if($$settings{help} || !@ARGV);
   $$settings{tempdir}||="tmp";
   $$settings{allowed}||=0;
@@ -33,9 +33,12 @@ sub main{
   my %matrix;
   my $bcfqueryFile=bcftoolsQuery($vcf,$settings);
 
-  # Remove clustered SNPs, etc
-  logmsg "Filtering for clustered SNPs or any other specified filters";
-  my $filteredMatrix=filterSites($bcfqueryFile,$settings);
+  # Remove clustered SNPs, etc, unless the user doesn't want it
+  my $filteredMatrix=$bcfqueryFile;
+  if($$settings{filter}){
+    logmsg "Filtering for clustered SNPs or any other specified filters";
+    $filteredMatrix=filterSites($bcfqueryFile,$settings);
+  }
 
   my $fasta=bcfqueryToFasta($filteredMatrix,$settings);
 
@@ -255,6 +258,7 @@ sub usage{
   Usage: 
     $0 pooled.fastq.gz > aln.fasta
   --ambiguities       to allow for ambiguity letter codes other than 'N'
+  --nofilter          Do not filter out any SNPs (overrides --ambiguities)
   --allowed 0         How close SNPs can be from each other before being thrown out
   --tempdir tmp       temporary directory
   --prefix ./prefix   The prefix for all output files
