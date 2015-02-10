@@ -1,8 +1,5 @@
 #!/usr/bin/env perl
 
-# tail -n +1 bcf.nofilter.out | perl -MData::Dumper -lane 'BEGIN{$_=<>; chomp; s/^#\s*//; @header=split /\t/;} $num=@F; for(my $i=0;$i<$num;$i++){$nt=substr($F[$i],0,1); $nt=$F[2] if($nt eq "." || $nt eq ","); $seq{$header[$i]}.=$nt; } END{while(my($id,$seq)=each(%seq)){print ">$id\n$seq";} }' | removeUninformativeSites.pl -ambiguities > informative.aln.fas
-# perl -lane 's/^>\[\d+\]/>/; print;'< informative.aln.fas | pairwiseDistances.pl -n 24 |sort -k3,3n| tee distances.tsv | column -t |head
-
 use strict;
 use warnings;
 use Data::Dumper;
@@ -10,18 +7,26 @@ use Getopt::Long;
 use Bio::Perl;
 use File::Basename;
 
+BEGIN{our $startTime=time;}
 $0=fileparse $0;
-sub logmsg{print STDERR "$0: @_\n";}
+sub logmsg{my $time=time-our $startTime; print STDERR "$0 ($time): @_\n";}
 
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help ambiguities min_coverage=i tempdir=s allowed=i positions=s bcfOutput=s)) or die $!;
+  GetOptions($settings,qw(help ambiguities! min_coverage=i tempdir=s allowed=i prefix=s)) or die $!;
   die usage() if($$settings{help} || !@ARGV);
   $$settings{min_coverage}||=10;
   $$settings{tempdir}||="tmp";
   $$settings{allowed}||=0;
-  $$settings{bcfOutput}||="$$settings{tempdir}/bcfquery";
+
+  # output files
+  $$settings{prefix}||="$0.out";
+  $$settings{bcfOutput}||="$$settings{prefix}.bcfquery";
+  $$settings{filteredBcf}||="$$settings{prefix}.filtered.bcfquery";
+  $$settings{fasta}   ||="$$settings{prefix}.aln.fas";
+  $$settings{positions}||="$$settings{prefix}.pos";
+
   my $vcf=$ARGV[0];
 
   # read in the file with bcftools query
@@ -31,21 +36,21 @@ sub main{
 
   # Remove clustered SNPs, etc
   logmsg "Filtering for clustered SNPs or any other specified filters";
-  my @queryMatrix=filterSites($bcfqueryFile,$settings);
+  my $filteredMatrix=filterSites($bcfqueryFile,$settings);
 
-  # Sort the matrix by position, keeping the header on top
-  logmsg "Sorting the matrix in memory";
-  @queryMatrix=sort{
-    my ($chrA,$posA)=split /\t/,$a;
-    my ($chrB,$posB)=split /\t/,$b;
-    return -1 if($a=~/^##/); # return deflines first
-    return -1 if($a=~/^#/);  # return deflines first
-    return ($chrA cmp $chrB) if($chrA ne $chrB);
-    return $posA <=> $posB;
-  } @queryMatrix;
+  my $fasta=bcfqueryToFasta($filteredMatrix,$settings);
+
+  return 0;
+}
+
+sub bcfqueryToFasta{
+  my($bcfqueryFile,$settings)=@_;
+  my $outfile=$$settings{fasta};
   
+  open(BCFQUERY,$bcfqueryFile) or die "ERROR: could not open $bcfqueryFile: $!";
+
   # Process the header line
-  my $header=shift(@queryMatrix);
+  my $header=<BCFQUERY>;
   $header=~s/^#\s*//; # remove the hash in front of the header
   $header=~s/^\s+|\s+$//g; # trim whitespace
   my @header=split(/\t/,$header);
@@ -53,11 +58,13 @@ sub main{
   $_=~s/:GT$//    for(@header); # remove :GT after each genotype field
 
   # genome names from the header
-  my @genome=@header[3..@header-1];
+  my($headerChr,$headerPos,$headerRef,@genome)=@header;
 
   # Figure out the basecall for each pos on each genome
   logmsg "Finding basecalls based on the genotype in the pooled VCF file";
-  for(@queryMatrix){
+  # TODO: multithread
+  my (%matrix,$i);
+  while(<BCFQUERY>){
     s/^\s+|\s+$//g; # trim whitespace
     my %F;
     @F{@header}=split /\t/;
@@ -71,10 +78,10 @@ sub main{
 
     # assign the nts for each genome, at each contig/pos
     while(my($genome,$GT)=each(%F)){
-      die "ERROR: could not find the genotype field (GT)!\n". Dumper [$genome,\%F] if(!$GT);
-      my $nt=$GT;
-      my ($nt1,$nt2)=split(/[\/\|]/,$nt);
-      $nt2=$nt1 if(!$nt2); # in case it is a haploid-style pooled VCF
+      die "ERROR: could not find the genotype field (GT) for genome '$genome'\n". Dumper [$genome,\%F] if(!$GT);
+      my $nt;
+      my ($nt1,$nt2)=split(/[\/\|]/,$GT); # Split on the forward slash in case it shows as diploid
+      $nt2=$nt1 if(!$nt2);                # In case it is a haploid-style pooled VCF
       if($nt1 eq $nt2){
         $nt=$nt1;
       } elsif($$settings{'ambiguities'}){
@@ -91,6 +98,10 @@ sub main{
 
       $matrix{$genome}{$extra{CHROM}}{$extra{POS}}=$nt;
     }
+    $i++;
+    if($i % 10000 == 0){
+      logmsg "Finished calling $i SNPs";
+    }
   }
   # DONE getting it into memory!
 
@@ -98,12 +109,15 @@ sub main{
   # get all the sorted positions
   my @CHROM=keys(%{ $matrix{$genome[0]} });
   my @POS;
+  # Sort number 1: sort by chromosome
   for my $chr(sort{$a cmp $b} @CHROM){
+    # Sort number 2: sort by numerical position
     push(@POS,"$chr:$_") for(sort{$a<=>$b} keys(%{ $matrix{$genome[0]}{$chr} }));
   }
 
   # create the alignment
-  my $out=Bio::SeqIO->new(-format=>"fasta");
+  logmsg "Found all positions; converting to fasta";
+  my $out=Bio::SeqIO->new(-file=>">$outfile",-format=>"fasta");
   for my $genome(@genome){
     my $seq="";
     for(@POS){
@@ -113,10 +127,13 @@ sub main{
     my $seqObj=Bio::Seq->new(-seq=>$seq,-id=>$genome);
     $out->write_seq($seqObj);
   }
+  $out->close;
+
   if($$settings{positions}){
     logmsg "Sorted positions pertaining to the final (and possibly filtered) alignment are found in $$settings{positions}";
     open(POS,">",$$settings{positions}) or die "ERROR: Could not open positions file $$settings{positions}: $!";
-    print POS join("\n",@POS)."\n";
+    print POS "$_\n" for(@POS);
+    #print POS join("\n",@POS)."\n";
     close POS;
   }
   
@@ -170,32 +187,38 @@ sub bcftoolsQuery{
     $streamInCommand="cat $file";
   }
 
-  my $bcfMatrix=`$streamInCommand | $bcfquery`;
-  die "ERROR running command: $!\n  $bcfquery < $file" if $?;
-
+  # Open a bcftools query stream
+  open(QUERYSTREAM,"$streamInCommand | $bcfquery |") or die "ERROR running command: $!\n  $bcfquery < $file";
   # Write the bcf query to a file
   open(BCFQUERY,">",$$settings{bcfOutput}) or die "ERROR: could not open $$settings{bcfOutput} for writing: $!";
-  print BCFQUERY $bcfMatrix;
+  while(<QUERYSTREAM>){
+    print BCFQUERY $_;
+  }
   close BCFQUERY;
+  close QUERYSTREAM;
 
   # return the file instead of a large string
   return $$settings{bcfOutput};
-    
-  #return split(/\n/,$bcfMatrix) if(wantarray);
-  #return $bcfMatrix;
 }
 
+# Filter the BCF query file into a new one, if any filters were given
 sub filterSites{
   my($bcfqueryFile,$settings)=@_;
 
+  my $outfile=$$settings{filteredBcf};
+  open(FILTEREDOUT,">",$outfile) or die "ERROR: could not open filtered output bcf query file: $!";
 
-  my ($newMatrix,$currentPos,$currentChr);
   open(BCFQUERY,"<",$bcfqueryFile) or die "ERROR: could not open bcftools query file $bcfqueryFile for reading: $!";
+
+  # Read in the header with genome labels
+  my $header=<BCFQUERY>;
+  print FILTEREDOUT $header;  # Print the header right away so that it can be saved correctly before it's changed
+  $header=~s/^\s+|^#|\s+$//g; # trim and remove pound sign
+  my @header=split /\t/, $header;
+
+  # Read the actual content with variant calls
+  my ($currentPos,$currentChr);
   while(my $bcfMatrixLine=<BCFQUERY>){
-    if($bcfMatrixLine=~/^#/){
-      push(@$newMatrix,$bcfMatrixLine);
-      next;
-    }
 
     # get the fields from the matrix
     my($CONTIG,$POS,$REF,@GT)=split(/\t/,$bcfMatrixLine);
@@ -209,20 +232,22 @@ sub filterSites{
       # start anew with these coordinates
       $currentChr=$CONTIG;
       $currentPos=$POS;
+      seek(BCFQUERY,-length($bcfMatrixLine),1);
       next;
     }
 
     # If the SNP is far enough away, then accept it into the new matrix
     if($POS - $currentPos >= $$settings{allowed}){
-      push(@$newMatrix,$bcfMatrixLine);
+      print FILTEREDOUT $bcfMatrixLine;
     }
 
     # update the position
     $currentPos=$POS;
   }
+  close BCFQUERY;
 
-  return @$newMatrix if wantarray;
-  return $newMatrix;
+  close FILTEREDOUT;
+  return $outfile;
 }
 
 sub usage{
@@ -234,7 +259,6 @@ sub usage{
   --allowed 0         How close SNPs can be from each other before being thrown out
   --min_coverage 10   Minimum coverage per site before it can be considered
   --tempdir tmp       temporary directory
-  --positions pos.tsv Output file with position information
-  --bcfOutput out.bcf Output file with the bcftools query matrix
+  --prefix ./prefix   The prefix for all output files
   "
 }
