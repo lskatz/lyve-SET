@@ -14,9 +14,8 @@ sub logmsg{my $time=time-our $startTime; print STDERR "$0 ($time): @_\n";}
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help ambiguities! min_coverage=i tempdir=s allowed=i prefix=s)) or die $!;
+  GetOptions($settings,qw(help ambiguities! tempdir=s allowed=i prefix=s)) or die $!;
   die usage() if($$settings{help} || !@ARGV);
-  $$settings{min_coverage}||=10;
   $$settings{tempdir}||="tmp";
   $$settings{allowed}||=0;
 
@@ -257,7 +256,6 @@ sub usage{
     $0 pooled.fastq.gz > aln.fasta
   --ambiguities       to allow for ambiguity letter codes other than 'N'
   --allowed 0         How close SNPs can be from each other before being thrown out
-  --min_coverage 10   Minimum coverage per site before it can be considered
   --tempdir tmp       temporary directory
   --prefix ./prefix   The prefix for all output files
   "
