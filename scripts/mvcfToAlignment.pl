@@ -1,5 +1,8 @@
 #!/usr/bin/env perl
 
+# tail -n +1 bcf.nofilter.out | perl -MData::Dumper -lane 'BEGIN{$_=<>; chomp; s/^#\s*//; @header=split /\t/;} $num=@F; for(my $i=0;$i<$num;$i++){$nt=substr($F[$i],0,1); $nt=$F[2] if($nt eq "." || $nt eq ","); $seq{$header[$i]}.=$nt; } END{while(my($id,$seq)=each(%seq)){print ">$id\n$seq";} }' | removeUninformativeSites.pl -ambiguities > informative.aln.fas
+# perl -lane 's/^>\[\d+\]/>/; print;'< informative.aln.fas | pairwiseDistances.pl -n 24 |sort -k3,3n| tee distances.tsv | column -t |head
+
 use strict;
 use warnings;
 use Data::Dumper;
@@ -22,12 +25,26 @@ sub main{
   my $vcf=$ARGV[0];
 
   # read in the file with bcftools query
+  logmsg "Running bcftools query to find all SNPs";
   my %matrix;
   my $bcfqueryFile=bcftoolsQuery($vcf,$settings);
 
   # Remove clustered SNPs, etc
+  logmsg "Filtering for clustered SNPs or any other specified filters";
   my @queryMatrix=filterSites($bcfqueryFile,$settings);
+
+  # Sort the matrix by position, keeping the header on top
+  logmsg "Sorting the matrix in memory";
+  @queryMatrix=sort{
+    my ($chrA,$posA)=split /\t/,$a;
+    my ($chrB,$posB)=split /\t/,$b;
+    return -1 if($a=~/^##/); # return deflines first
+    return -1 if($a=~/^#/);  # return deflines first
+    return ($chrA cmp $chrB) if($chrA ne $chrB);
+    return $posA <=> $posB;
+  } @queryMatrix;
   
+  # Process the header line
   my $header=shift(@queryMatrix);
   $header=~s/^#\s*//; # remove the hash in front of the header
   $header=~s/^\s+|\s+$//g; # trim whitespace
@@ -35,9 +52,11 @@ sub main{
   $_=~s/\[\d+\]// for(@header); # remove [number] notations for the headers
   $_=~s/:GT$//    for(@header); # remove :GT after each genotype field
 
-  # genome names
+  # genome names from the header
   my @genome=@header[3..@header-1];
 
+  # Figure out the basecall for each pos on each genome
+  logmsg "Finding basecalls based on the genotype in the pooled VCF file";
   for(@queryMatrix){
     s/^\s+|\s+$//g; # trim whitespace
     my %F;
@@ -55,6 +74,7 @@ sub main{
       die "ERROR: could not find the genotype field (GT)!\n". Dumper [$genome,\%F] if(!$GT);
       my $nt=$GT;
       my ($nt1,$nt2)=split(/[\/\|]/,$nt);
+      $nt2=$nt1 if(!$nt2); # in case it is a haploid-style pooled VCF
       if($nt1 eq $nt2){
         $nt=$nt1;
       } elsif($$settings{'ambiguities'}){
@@ -139,7 +159,8 @@ sub rev_iub{
 sub bcftoolsQuery{
   my($file,$settings)=@_;
   my $matrix="$$settings{tempdir}/$$.matrix";
-  my $bcfquery="bcftools query -i '%TYPE=\"snp\" && %MIN(DP)>=$$settings{min_coverage}' -f '%CHROM\\t%POS\\t%REF\\t[%TGT\\t]\\n' --print-header";
+  my $bcfquery="bcftools query -i '%TYPE=\"snp\"' -f '%CHROM\\t%POS\\t%REF\\t[%TGT\\t]\\n' --print-header";
+  #my $bcfquery="bcftools query -i '%TYPE=\"snp\" && %MIN(DP)>=$$settings{min_coverage}' -f '%CHROM\\t%POS\\t%REF\\t[%TGT\\t]\\n' --print-header";
 
   # handle the input file depending on how it is compressed or not
   my $streamInCommand="";
