@@ -1,7 +1,5 @@
 #!/usr/bin/env perl
 
-# perl -lane 's/^>\[\d+\]/>/; print;'< informative.aln.fas | pairwiseDistances.pl -n 24 |sort -k3,3n| tee distances.tsv | column -t |head
-
 use strict;
 use warnings;
 use Data::Dumper;
@@ -26,7 +24,7 @@ sub main{
   $$settings{prefix}||="$0.out";
   $$settings{bcfOutput}||="$$settings{prefix}.bcfquery";
   $$settings{filteredBcf}||="$$settings{prefix}.filtered.bcfquery";
-  $$settings{fasta}   ||="$$settings{prefix}.fasta";
+  $$settings{fasta}   ||="$$settings{prefix}.aln.fas";
   $$settings{positions}||="$$settings{prefix}.pos";
 
   my $vcf=$ARGV[0];
@@ -49,8 +47,6 @@ sub bcfqueryToFasta{
   my($bcfqueryFile,$settings)=@_;
   my $outfile=$$settings{fasta};
   
-# cat bcf.nofilter.out | perl -MData::Dumper -lane 'BEGIN{$_=<>; chomp; s/^#\s*//; @header=split /\t/;} $num=@F; for(my $i=0;$i<$num;$i++){$nt=substr($F[$i],0,1); $nt=$F[2] if($nt eq "." || $nt eq ","); $seq{$header[$i]}.=$nt; } END{while(my($id,$seq)=each(%seq)){print ">$id\n$seq";} }' | removeUninformativeSites.pl -ambiguities > informative.aln.fas
-
   open(BCFQUERY,$bcfqueryFile) or die "ERROR: could not open $bcfqueryFile: $!";
 
   # Process the header line
@@ -67,7 +63,7 @@ sub bcfqueryToFasta{
   # Figure out the basecall for each pos on each genome
   logmsg "Finding basecalls based on the genotype in the pooled VCF file";
   # TODO: multithread
-  my %matrix;
+  my (%matrix,$i);
   while(<BCFQUERY>){
     s/^\s+|\s+$//g; # trim whitespace
     my %F;
@@ -101,6 +97,10 @@ sub bcfqueryToFasta{
       $nt="N" if(length($nt)!=1 || $nt!~/^\w$/i);
 
       $matrix{$genome}{$extra{CHROM}}{$extra{POS}}=$nt;
+    }
+    $i++;
+    if($i % 10000 == 0){
+      logmsg "Finished calling $i SNPs";
     }
   }
   # DONE getting it into memory!
