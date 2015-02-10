@@ -90,5 +90,6 @@ sub usage{
   --numcpus 1  # How many cpus you want to use
   --do-nothing # To print the commands but do not run system calls
   -- [......]  # Put any parameters for launch_set.pl after a double dash and a space
+               # If used, then the user must specify [project]
   "
 }
