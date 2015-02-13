@@ -95,6 +95,9 @@ sub mapReads{
     die if $?;
     system("rm -v '$prefix.1.fastq' '$prefix.2.fastq'"); die if $?;
   } else {
+    # remove any paired end parameters that would cause an error
+    $$settings{smaltxopts}=~s/-i\s+\d+//;
+
     system("gunzip -c '$query' > $prefix.SE.fastq");
     die "Problem gunzipping $query to $prefix.SE.fastq" if $?;
     system("smalt map $$settings{smaltxopts} $ref '$prefix.SE.fastq' | samtools view -bS -T $ref - > $tmpOut");
