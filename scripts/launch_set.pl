@@ -404,7 +404,7 @@ sub pooledToAlignment{
     return $outMsa;
   }
 
-  $sge->pleaseExecute("mvcfToAlignment.pl $pooled --prefix out --allowed $$settings{allowedFlanking} > $outMsa",{jobname=>"matrixToAlignment",numcpus=>1});
+  $sge->pleaseExecute("mvcfToAlignment.pl $pooled --prefix $$settings{msadir}/out --allowed $$settings{allowedFlanking}",{jobname=>"matrixToAlignment",numcpus=>1});
   $sge->wrapItUp();
 
   return $outMsa;
