@@ -256,7 +256,7 @@ sub usage{
   "Multiple VCF format to alignment
   $0: reads a pooled vcf (from bcftools merge) and creates a multiple sequence alignment file.
   Usage: 
-    $0 pooled.fastq.gz > aln.fasta
+    $0 pooled.fastq.gz --prefix out
   --ambiguities       to allow for ambiguity letter codes other than 'N'
   --nofilter          Do not filter out any SNPs (overrides --ambiguities)
   --allowed 0         How close SNPs can be from each other before being thrown out

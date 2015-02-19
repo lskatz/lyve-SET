@@ -21,6 +21,7 @@ sub main{
 
   # smalt extra options
   $$settings{smaltxopts}||="";
+  #$$settings{smaltxopts}.=" -i 1000 -y 0.95 -f samsoft -n $$settings{numcpus}";
   $$settings{smaltxopts}.=" -i 1000 -y 0.95 -r -1 -f samsoft -n $$settings{numcpus}";
 
   for(qw(reference fastq bam)){
