@@ -16,7 +16,7 @@ exit main();
 sub main{
   my $settings={};
   GetOptions($settings,qw(help tempdir=s)) or die $!;
-  die usage() if($$settings{help} || !@ARGV);
+  die usage() if($$settings{help});
   $$settings{tempdir}||="tmp";
 
   my($matrix)=@ARGV;
@@ -29,10 +29,16 @@ sub main{
 sub bcfqueryToFasta{
   my($bcfqueryFile,$settings)=@_;
   
-  open(BCFQUERY,$bcfqueryFile) or die "ERROR: could not open $bcfqueryFile: $!";
+  # Where to read from?
+  my $bcfqueryFp;
+  if($bcfqueryFile){
+    open($bcfqueryFp,$bcfqueryFile) or die "ERROR: could not open $bcfqueryFile: $!";
+  } else {
+    $bcfqueryFp=*STDIN;
+  }
 
   # Process the header line
-  my $header=<BCFQUERY>;
+  my $header=<$bcfqueryFp>;
   $header=~s/^#\s*//; # remove the hash in front of the header
   $header=~s/^\s+|\s+$//g; # trim whitespace
   my @header=split(/\t/,$header);
@@ -46,7 +52,7 @@ sub bcfqueryToFasta{
   logmsg "Finding basecalls based on the genotype in the pooled VCF file";
   # TODO: multithread
   my (%matrix,$i);
-  while(<BCFQUERY>){
+  while(<$bcfqueryFp>){
     s/^\s+|\s+$//g; # trim whitespace
     my %F;
     @F{@header}=split /\t/;
@@ -85,7 +91,7 @@ sub bcfqueryToFasta{
       logmsg "Finished calling $i SNPs";
     }
   }
-  close BCFQUERY;
+  close $bcfqueryFp;
   # DONE getting it into memory!
 
   # START output
