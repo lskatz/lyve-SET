@@ -385,7 +385,7 @@ sub variantsToMatrix{
   #  $$settings{allowedFlanking}=$allowedFlanking*3;
   #}
 
-  $sge->pleaseExecute("vcfMerge.sh -o $pooled $inVcf",{jobname=>"poolVcfs",numcpus=>1});
+  $sge->pleaseExecute("mergeVcf.sh -o $pooled $inVcf",{jobname=>"poolVcfs",numcpus=>1});
   $sge->wrapItUp();
 
   return $pooled;
@@ -400,7 +400,10 @@ sub pooledToAlignment{
     return $outMsa;
   }
 
-  $sge->pleaseExecute("mvcfToAlignment.pl $pooled --prefix $$settings{msadir}/out --allowed $$settings{allowedFlanking}",{jobname=>"matrixToAlignment",numcpus=>1});
+  # Make in order: bcftools matrix; filtered matrix; fasta alignment
+  $sge->pleaseExecute("pooledToMatrix.sh -o $$settings{msadir}/out.bcftoolsquery.tsv $$settings{msadir}/out.pooled.vcf.gz",{jobname=>"pooledToMatrix",numcpus=>1});
+  $sge->pleaseExecute("filterMatrix.pl --allowed $$settings{allowedFlanking} --tempdir $$settings{tempdir} $$settings{msadir}/out.bcftoolsquery.tsv > out.filteredbcftoolsquery.tsv",{jobname=>"filterMatrix",numcpus=>1,qsubxopts=>"-hold_jid pooledToMatrix"});
+  $sge->pleaseExecute("matrixToAlignment.pl $$settings{msadir}/out.bcftoolsquery.tsv > $$settings{msadir}/out.aln.fas",{jobname=>"matrixToAlignment",numcpus=>1,qsubxopts=>"-hold_jid filterMatrix"});
   $sge->wrapItUp();
 
   return $outMsa;
