@@ -17,7 +17,7 @@ Requirements
   * CG-Pipeline
   * Schedule::SGELK
   * VCF Tools and Vcf.pm
-  * Samtools
+  * Samtools v1.1 or newer
     * wgsim if you are simulating reads
     * bgzip
     * tabix
