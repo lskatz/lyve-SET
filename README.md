@@ -127,6 +127,10 @@ Output files
 ------------
 Most output files that you will want to see are under project/msa.  However for more details please see [docs/output.md](docs/OUTPUT.md).
 
+Getting help
+------------
+* Check out the [FAQ](docs/FAQ.md) first to see if your question has already been asked
+
 Citing lyve-SET
 -----
 To cite lyve-SET, please reference this site and cite the Haiti Anniversary paper. Lyve-SET also makes use of the tools shown above in the prerequisites.  If you feel like your study relied heavily on any of those tools, please don't forget to cite them!
