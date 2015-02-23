@@ -301,22 +301,10 @@ sub variantCalls{
       # terminate called after throwing an instance of 'std::out_of_range'
     } elsif($$settings{snpcaller} eq 'varscan'){
       $jobname="varscan$b";
-      $sge->pleaseExecute("$scriptsdir/launch_varscan.pl $bam --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} > $vcfdir/unfiltered/$b.vcf",{numcpus=>1,jobname=>$jobname,qsubxopts=>""});
+      $sge->pleaseExecute("$scriptsdir/launch_varscan.pl $bam --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} > $vcfdir/$b.vcf",{numcpus=>1,jobname=>$jobname,qsubxopts=>""});
       # sort VCF
-      $sge->pleaseExecute("mv $vcfdir/unfiltered/$b.vcf $vcfdir/unfiltered/$b.vcf.tmp && vcf-sort < $vcfdir/unfiltered/$b.vcf.tmp > $vcfdir/unfiltered/$b.vcf && rm -v $vcfdir/unfiltered/$b.vcf.tmp",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
-      # filter VCF
-      $sge->pleaseExecute("$scriptsdir/filterVcf.pl $vcfdir/unfiltered/$b.vcf --noindels -d $$settings{min_coverage} -o $vcfdir/$b.vcf",{qsubxopts=>"-hold_jid sort$b",numcpus=>1,jobname=>"filter$b"});
-      $jobname="filter$b"; # the thing that bgzip waits on to finish
-    } elsif($$settings{snpcaller} eq 'callsam'){
-      die "ERROR: callsam is deprecated\n".usage();
-      $jobname="callsam$b";
-      # call snps
-      $sge->pleaseExecute("$scriptsdir/../lib/callsam/bin/callsam_MT.pl $bam --numcpus $$settings{numcpus} --min-coverage $$settings{min_coverage} --min-frequency $$settings{min_alt_frac} --reference '$ref' > $vcfdir/unfiltered/$b.vcf",{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
-      # sort VCF
-      $sge->pleaseExecute("mv $vcfdir/unfiltered/$b.vcf $vcfdir/unfiltered/$b.vcf.tmp && vcf-sort < $vcfdir/unfiltered/$b.vcf.tmp > $vcfdir/unfiltered/$b.vcf",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
-      # filter VCF
-      $jobname="filter$b";
-      $sge->pleaseExecute("$scriptsdir/filterVcf.pl $vcfdir/unfiltered/$b.vcf --noindels -d $$settings{min_coverage} -o $vcfdir/$b.vcf",{qsubxopts=>"-hold_jid sort$b",numcpus=>1,jobname=>$jobname});
+      $sge->pleaseExecute("mv $vcfdir/$b.vcf $vcfdir/$b.vcf.tmp && vcf-sort < $vcfdir/$b.vcf.tmp > $vcfdir/$b.vcf && rm -v $vcfdir/$b.vcf.tmp",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
+      $jobname="sort$b"; # the thing that bgzip waits on to finish
     } else {
       die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
     }
@@ -325,14 +313,8 @@ sub variantCalls{
     # TODO can bcftools query take care of filtering instead?
 
     # bgzip and tabix indexing
-    # TODO enable this if statement or put it into the launch_* scripts
-    if($bgzip && $tabix){
-      indexAndCompressVcf("$vcfdir/unfiltered/$b.vcf",$jobname,$settings);
-      indexAndCompressVcf("$vcfdir/$b.vcf",$jobname,$settings);
-    }
-    else {
-      logmsg "Either bgzip or tabix is not in your path, and so I will not compress and index VCFs";
-    }
+    indexAndCompressVcf("$vcfdir/$b.vcf",$jobname,$settings);
+
   } # END bam while loop
   logmsg "All variant-calling jobs have been submitted. Waiting on them to finish";
   $sge->wrapItUp();
@@ -351,7 +333,8 @@ sub indexAndCompressVcf{
     ",{qsubxopts=>"-hold_jid $holdjid",jobname=>"sortAndCompress",numcpus=>1});
   };
   if($@){
-    logmsg "Warning: Could not compress and index $vcf: $@";
+    logmsg "Warning: Could not compress and index $vcf: $@\n  See if bgzip and tabix are both installed correctly.";
+    die;
   }
   return $j;
 }
@@ -369,7 +352,7 @@ sub variantsToMatrix{
   }
 
   # input files
-  my @vcf=glob("$vcfdir/unfiltered/*.vcf.gz");
+  my @vcf=glob("$vcfdir/*.vcf.gz");
   my @bam=glob("$bamdir/*.sorted.bam");
   my @infile=(@bam,@vcf);
   my $infile="'".join("' '",@infile)."'";
