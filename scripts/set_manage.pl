@@ -18,7 +18,7 @@ use lib "$FindBin::RealBin/../lib";
 $ENV{PATH}="$ENV{PATH}:$FindBin::RealBin/../lib/edirect";
 
 # The directories a project should have
-my @projectSubdir=qw(vcf vcf/unfiltered msa bam reads reference tmp asm log);
+my @projectSubdir=qw(vcf msa bam reads reference tmp asm log);
 
 # get project test data
 my $testDir="$FindBin::RealBin/../testdata";
@@ -181,7 +181,7 @@ sub addAssembly{
 sub removeReads{
   my($project,$settings)=@_;
   my $name=$$settings{'remove-reads'};
-  for my $file("$project/reads/$name",glob("$project/bam/$name*"),glob("project/vcf/$name*"),glob("project/vcf/unfiltered/$name*")){
+  for my $file("$project/reads/$name",glob("$project/bam/$name*"),glob("$project/vcf/$name*"),glob("$project/vcf/unfiltered/$name*")){
     unlink($file) or logmsg "Warning: could not remove $file";
   }
   return 1;
