@@ -209,6 +209,7 @@ sub maskReference{
   # Make the directory where these masking coordinates go
   my $maskDir="$$settings{refdir}/maskedRegions";
   mkdir($maskDir) if(!-d $maskDir);
+  logmsg "Finding regions to mask, and recording them in $maskDir/*";
   
   # Mark phage locations if they haven't already been marked
   my $phageRegions="$maskDir/phages.bed";
@@ -218,6 +219,81 @@ sub maskReference{
   }
 
   $sge->wrapItUp();
+
+  logmsg "DONE with finding regions to mask";
+  # END: finding regions to mask
+  ##############################
+
+  #########################
+  # Find out which regions should be kept in the final pileups
+  # and mark it as such in a final file.
+
+  logmsg "Creating a unique list of coordinates to mask";
+  # Find out how long each sequence is first.
+  my $in=Bio::SeqIO->new(-file=>$ref);
+  my %seqLength;
+  while(my $seq=$in->next_seq){
+    $seqLength{$seq->id}=$seq->length;
+  }
+  
+  # Find out what the masked regions are in each bed file
+  # and find a union of all masked regions, ie, a unique set of points.
+  my %points;
+  for my $bed(glob("$maskDir/*.bed")){
+    open(BED,$bed) or die "ERROR: could not open $bed for reading: $!";
+    while(<BED>){
+      chomp;
+      my($contig,$start,$stop)=split /\t/;
+      for my $pos($start..$stop){
+        $points{$contig}{$pos}=1;
+      }
+    }
+    close BED;
+  }
+  # Change the unique points to ranges
+  my @masked; 
+  my $maskedRegions="$$settings{refdir}/maskedRegions.bed";
+  open(MASKEDBED,">$maskedRegions") or die "ERROR: could not open $maskedRegions: $!";
+  while(my($contig,$positions)=each(%points)){
+    # Change the list to a range
+    # http://www.perlmonks.org/?node_id=87538
+    my $strList=integersToRange(keys(%$positions));
+    while($strList=~/(\d+)\-(\d+)/g){
+      print MASKEDBED join("\t",$contig,$1,$2)."\n";
+      push(@masked,[$contig,$1,$2]);
+    }
+  }
+  close MASKEDBED;
+
+  # invert the coordinates
+  my %unmaskedPoints;
+  my $unmaskedRegions="$$settings{refdir}/unmaskedRegions.bed";
+  open(UNMASKEDBED,">$unmaskedRegions") or die "ERROR: could not open $unmaskedRegions: $!";
+  while(my($contig,$positions)=each(%points)){
+    # Find the inverse by finding which coordinates of the contig
+    # do not show up in the original masked datapoints.
+    my @inverse=sort{$a<=>$b} grep{!$$positions{$_}} (0..$seqLength{$contig}-1);
+    my %inverse;
+    @inverse{@inverse}=(1) x @inverse;
+    $unmaskedPoints{$contig}=\%inverse;
+    my $unmaskedPointsStr=integersToRange(keys(%{$unmaskedPoints{$contig}}));
+    while($unmaskedPointsStr=~/(\d+)\-(\d+)/g){
+      print UNMASKEDBED join("\t",$contig,$1,$2)."\n";
+    }
+  }
+  close UNMASKEDBED;
+
+  logmsg "Inverted masked regions from $maskedRegions and put them into $unmaskedRegions";
+  logmsg "I now know where 'good' regions are, as they are listed in $unmaskedRegions.";
+
+  return $unmaskedRegions;
+}
+
+sub integersToRange{
+  my @sorted=sort({$a<=>$b} @_);
+  my $str=join(",",@sorted); # comma-separated
+  $str=~s/(?<!\d)(\d+)(?:,((??{$++1}))){1,32766}(?!\d)/$1-$+/g; # range format
+  return $str;
 }
 
 sub indexReference{
