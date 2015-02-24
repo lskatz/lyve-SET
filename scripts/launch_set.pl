@@ -189,13 +189,23 @@ sub simulateReads{
     my $out2="$$settings{tmpdir}/$b.2.fastq";
     next if(-e $outGz && !-e $outFastq); 
     logmsg "I did not find $outFastq simulated reads. Simulating now with $exec.";
+
+    # How many simulated reads should there be with a reasonable coverage?
+    my $coverage=100;
+    my $readLength=250;
+    my $approximateGenomeSize = (-s $asm); # estimate based on file size
+    if($approximateGenomeSize < $readLength){
+      logmsg "WARNING: I am not simulating reads from $asm because it is too small";
+      next;
+    }
+    my $numReads=$approximateGenomeSize * 100 / ($readLength*2);
     
     # Four successive jobs that depend on each other:
     #   1. Simulate into paired ends
     #   2. Shuffle
     #   3. Gzip
     #   4. Remove simulated unshuffled reads (depends on the shuffle step and not gzip)
-    $sge->pleaseExecute("$exec -d 400 -N 1000000 -1 250 -2 250 -e 0.0 -r 0.0 -R 0.0000 -h '$asm' $out1 $out2",{jobname=>"wgsim$b",numcpus=>1});
+    $sge->pleaseExecute("$exec -d 400 -N $numReads -1 $readLength -2 $readLength -e 0.0 -r 0.0 -R 0.0000 -h '$asm' $out1 $out2",{jobname=>"wgsim$b",numcpus=>1});
     $sge->pleaseExecute("run_assembly_shuffleReads.pl $out1 $out2 > $outFastq",{jobname=>"shuffle$b",qsubxopts=>"-hold_jid wgsim$b",numcpus=>1});
     $sge->pleaseExecute("gzip -v '$outFastq' 2>&1",{jobname=>"gzip$b",qsubxopts=>"-hold_jid shuffle$b",numcpus=>1});
     $sge->pleaseExecute("rm -v $out1 $out2",{jobname=>"rmTmp$b",qsubxopts=>"-hold_jid shuffle$b",numcpus=>1});
