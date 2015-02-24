@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 use Getopt::Long;
-use File::Basename;
+use File::Basename qw/fileparse dirname basename/;
 use Bio::Perl;
 
 $0=fileparse $0;
@@ -19,6 +19,7 @@ sub main{
   }
   $$settings{numcpus}||=1;
   $$settings{tempdir}||="tmp";
+  $$settings{samtoolsxopts}||="";
 
   mkdir $$settings{tempdir} if(!-d $$settings{tempdir});
   logmsg "Temporary directory is $$settings{tempdir}";
@@ -26,6 +27,7 @@ sub main{
   my $fastq=$$settings{fastq};
   my $bam=$$settings{bam};
   my $reference=$$settings{reference};
+  $$settings{refdir}||=dirname($reference);
 
   logmsg "Cleaning was disabled. I will not clean the reads before mapping" if(!$$settings{clean});
   $fastq=cleanReads($fastq,$settings) if($$settings{clean});
@@ -59,16 +61,6 @@ sub mapReads{
   my $b=fileparse $query;
   my $prefix="$$settings{tempdir}/$b";
   
-  ## don't allow underscores in the reference
-  #my $numUnderscores=`grep '>' $ref | grep -c _`; chomp($numUnderscores);
-  #if($numUnderscores > 0){
-  #  logmsg "ERROR: You cannot have deflines with underscores in them because of the way this script handles deflines internally.";
-  #  logmsg "Suggestion: change all underscores to dashes";
-  #  logmsg "  sed -ip 's/_/-/g' $ref # an example ";
-  #  logmsg "TODO: automate this step";
-  #  die;
-  #}
-
   my $tmpOut="$bam.sam";
   logmsg "$bam not found. I'm really doing the mapping now!\n  Outfile: $tmpOut";
 
@@ -88,7 +80,7 @@ sub mapReads{
     # creating the file yourself first.
     system("touch $tmpOut");
     die if $?;
-    system("snap paired $ref.snap '$prefix.1.fastq' '$prefix.2.fastq' -t $$settings{numcpus} -so -o $tmpOut");
+    system("snap paired $ref.snap '$prefix.1.fastq' '$prefix.2.fastq' -t $$settings{numcpus} -so -o $tmpOut -h 1");
     die if $?;
 
     system("rm -v '$prefix.1.fastq' '$prefix.2.fastq'"); die if $?;
@@ -100,7 +92,7 @@ sub mapReads{
     die "Problem with gunzip" if $?;
     system("touch $tmpOut $tmpOut.bai");
     die if $?;
-    system("snap single $ref.snap '$prefix.SE.fastq' -t $$settings{numcpus} -so -o $tmpOut");
+    system("snap single $ref.snap '$prefix.SE.fastq' -t $$settings{numcpus} -so -o $tmpOut -h 1");
     if($?){
       # longer reads will cause an error.  Try the snapxl binary instead just in case
       logmsg "Snap failed with an error.  Trying snapxl";
@@ -111,10 +103,35 @@ sub mapReads{
     system("rm -v '$prefix.SE.fastq'"); die if $?;
   }
 
+  # SNAP includes the entire defline for some reason, but the 
+  # part in the defline after the space needs to be removed for 
+  # compatibility with samtools
+  my $seqin=Bio::SeqIO->new(-file=>$ref);
+  while(my $seq=$seqin->next_seq){
+    my $desc=$seq->desc;
+    $desc=~s/\s/_/g;
+    logmsg "Removing _$desc from sam file";
+    system("sed -i 's/_$desc//' $tmpOut");
+    logmsg "WARNING: could not replace a desc from the defline: $!\n  The temporary sam file might not be compatible with the rest of the automation." if $?;
+  }
+
+
+  # Do some post-mapping filtering
+  $$settings{samtoolsxopts}.="-F 4 ";
+  my $regions="$$settings{refdir}/unmaskedRegions.bed";
+  if(-e $regions && -s $regions > 0){
+    logmsg "Found bed file of regions to accept and so I am using it! $regions";
+    $$settings{samtoolsxopts}.="-L $regions ";
+  }
+  system("mv -v $tmpOut $tmpOut.unfiltered && samtools view $$settings{samtoolsxopts} -bSh -T $ref $tmpOut.unfiltered > $tmpOut.bam");
+  die "ERROR with samtools view" if $?;
+  unlink("$tmpOut.unfiltered");
+
+  # Sort/index
   my $sorted="$bam.sorted.bam";
-  system("samtools sort $tmpOut $bam.sorted"); die "ERROR with samtools sort" if $?;
+  system("samtools sort $tmpOut.bam $bam.sorted"); die "ERROR with samtools sort" if $?;
   system("samtools index $sorted"); die "ERROR with samtools index" if $?;
-  system("rm -v $tmpOut"); die "ERROR could not delete $tmpOut" if $?;
+  system("rm -v $tmpOut.bam"); die "ERROR could not delete $tmpOut" if $?;
 
   logmsg "Getting the depth at each position in the sorted bam file";
   # read the depth, but unfortunately it skips over zero-depth sites
