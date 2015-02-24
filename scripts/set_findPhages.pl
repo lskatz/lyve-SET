@@ -11,8 +11,6 @@ use List::MoreUtils qw(uniq);
 use FindBin;
 use Bio::Perl;
 
-$ENV{PATH}="$FindBin::RealBin/../lib/phispy/phiSpyNov11_v2.3:".$ENV{PATH};
-
 local $0=fileparse $0;
 sub logmsg{print STDERR "$0: @_\n";}
 
@@ -25,14 +23,17 @@ sub main{
   my $fasta=$ARGV[0];
   die usage() if(!$fasta || $$settings{help});
 
-  my $phispyCoordinates=phispy($fasta,$settings);
   my $phastCoordinates=phast($fasta,$settings);
 
   my %seq=readFasta($fasta,$settings);
 
-  for ($phispyCoordinates,$phastCoordinates){
-    maskSequences(\%seq,$_,$settings);
+  my $ranges=findRangeUnion(\%seq,$phastCoordinates,$settings);
+
+  # Print the ranges to stdout
+  for my $r(@$ranges){
+    print join("\t",@$r)."\n";
   }
+  return 0;
 
   # print the masked sequences
   while(my ($id,$seq)=each(%seq)){
@@ -44,16 +45,13 @@ sub main{
   return 0;
 }
 
-sub phispy{
-  return [];
-}
-
 sub phast{
   my($fasta,$settings)=@_;
 
   my $db="$FindBin::RealBin/../lib/phast/phast.faa";
   logmsg "Running blastx against $db";
   my $allResults=`blastx -query '$fasta' -db $db -evalue 0.05 -outfmt 6 -num_threads $$settings{numcpus}`;
+  #die $allResults;
   die "ERROR with blastx: $!" if $?;
 
   logmsg "Parsing results";
@@ -79,23 +77,73 @@ sub phast{
   return \@range;
 }
 
-sub maskSequences{
+sub findRangeUnion{
   my($seq,$ranges,$settings)=@_;
+
+  my $points=simplifyRangesToPoints($ranges,$settings);
+  return pointsToRanges($points,$settings);
   
+}
+
+sub simplifyRangesToPoints{
+  my($ranges,$settings)=@_;
+  
+  # 1) Convert to a better format
+  # 2) Find the union as we go
+  my (%unionIndex);
+  my %range;
   for my $r(@$ranges){
     my($contig,$range)=split(/:/,$r);
     my($start,$stop)=split(/\-/,$range);
-    die "ERROR: could not find contig $contig in the input fasta sequence!" if(!$$seq{$contig});
-    #($contig,$start,$stop)=("NODE38length2280cov11.704", 5, 10); # debug
-    my $length=abs($stop-$start)+1;
+    $start--; $stop--;
+    
+    # Convert the range to a true perl range, with a contig prefix
+    my @range=($start..$stop);
+    $_=$contig.":".$_ for(@range);
 
-    # convert to zero-base
-    $start--;
-    $stop--;
-
-    # use substr to switch out phages with N
-    $$seq{$contig}=substr($$seq{$contig},0,$start) . ("N" x $length) . substr($$seq{$contig},$stop+1);
+    # Index the range
+    @unionIndex{@range} = (1) x @range;
   }
+  
+  # sort the points by contig/pos
+  my @union=sort {
+    my($contigA,$posA)=split(/:/,$a);
+    my($contigB,$posB)=split(/:/,$b);
+    return $contigA cmp $contigB if($contigA ne $contigB);
+    return $posA<=>$posB;
+  } keys(%unionIndex);
+  return \@union;
+}
+
+# Points should already be sorted
+sub pointsToRanges{
+  my($points,$settings)=@_;
+  my @range;
+  my ($currentContig,$start)=split(/:/,$$points[0]);
+  my $end=$start;
+  my $numPoints=@$points;
+  for(my $i=1;$i<$numPoints-1;$i++){
+    my($contig,$pos)=split(/:/,$$points[$i]);
+    my($lastContig,$lastPos)=split(/:/,$$points[$i-1]);
+    my($nextContig,$nextPos)=split(/:/,$$points[$i+1]);
+
+    # The range ends if the next integer is not subsequent.
+    if($contig ne $lastContig || $pos-$lastPos!=1){
+      $end=$lastPos; # cut off the range
+
+      push(@range,[$currentContig,$start,$end]);
+
+      $currentContig=$contig;
+      $start=$pos;
+    }
+
+    # Record one final range at the end
+    if($i==$numPoints-2 && $contig eq $nextContig){
+      push(@range,[$nextContig,$start,$nextPos]);
+    }
+  }
+
+  return \@range;
 }
 
 sub readFasta{

@@ -81,6 +81,7 @@ sub main{
   #system("set_manage.pl '$project'"); die if $?;
   # Set the defaults if they aren't set already
   $$settings{ref}||="$project/reference/reference.fasta";
+  $$settings{refdir}||=dirname($$settings{ref});
   # Check SET directories' existence and set their defaults
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir logdir)){
     my $b=$param;
@@ -204,18 +205,16 @@ sub simulateReads{
 
 sub maskReference{
   my($ref,$settings)=@_;
-  
-  # Don't do this if there is already an unmasked file, aka if it's already done
-  my $unmasked=dirname($ref).'/'.basename($ref,qw(.fasta .fa .fna .fsa .mfa)).'.unmasked.fasta';
-  return if(-e $unmasked); 
 
-  if($$settings{'mask-phages'}){
+  # Make the directory where these masking coordinates go
+  my $maskDir="$$settings{refdir}/maskedRegions";
+  mkdir($maskDir) if(!-d $maskDir);
+  
+  # Mark phage locations if they haven't already been marked
+  my $phageRegions="$maskDir/phages.bed";
+  if($$settings{'mask-phages'} && !-e $phageRegions){
     logmsg "Masking the reference genome for phages";
-    # Find phages into a temporary file,
-    # rename the reference to 'unmasked' to get it out of the way and back it up,
-    # and rename the temporary masked file as the reference file name
-    my $tmpMasked="$$settings{tmpdir}/".basename($ref);
-    $sge->pleaseExecute("set_findPhages.pl --numcpus $$settings{numcpus} $ref > $tmpMasked && mv -v $ref $unmasked && mv -v $tmpMasked $ref",{numcpus=>$$settings{numcpus},jobname=>"set_findPhages"});
+    $sge->pleaseExecute("set_findPhages.pl --numcpus $$settings{numcpus} $ref > $phageRegions.tmp && mv -v $phageRegions.tmp $phageRegions",{numcpus=>$$settings{numcpus},jobname=>"set_findPhages"});
   }
 
   $sge->wrapItUp();
