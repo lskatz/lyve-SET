@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 use Getopt::Long;
-use File::Basename;
+use File::Basename qw/fileparse dirname basename/;
 use Bio::Perl;
 
 $0=fileparse $0;
@@ -23,6 +23,7 @@ sub main{
   $$settings{smaltxopts}||="";
   #$$settings{smaltxopts}.=" -i 1000 -y 0.95 -f samsoft -n $$settings{numcpus}";
   $$settings{smaltxopts}.=" -i 1000 -y 0.95 -r -1 -f samsoft -n $$settings{numcpus}";
+  $$settings{samtoolsxopts}||="";
 
   for(qw(reference fastq bam)){
     die "ERROR: need option $_\n".usage($settings) if(!$$settings{$_});
@@ -34,6 +35,7 @@ sub main{
   my $fastq=$$settings{fastq};
   my $bam=$$settings{bam};
   my $reference=$$settings{reference};
+  $$settings{refdir}||=dirname($reference);
 
   logmsg "Cleaning was disabled. I will not clean the reads before mapping" if(!$$settings{clean});
   $fastq=cleanReads($fastq,$settings) if($$settings{clean});
@@ -70,19 +72,18 @@ sub mapReads{
   my $b=fileparse $query;
   my $prefix="$$settings{tempdir}/$b";
   
-  ## don't allow underscores in the reference
-  #my $numUnderscores=`grep '>' $ref | grep -c _`; chomp($numUnderscores);
-  #if($numUnderscores > 0){
-  #  logmsg "ERROR: You cannot have deflines with underscores in them because of the way this script handles deflines internally.";
-  #  logmsg "Suggestion: change all underscores to dashes";
-  #  logmsg "  sed -ip 's/_/-/g' $ref # an example ";
-  #  logmsg "TODO: automate this step";
-  #  die;
-  #}
-
   my $RANDOM=rand(999999);
   my $tmpOut="$bam.$RANDOM.tmp";
+  my $tmpSamOut="$prefix.tmp.sam";
   logmsg "$bam not found. I'm really doing the mapping now!\n  Outfile: $tmpOut";
+
+  # Find out if there is a set of coordinates to use
+  my $regions="$$settings{refdir}/unmaskedRegions.bed";
+  if(-e $regions && -s $regions > 0){
+    logmsg "Found bed file of regions to accept and so I am using it! $regions";
+    $$settings{samtoolsxopts}.="-L $regions ";
+  }
+  $$settings{samtoolsxopts}.="-F 4 "; # only keep mapped reads to save on space
 
   # PE reads or not?  Mapping differently for different types.
   if(is_fastqPE($query)){
@@ -91,8 +92,8 @@ sub mapReads{
     system("run_assembly_shuffleReads.pl -d '$query' 1>'$prefix.1.fastq' 2>'$prefix.2.fastq'");
     die "Problem with deshuffling reads! I am assuming paired end reads." if $?;
 
-    # mapping
-    system("smalt map $$settings{smaltxopts} $ref '$prefix.1.fastq' '$prefix.2.fastq' | samtools view -F 4 -bS -T $ref - > $tmpOut");
+    # Mapping
+    system("smalt map $$settings{smaltxopts} $ref '$prefix.1.fastq' '$prefix.2.fastq' > $tmpSamOut");
     die if $?;
     system("rm -v '$prefix.1.fastq' '$prefix.2.fastq'"); die if $?;
   } else {
@@ -101,10 +102,15 @@ sub mapReads{
 
     system("gunzip -c '$query' > $prefix.SE.fastq");
     die "Problem gunzipping $query to $prefix.SE.fastq" if $?;
-    system("smalt map $$settings{smaltxopts} $ref '$prefix.SE.fastq' | samtools view -bS -T $ref - > $tmpOut");
+    # Mapping
+    system("smalt map $$settings{smaltxopts} $ref '$prefix.SE.fastq' > $tmpSamOut"); 
     die if $?;
     system("rm -v '$prefix.SE.fastq'"); die if $?;
   }
+
+  # Convert to bam
+  system("samtools view $$settings{samtoolsxopts} -bS -T $ref $tmpSamOut > $tmpOut");
+  die "ERROR with samtools view $$settings{samtoolsxopts}" if $?;
 
   logmsg "Transforming the output file with samtools";
   my $sPrefix="$tmpOut.sorted";
