@@ -386,10 +386,9 @@ sub variantCalls{
       # sort VCF
       $sge->pleaseExecute("mv $vcfdir/$b.vcf $vcfdir/$b.vcf.tmp && vcf-sort < $vcfdir/$b.vcf.tmp > $vcfdir/$b.vcf && rm -v $vcfdir/$b.vcf.tmp",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
       $jobname="sort$b"; # the thing that bgzip waits on to finish
-    }
-    elsif($$settings{snpcaller} eq 'freebayes'){
-      $jobname="freebayes$b";
-      $sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}",{numcpus=>1,jobname=>$jobname});
+    #} elsif($$settings{snpcaller} eq 'freebayes'){
+    #  $jobname="freebayes$b";
+    #  $sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}",{numcpus=>1,jobname=>$jobname});
     } else {
       die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
     }
