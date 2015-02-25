@@ -380,16 +380,16 @@ sub variantCalls{
     }
     logmsg "Calling SNPs into $vcfdir/$b.vcf";
     my $jobname=""; # the job that the filter/sort scripts are waiting for
-    if($$settings{snpcaller} eq 'freebayes'){
-      $jobname="freebayes$b";
-      $sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}",{numcpus=>1,jobname=>$jobname});
-      # terminate called after throwing an instance of 'std::out_of_range'
-    } elsif($$settings{snpcaller} eq 'varscan'){
+    if($$settings{snpcaller} eq 'varscan'){
       $jobname="varscan$b";
       $sge->pleaseExecute("$scriptsdir/launch_varscan.pl $bam --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} > $vcfdir/$b.vcf",{numcpus=>1,jobname=>$jobname,qsubxopts=>""});
       # sort VCF
       $sge->pleaseExecute("mv $vcfdir/$b.vcf $vcfdir/$b.vcf.tmp && vcf-sort < $vcfdir/$b.vcf.tmp > $vcfdir/$b.vcf && rm -v $vcfdir/$b.vcf.tmp",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
       $jobname="sort$b"; # the thing that bgzip waits on to finish
+    }
+    elsif($$settings{snpcaller} eq 'freebayes'){
+      $jobname="freebayes$b";
+      $sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}",{numcpus=>1,jobname=>$jobname});
     } else {
       die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
     }
@@ -518,8 +518,9 @@ sub usage{
     --nomsa                          Do not make a multiple sequence alignment
     --notrees                        Do not make phylogenies
     MODULES
-    --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap
-    --snpcaller    $$settings{snpcaller}   Which SNP caller? Choices: freebayes, varscan
+    --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap";
+    #--snpcaller    $$settings{snpcaller}   Which SNP caller? Choices: freebayes, varscan
+    $help.="
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue        all.q             The default queue to use.
     --qsubxopts    '-N lyve-set'     Extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
