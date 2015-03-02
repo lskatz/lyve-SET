@@ -130,6 +130,7 @@ Most output files that you will want to see are under project/msa.  However for 
 Getting help
 ------------
 * Check out the [FAQ](docs/FAQ.md) first to see if your question has already been asked
+* Join the [Google Group](https://groups.google.com/forum/#!forum/lyve-set) at https://groups.google.com/forum/#!forum/lyve-set 
 
 Citing lyve-SET
 -----
