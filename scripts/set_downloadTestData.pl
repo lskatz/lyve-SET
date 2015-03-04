@@ -152,12 +152,20 @@ sub _downloadAssembly{
   die "ERROR with efetch or esearch" if $?;
   die "ERROR: downloaded a zero-byte file for $NC. Is it the correct identifier?\n" if (-s $tmpFile < 1);
 
-  # filter the sequence to contigs >500bp
+  # process the downloaded fasta file
   my $numContigsPassed=0;
   my $in=Bio::SeqIO->new(-format=>"fasta",-file=>$tmpFile);
   my $out=Bio::SeqIO->new(-format=>"fasta",-file=>">$filteredFile.tmp");
   while(my $seq=$in->next_seq){
+    # filter the sequence to contigs >500bp
     next if($seq->length < 500);
+    # make the defline kosher
+    my $id=$seq->id;
+    $id=~s/\:/_/g;
+    $seq->id($id);
+    $seq->desc("descriptionRemovedByLyveSet");
+
+    # Write it all out
     $out->write_seq($seq);
     $numContigsPassed++;
   }
