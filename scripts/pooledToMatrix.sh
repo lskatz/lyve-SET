@@ -2,8 +2,19 @@
 # Runs bcftools query to make a SNP matrix
 
 script=$(basename $0);
-while getopts "o:" o; do
+
+usage () {
+  echo "$script: generates a SNP matrix using BCFtools and a pooled VCF file"
+  echo "USAGE: $script -o bcfmatrix.tsv pooled.vcf.gz"
+  return 0;
+}
+
+while getopts "ho:" o; do
   case "${o}" in
+    h)
+      usage
+      exit 1
+      ;;
     o)
       OUT="$OPTARG"
       ;;
@@ -17,8 +28,7 @@ shift $(($OPTIND-1)) # remove the flag arguments from ARGV
 IN=$1
 
 if [ "$OUT" == "" ] || [ "$IN" == "" ]; then
-  echo "$script: generates a SNP matrix using BCFtools and a pooled VCF file"
-  echo "USAGE: $script -o bcfmatrix.tsv pooled.vcf.gz"
+  usage
   exit 1;
 fi
 
