@@ -45,7 +45,7 @@ exit(main());
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --noclean
   my $settings={trees=>1,msa=>1, matrix=>1, clean=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s msa-creation=s clean info=s@ mask-phages!)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s msa-creation=s clean info=s@ mask-phages! rename-taxa=s)) or die $!;
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
@@ -53,6 +53,7 @@ sub main{
   $$settings{min_coverage}||=10;
   $$settings{info}||=['version']; #info that the user requests to see
   $$settings{'mask-phages'}=1 if(!defined($$settings{'mask-phages'}));
+  $$settings{'rename-taxa'}||="";
   # modules defaults
   $$settings{mapper}||="smalt";
   $$settings{snpcaller}||="varscan";
@@ -130,7 +131,8 @@ sub main{
 
   if($$settings{trees}){
     logmsg "Launching set_processMsa.pl";
-    $sge->pleaseExecute("set_processMsa.pl --auto --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus} 2>&1 | tee $$settings{logdir}/set_processMsa.log ",{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
+    my $regexParam="--rename-taxa ".$$settings{'rename-taxa'};
+    $sge->pleaseExecute("set_processMsa.pl --auto $regexParam --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus} 2>&1 | tee $$settings{logdir}/set_processMsa.log ",{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
     $sge->wrapItUp();
   } else {
     logmsg "The phylogeny was not requested; wrapping up";
@@ -504,6 +506,7 @@ sub usage{
     --allowedFlanking  $$settings{allowedFlanking} allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
     --min_alt_frac     $$settings{min_alt_frac}  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
     --min_coverage     $$settings{min_coverage}  Minimum coverage needed before a SNP is called. Otherwise, 'N'
+    --rename-taxa      ''  A perl regex to rename taxa in the MSA. See set_processMsa.pl for details and examples.  Use additional escapes for special characters, e.g. 's/\\..*//'
     ";
     return "$help\n  --help To view more help\n" if(!$$settings{help});
 
