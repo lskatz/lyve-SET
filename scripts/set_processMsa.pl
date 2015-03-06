@@ -276,6 +276,7 @@ sub usage{
 OUTPUT
   --rename-taxa ''      Rename taxa with a valid perl regex. Default: no renaming
                         Example to remove anything after the dot: --rename-taxa 's/\..*//'
+                        Example to remove a suffix: --rename-taxa 's/\.fastq\.gz\-reference//'
   -tre treePrefix
   -aln informative.aln  Informative alignment, created by removeUninformativeSites.pl
   -p   pairwisePrefix   Pairwise distances
