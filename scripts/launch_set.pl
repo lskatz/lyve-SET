@@ -335,7 +335,7 @@ sub mapReads{
   $sge->set("numcpus",$$settings{numcpus});
   my $tmpdir=$$settings{tmpdir};
   my $log=$$settings{logdir};
-  my @file=(glob("$readsdir/*.fastq"),glob("$readsdir/*.fastq.gz"));
+  my @file=(glob("$readsdir/*.fastq"),glob("$readsdir/*.fastq.gz"),glob("$readsdir/*.fq"),glob("$readsdir/*.fq.gz"));
   my @job;
   for my $fastq(@file){
     my $b=fileparse $fastq;
