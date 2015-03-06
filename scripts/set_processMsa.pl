@@ -12,6 +12,8 @@ use Data::Dumper;
 use Getopt::Long;
 use File::Basename;
 use File::Spec;
+use Bio::Perl;
+use File::Copy qw/move copy/;
 use threads;
 use Thread::Queue;
 
@@ -21,7 +23,7 @@ exit main();
 sub main{
   local $0=basename $0;
   my $settings={informative=>1};
-  GetOptions($settings,qw(auto groups=s@ treePrefix=s informative! alnPrefix=s pairwisePrefix=s fstPrefix=s eigenPrefix=s numcpus=i msaDir=s tempdir=s force help)) or die $!;
+  GetOptions($settings,qw(auto groups=s@ treePrefix=s informative! alnPrefix=s pairwisePrefix=s fstPrefix=s eigenPrefix=s numcpus=i msaDir=s tempdir=s force help rename-taxa=s)) or die $!;
   $$settings{treePrefix}||="";
   $$settings{alnPrefix}||="";
   $$settings{pairwisePrefix}||="";
@@ -31,6 +33,7 @@ sub main{
   $$settings{auto}||=0;
   $$settings{msaDir}||=0;
   $$settings{force}||=0;
+  $$settings{'rename-taxa'}||="";
   die usage() if($$settings{help});
 
   if($$settings{auto} || $$settings{msaDir}){
@@ -66,6 +69,7 @@ sub main{
   }
   logmsg "Input alignment file is ".File::Spec->rel2abs($infile);
 
+  renameTaxa($infile,$settings) if($$settings{'rename-taxa'});
   my $outgroup=distanceStuff($infile,$settings);
   my($informativeAln,$tree)=phylogenies($infile,$outgroup,$settings);
   Fst($infile,$$settings{pairwisePrefix},$$settings{treePrefix},$$settings{fstPrefix},$settings) if($$settings{fstPrefix} && $$settings{treePrefix} && $$settings{pairwisePrefix});
@@ -79,6 +83,48 @@ sub main{
 ## distance metrics stuff
 ####
 
+# Rename the taxa in a fasta file. Back up the original file.
+# Return the original file (renamed).
+sub renameTaxa{
+  my($infile,$settings)=@_;
+  my $renamed="$infile.renamed.fasta";
+  my $i=0;
+  my $orig="$infile.orig".++$i;
+  while(-e $orig){
+    $orig="$infile.orig".++$i;
+  }
+  my $regex=$$settings{'rename-taxa'};
+
+  logmsg "You requested to rename taxa with this regex =>$regex<=";
+
+  my %taxa;
+
+  my $in=Bio::SeqIO->new(-file=>$infile);
+  my $out=Bio::SeqIO->new(-file=>">$renamed");
+  while(my $seq=$in->next_seq){
+    my $defline=$seq->id." ".$seq->desc;
+    my $oldDefline=$defline;
+    eval "\$defline=~$regex";
+    my($id,@desc)=split(/\s+/,$defline);
+    my $desc=join(" ",@desc);
+
+    logmsg "$oldDefline => $defline";
+
+    if($taxa{$id}++){
+      die "ERROR: I have already seen id $id\n  It is possible that the regular expression you provided is too strict.";
+    }
+
+    # Print out the sequence
+    $seq->id($id);
+    $seq->desc($desc);
+    $out->write_seq($seq);
+  }
+
+  copy($infile,$orig);
+  move($renamed,$infile);
+  return $orig;
+}
+    
 sub distanceStuff{
   my($infile,$settings)=@_;
   logmsg "Calculating distances";
@@ -221,8 +267,6 @@ sub usage{
   local $0=basename $0;
   "Process an MSA from a hqSNP pipeline and get useful information
   Usage: $0 file.fasta
-  #-g   groups.txt       Text files of genome names, one per line (multiple -g are encouraged).
-                        Groups will help with Fst and with pairwise distances.
   -n   numcpus
   --force               Files will be overwritten even if they exist
   --tempdir tmp/        Place to put temporary files
@@ -230,6 +274,8 @@ sub usage{
                         The output alignment will be the same as the 'informative' one in the MSA directory.
 
 OUTPUT
+  --rename-taxa ''      Rename taxa with a valid perl regex. Default: no renaming
+                        Example to remove anything after the dot: --rename-taxa 's/\..*//'
   -tre treePrefix
   -aln informative.aln  Informative alignment, created by removeUninformativeSites.pl
   -p   pairwisePrefix   Pairwise distances
