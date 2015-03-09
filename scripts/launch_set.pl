@@ -509,7 +509,7 @@ sub usage{
     --allowedFlanking  $$settings{allowedFlanking} allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
     --min_alt_frac     $$settings{min_alt_frac}  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
     --min_coverage     $$settings{min_coverage}  Minimum coverage needed before a SNP is called. Otherwise, 'N'
-    --rename-taxa      ''  A perl regex to rename taxa in the MSA. See set_processMsa.pl for details and examples.  Use additional escapes for special characters, e.g. 's/\\..*//'
+    --rename-taxa      ''  A perl regex to rename taxa in the MSA. See set_processMsa.pl for details and examples.  Use additional escapes for special characters, e.g. 's/\\\\..*//'
     ";
     return "$help\n  --help To view more help\n" if(!$$settings{help});
 
