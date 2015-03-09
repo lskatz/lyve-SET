@@ -48,7 +48,7 @@ exit(main());
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --notrees
   my $settings={trees=>1,msa=>1, matrix=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s msa-creation=s info=s@ mask-phages! rename-taxa=s fast)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s info=s@ mask-phages! rename-taxa=s fast downsample)) or die $!;
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
@@ -57,18 +57,26 @@ sub main{
   $$settings{info}||=['version']; #info that the user requests to see
   $$settings{'mask-phages'}=1 if(!defined($$settings{'mask-phages'}));
   $$settings{'rename-taxa'}||="";
+  $$settings{downsample}||=0;
   # modules defaults
   $$settings{mapper}||="smalt";
   $$settings{snpcaller}||="varscan";
-  $$settings{'msa-creation'}||="lyve-set-lowmem";
   # queue stuff
   $$settings{vcfToAlignment_xopts}||="-l mem_free=100G -q highmem.q";
   $$settings{numcpus}||=1;
   $$settings{numnodes}||=20;
   $$settings{qsubxopts}||="";
-  $$settings{queue}||="";
+  $$settings{queue}||="all.q";
+
+  # What options change when --fast is used?
+  if($$settings{fast}){
+    $$settings{mapper}="snap";
+    $$settings{'mask-phages'}=0;
+    $$settings{downsample}=1;
+  }
+
   # Some things need to just be lowercase to make things easier downstream
-  $$settings{$_}=lc($$settings{$_}) for(qw(msa-creation snpcaller mapper));
+  $$settings{$_}=lc($$settings{$_}) for(qw(snpcaller mapper));
 
   ##########################################################
   ### Other defaults: reference genome; default directories#
@@ -485,9 +493,8 @@ sub usage{
   my @dir=qw(asmdir msadir readsdir bamdir vcfdir tmpdir logdir);
   $$settings{$_}=File::Spec->abs2rel($_).'/' for(@dir);
   # right padding for some options
-  $$settings{$_}=reverse(sprintf("%15s","".reverse($$settings{$_}))) for(qw(mapper snpcaller msa-creation allowedFlanking),@dir);
-  #$$settings{$_}=sprintf("%10s",$$settings{$_}) for(qw(mapper snpcaller msa-creation));
-  $0=fileparse $0;
+  $$settings{$_}=reverse(sprintf("%15s","".reverse($$settings{$_}))) for(qw(mapper snpcaller allowedFlanking),@dir);
+  local $0=fileparse $0;
 
   # The help menu
   my $help="$0: Launches the Lyve-SET pipeline
@@ -518,15 +525,18 @@ sub usage{
     --nomatrix                       Do not create an hqSNP matrix
     --nomsa                          Do not make a multiple sequence alignment
     --notrees                        Do not make phylogenies
+    OTHER SHORTCUTS
+    --fast                           Shorthand for --downsample --mapper snap --nomask-phages
+    --downsample                     Downsample all reads to 50x. Approximated according to the ref genome assembly
     MODULES
     --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap";
     #--snpcaller    $$settings{snpcaller}   Which SNP caller? Choices: freebayes, varscan
     $help.="
     SCHEDULER AND MULTITHREADING OPTIONS
-    --queue        all.q             The default queue to use.
-    --qsubxopts    '-N lyve-set'     Extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
-    --numnodes     20                maximum number of nodes
+    --queue        $$settings{queue}             The default queue to use.
+    --numnodes     $$settings{numnodes}                maximum number of nodes
     --numcpus      $$settings{numcpus}                 number of cpus
+    --qsubxopts    '-N lyve-set'     Extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
     OTHER
     --info         version           Display information about Lyve-SET. The only option right now is 'version' and it is turned on by default
   ";
