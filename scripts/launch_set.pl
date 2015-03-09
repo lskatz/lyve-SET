@@ -134,8 +134,13 @@ sub main{
 
   if($$settings{trees}){
     logmsg "Launching set_processMsa.pl";
-    my $regexParam="--rename-taxa ".$$settings{'rename-taxa'};
-    $sge->pleaseExecute("set_processMsa.pl --auto $regexParam --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus} 2>&1 | tee $$settings{logdir}/set_processMsa.log ",{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
+    my $regexParam="";
+    if($$settings{'rename-taxa'}){
+      $regexParam="--rename-taxa ".$$settings{'rename-taxa'};
+    }
+    my $command="set_processMsa.pl --auto $regexParam --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus} 2>&1 | tee $$settings{logdir}/set_processMsa.log ";
+    logmsg "Processing the MSA\n  $command";
+    $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
     $sge->wrapItUp();
   } else {
     logmsg "The phylogeny was not requested; wrapping up";
