@@ -113,6 +113,9 @@ sub main{
   die "ERROR: Could not find the reference file at $$settings{ref}\n".usage($settings) if(!-f $$settings{ref});
   my $ref=$$settings{ref};
 
+  #####################################
+  # Go through the major steps of SET #
+  # ###################################
   printSetInfo($settings);
   simulateReads($settings);
   maskReference($ref,$settings);
@@ -342,11 +345,15 @@ sub indexReference{
 
 sub mapReads{
   my($ref,$readsdir,$bamdir,$settings)=@_;
+
   logmsg "Mapping reads with $$settings{mapper}";
   $sge->set("numcpus",$$settings{numcpus});
   my $tmpdir=$$settings{tmpdir};
   my $log=$$settings{logdir};
   my @file=(glob("$readsdir/*.fastq"),glob("$readsdir/*.fastq.gz"),glob("$readsdir/*.fq"),glob("$readsdir/*.fq.gz"));
+
+  downsampleReads($ref,\@file,$settings) if($$settings{downsample});
+
   my @job;
   for my $fastq(@file){
     my $b=fileparse $fastq;
@@ -369,6 +376,22 @@ sub mapReads{
   logmsg "All mapping jobs have been submitted. Waiting on them to finish.";
   $sge->wrapItUp();
   return 1;
+}
+
+sub downsampleReads{
+  my($ref,$reads,$settings)=@_;
+  my $coverage=50;
+  my $reducedBases=(-s $ref) * $coverage;
+  logmsg "Downsampling the reads to ${coverage}x. Backup of the original files will be renamed to *.orig";
+  for my $file(@$reads){
+    # downsample into tmpdir
+    # move the original reads to "$file.orig"
+    my $b=basename($file);
+    my $backup="$file.orig";
+    next if(-e $backup);
+    $sge->pleaseExecute("run_assembly_removeDuplicateReads.pl -size $reducedBases $file | gzip -c > $file.downsampled.fastq.gz && mv -v $file $file.orig",{numcpus=>1,jobname=>"downsample$b"});
+  }
+  $sge->wrapItUp();
 }
 
 sub variantCalls{
