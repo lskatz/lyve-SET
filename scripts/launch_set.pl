@@ -46,9 +46,9 @@ my $sge=Schedule::SGELK->new(-verbose=>1,-numnodes=>20,-numcpus=>1);
 exit(main());
 
 sub main{
-  # start with the settings that are on by default, and which can be turned off by, e.g., --noclean
-  my $settings={trees=>1,msa=>1, matrix=>1, clean=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s msa-creation=s clean info=s@ mask-phages! rename-taxa=s)) or die $!;
+  # start with the settings that are on by default, and which can be turned off by, e.g., --notrees
+  my $settings={trees=>1,msa=>1, matrix=>1};
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s msa-creation=s info=s@ mask-phages! rename-taxa=s fast)) or die $!;
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
@@ -69,11 +69,6 @@ sub main{
   $$settings{queue}||="";
   # Some things need to just be lowercase to make things easier downstream
   $$settings{$_}=lc($$settings{$_}) for(qw(msa-creation snpcaller mapper));
-
-  # A warning about --noclean
-  if(!$$settings{clean}){
-    die "Warning: the --noclean option has been removed in Lyve-SET v0.9.2.  You should clean your reads before using Lyve-SET.";
-  }
 
   ##########################################################
   ### Other defaults: reference genome; default directories#
@@ -354,7 +349,6 @@ sub mapReads{
     }else{
       logmsg "Mapping to create $bamPrefix.sorted.bam";
     }
-    my $clean=($$settings{clean})?"--clean":"--noclean"; # the clean parameter or not
 
     if($$settings{mapper} eq 'smalt'){
       $sge->pleaseExecute("$scriptsdir/launch_smalt.pl -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} ",{jobname=>"smalt$b"});
