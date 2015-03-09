@@ -31,6 +31,7 @@ sub main{
   die usage() if(!@ARGV || $$settings{help});
   die "ERROR: need a dataset name\n".usage() if(!$dataset);
   $project||=$dataset;
+  #push(@setArgv,qw(--rename-taxa s/\\\\\\..*//)); # doesn't seem to put in the backslashes into the final processMsa command yet
 
   if(!-d $project){
     getData($dataset,$project,$settings);
