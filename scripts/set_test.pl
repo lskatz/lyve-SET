@@ -32,7 +32,9 @@ sub main{
   die "ERROR: need a dataset name\n".usage() if(!$dataset);
   $project||=$dataset;
 
-  getData($dataset,$project,$settings);
+  if(!-d $project){
+    getData($dataset,$project,$settings);
+  }
   launchSet($project,\@setArgv,$settings);
 
   return 0;
@@ -83,9 +85,9 @@ sub command{
 
 sub usage{
   "Runs a test dataset with Lyve-SET
-  Usage: $0 dataset [project]
+  Usage: $0 dataset project
   dataset names could be one of the following:\n    ".join(", ",@dataname)."
-  NOTE: project will be the name of the dataset, if it is not given
+  NOTE: project is the output directory for Lyve-SET
 
   --numcpus 1  # How many cpus you want to use
   --do-nothing # To print the commands but do not run system calls
