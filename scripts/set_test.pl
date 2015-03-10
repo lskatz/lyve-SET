@@ -24,12 +24,13 @@ for my $path(glob("$datadir/*")){
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help do-nothing numcpus=i)) or die $!;
+  GetOptions($settings,qw(help do-nothing numcpus=i fast)) or die $!;
   $$settings{numcpus}||=1;
 
   my ($dataset,$project,@setArgv)=@ARGV;
   die usage() if(!@ARGV || $$settings{help});
   die "ERROR: need a dataset name\n".usage() if(!$dataset);
+  push(@setArgv,"--fast") if($$settings{fast});
   $project||=$dataset;
   #push(@setArgv,qw(--rename-taxa s/\\\\\\..*//)); # doesn't seem to put in the backslashes into the final processMsa command yet
 
@@ -55,14 +56,18 @@ sub getData{
     command("set_manage.pl $project --add-reads $_",$settings);
   }
 
-  #link the assemblies
-  for(glob("$datadir/$dataset/asm/*.fasta")){
-    command("set_manage.pl $project --add-assembly $_",$settings);
-  }
-
   # link the reference genome assembly
   for(glob("$datadir/$dataset/asm/*.fasta")){
     command("set_manage.pl $project --change-reference $_",$settings);
+  }
+
+  # All steps after this are only gravy and so skip them
+  # if we are trying to be fast.
+  return if($$settings{fast});
+
+  #link the assemblies
+  for(glob("$datadir/$dataset/asm/*.fasta")){
+    command("set_manage.pl $project --add-assembly $_",$settings);
   }
 }
 
@@ -92,6 +97,7 @@ sub usage{
 
   --numcpus 1  # How many cpus you want to use
   --do-nothing # To print the commands but do not run system calls
+  --fast       # Use some shortcuts: do not simulate reads; use --fast for launch_set.pl
   -- [......]  # Put any parameters for launch_set.pl after a double dash and a space
                # If used, then the user must specify [project]
   "
