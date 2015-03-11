@@ -75,43 +75,46 @@ sub mapReads{
     logmsg "Deshuffling to $prefix.1.fastq and $prefix.2.fastq";
     system("run_assembly_shuffleReads.pl -d '$query' 1>'$prefix.1.fastq' 2>'$prefix.2.fastq'");
     die "Problem with deshuffling reads! I am assuming paired end reads." if $?;
+    # SNAP 
+    system("gzip -vf1 $prefix.1.fastq $prefix.2.fastq");
+    die "ERROR with gzip" if $?;
 
-    # SNAP checks the read IDs and is incorrectly reading them as wrongly paired.
-    # Therefore I need to make them more kosher with new IDs.
-    # Unfortunately this removes the original information but I am not sure how to
-    # retain it properly while removing information that trips up snap.
-    my $filecount=0;
-    for my $file("$prefix.1.fastq","$prefix.2.fastq"){
-      $filecount++;  # this will be used as the /1 or /2 in the identifier
-      move($file,"$file.tmp");
-      open(FASTQMODDED,">",$file) or die "ERROR: could not open for writing: $file: $!";
-      open(FASTQ,"$file.tmp") or die "ERROR: could not open for reading $file.tmp: $!";
-      my $i=0;
-      my $identifier;
-      while(<FASTQ>){
-        my $mod=++$i % 4;
-        if($mod==1){
-          $identifier="\@$i/$filecount";
-          s/.*/$identifier/;  #just replace the defline with whatever as long as it's consistent
-        } elsif($mod==3){
-          s/.*/\+/;
-        }
-        print FASTQMODDED $_;
-      }
-      close FASTQ;
-      close FASTQMODDED;
-    }
+#    # SNAP checks the read IDs and is incorrectly reading them as wrongly paired.
+#    # Therefore I need to make them more kosher with new IDs.
+#    # Unfortunately this removes the original information but I am not sure how to
+#    # retain it properly while removing information that trips up snap.
+#    my $filecount=0;
+#    for my $file("$prefix.1.fastq","$prefix.2.fastq"){
+#      $filecount++;  # this will be used as the /1 or /2 in the identifier
+#      move($file,"$file.tmp");
+#      open(FASTQMODDED,">",$file) or die "ERROR: could not open for writing: $file: $!";
+#      open(FASTQ,"$file.tmp") or die "ERROR: could not open for reading $file.tmp: $!";
+#      my $i=0;
+#      my $identifier;
+#      while(<FASTQ>){
+#        my $mod=++$i % 4;
+#        if($mod==1){
+#          $identifier="\@$i/$filecount";
+#          s/.*/$identifier/;  #just replace the defline with whatever as long as it's consistent
+#        } elsif($mod==3){
+#          s/.*/\+/;
+#        }
+#        print FASTQMODDED $_;
+#      }
+#      close FASTQ;
+#      close FASTQMODDED;
+#    }
 
     # mapping ###
     # SNAP gives weird permissions to the output file. Avoid it by
     # creating the file yourself first.
     system("touch $tmpOut");
     die if $?;
-    my $command="snap paired $ref.snap '$prefix.1.fastq' '$prefix.2.fastq' -t $$settings{numcpus} -so -o $tmpOut -h 1";
+    my $command="snap paired $ref.snap '$prefix.1.fastq.gz' '$prefix.2.fastq.gz' -t $$settings{numcpus} -so -o $tmpOut -h 1 -C++ -M";
     system($command);
     die "ERROR with command: $!\n $command" if $?;
 
-    system("rm -v '$prefix.1.fastq' '$prefix.2.fastq'"); die if $?;
+    system("rm -v '$prefix.1.fastq.gz' '$prefix.2.fastq.gz'"); die if $?;
   } else {
     ##########
     # SE reads
