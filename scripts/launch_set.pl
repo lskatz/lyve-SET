@@ -386,10 +386,15 @@ sub downsampleReads{
   for my $file(@$reads){
     # downsample into tmpdir
     # move the original reads to "$file.orig"
-    my $b=basename($file);
-    my $backup="$file.orig";
+    my $b=basename($file,qw(.downsampled.fastq.gz .fastq.gz));
+    my $d=dirname($file);
+    my $backup="$d/$b.fastq.gz.orig";
     next if(-e $backup);
-    $sge->pleaseExecute("run_assembly_removeDuplicateReads.pl -size $reducedBases $file | gzip -c > $file.downsampled.fastq.gz && mv -v $file $file.orig",{numcpus=>1,jobname=>"downsample$b"});
+    logmsg "Did not find $backup. Downsampling...";
+    # 1. Downsample to file.downsampled
+    # 2. Mv un-downsampled file to file.orig
+    # 3. Mv file.downsampled to file
+    $sge->pleaseExecute("run_assembly_removeDuplicateReads.pl -size $reducedBases $file | gzip -c > $file.downsampled && mv -v $file $backup && mv -v $file.downsampled $file",{numcpus=>1,jobname=>"downsample$b"});
   }
   $sge->wrapItUp();
 }
