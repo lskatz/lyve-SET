@@ -6,6 +6,7 @@ use Data::Dumper;
 use Getopt::Long;
 use File::Basename qw/fileparse dirname basename/;
 use Bio::Perl;
+use File::Copy qw/copy move/;
 
 $0=fileparse $0;
 sub logmsg{print STDERR "@_\n";}
@@ -75,13 +76,40 @@ sub mapReads{
     system("run_assembly_shuffleReads.pl -d '$query' 1>'$prefix.1.fastq' 2>'$prefix.2.fastq'");
     die "Problem with deshuffling reads! I am assuming paired end reads." if $?;
 
+    # SNAP checks the read IDs and is incorrectly reading them as wrongly paired.
+    # Therefore I need to make them more kosher with new IDs.
+    # Unfortunately this removes the original information but I am not sure how to
+    # retain it properly while removing information that trips up snap.
+    my $filecount=0;
+    for my $file("$prefix.1.fastq","$prefix.2.fastq"){
+      $filecount++;  # this will be used as the /1 or /2 in the identifier
+      move($file,"$file.tmp");
+      open(FASTQMODDED,">",$file) or die "ERROR: could not open for writing: $file: $!";
+      open(FASTQ,"$file.tmp") or die "ERROR: could not open for reading $file.tmp: $!";
+      my $i=0;
+      my $identifier;
+      while(<FASTQ>){
+        my $mod=++$i % 4;
+        if($mod==1){
+          $identifier="\@$i/$filecount";
+          s/.*/$identifier/;  #just replace the defline with whatever as long as it's consistent
+        } elsif($mod==3){
+          s/.*/\+/;
+        }
+        print FASTQMODDED $_;
+      }
+      close FASTQ;
+      close FASTQMODDED;
+    }
+
     # mapping ###
     # SNAP gives weird permissions to the output file. Avoid it by
     # creating the file yourself first.
     system("touch $tmpOut");
     die if $?;
-    system("snap paired $ref.snap '$prefix.1.fastq' '$prefix.2.fastq' -t $$settings{numcpus} -so -o $tmpOut -h 1");
-    die if $?;
+    my $command="snap paired $ref.snap '$prefix.1.fastq' '$prefix.2.fastq' -t $$settings{numcpus} -so -o $tmpOut -h 1";
+    system($command);
+    die "ERROR with command: $!\n $command" if $?;
 
     system("rm -v '$prefix.1.fastq' '$prefix.2.fastq'"); die if $?;
   } else {
