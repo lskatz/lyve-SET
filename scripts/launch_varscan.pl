@@ -21,7 +21,7 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help reference=s tempdir=s altFreq=s coverage=i));
+  GetOptions($settings,qw(help reference=s tempdir=s altFreq=s coverage=i region=s)) or die $!;
 
   my $bam=$ARGV[0] or die "ERROR: need bam\n".usage();
   $samplename=basename($bam,qw(.sorted.bam .bam));
@@ -29,6 +29,7 @@ sub main{
   $$settings{tempdir}||="tmp";
   $$settings{coverage}||=10;
   $$settings{altFreq}||=0.75;
+  $$settings{region}||=0;
 
   # Check to see if varscan is installed correctly
   `varscan.sh >/dev/null`;
@@ -49,7 +50,10 @@ sub mpileup{
   my $pileup="$$settings{tempdir}/".fileparse($bam).".mpileup";
   return $pileup if(-e $pileup && -s $pileup > 0);
   logmsg "Creating a pileup $pileup";
-  system("samtools mpileup -f '$reference' '$bam' 1>$pileup");
+  
+  my $xopts="";
+  $xopts.="--positions $$settings{region} " if($$settings{region});
+  system("samtools mpileup -f '$reference' $xopts '$bam' 1>$pileup");
   die "ERROR: problem with\n  samtools mpileup -f '$reference' '$bam'" if $?;
   return $pileup;
 }
@@ -194,9 +198,10 @@ sub vcf_markAmbiguous{
 sub usage{
   local $0=fileparse $0;
   "$0: find SNPs using varscan
-  Usage: $0 file.bam > file.vcf
-  -t tmp/ A temporary directory to store files
-  -c 10   Min coverage
-  -a 0.75 Min consensus agreement for a SNP
+  Usage: $0 file.bam --reference ref.fasta > file.vcf
+  --tempdir  tmp/      A temporary directory to store files
+  --coverage 10        Min coverage
+  --altFreq  0.75      Min consensus agreement for a SNP
+  --region   file.bed  File of positions to read (default with no bed file: read all positions)
   "
 }
