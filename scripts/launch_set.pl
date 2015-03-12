@@ -336,7 +336,7 @@ sub indexReference{
     die if $?;
   } elsif($$settings{mapper} eq 'snap'){
     return $ref if(-d "$ref.snap" && -e "$ref.snap/GenomeIndex");
-    system("snap index $ref $ref.snap -s 13 -exact -large");
+    system("snap index $ref $ref.snap -exact -large");
     die if $?;
   }
   return $ref;
@@ -407,6 +407,29 @@ sub variantCalls{
   my $bgzip=`which bgzip 2>/dev/null`; chomp($bgzip);
   my $tabix=`which tabix 2>/dev/null`; chomp($tabix);
 
+  # If --fast is given, choose a genome. Find possible 
+  # variant sites in that genome and use those regions 
+  # for the next SNP-calling instances.
+  my $regionsFile="";
+  if($$settings{fast}){
+    my $initBam=$bam[0];
+    $regionsFile="$$settings{tmpdir}/initialSnpSites.bed";
+    logmsg "--fast was specified: finding initial variant sites to make the downstream SNP calling faster. Using $initBam";
+
+    # This complicated command does multithreaded samtools mpileup
+    # using xargs and one cpu per contig.
+    # https://www.biostars.org/p/48781/#48815
+    if(!-e $regionsFile){
+      system("rm -fv $regionsFile.*.tmp");
+      my $command="samtools view -H $initBam | grep \"\@SQ\" | sed 's/^.*SN://g' | cut -f 1 | xargs -I {} -n 1 -P $$settings{numcpus} sh -c \"samtools mpileup -uf $ref -r '{}' $initBam | bcftools call -cv | grep -v '^#' | cut -f 1,2 > $regionsFile.'{}'.tmp \" ";
+      $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"snpPositionDiscovery"});
+      $sge->wrapItUp();
+
+      system("sort -k1,1 -k2,2n $regionsFile.*.tmp | uniq | grep . > $regionsFile && rm -v $regionsFile.*.tmp");
+      die if $?;
+    }
+  }
+
   # TODO make the variant callers output to bgzip and indexed files
   for my $bam(@bam){
     my $b=fileparse($bam,".sorted.bam");
@@ -418,7 +441,9 @@ sub variantCalls{
     my $jobname=""; # the job that the filter/sort scripts are waiting for
     if($$settings{snpcaller} eq 'varscan'){
       $jobname="varscan$b";
-      $sge->pleaseExecute("$scriptsdir/launch_varscan.pl $bam --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} > $vcfdir/$b.vcf",{numcpus=>1,jobname=>$jobname,qsubxopts=>""});
+      my $varscanxopts="";
+      $varscanxopts.="--region $regionsFile " if($regionsFile);
+      $sge->pleaseExecute("$scriptsdir/launch_varscan.pl $bam --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $varscanxopts > $vcfdir/$b.vcf",{numcpus=>1,jobname=>$jobname,qsubxopts=>""});
       # sort VCF
       $sge->pleaseExecute("mv $vcfdir/$b.vcf $vcfdir/$b.vcf.tmp && vcf-sort < $vcfdir/$b.vcf.tmp > $vcfdir/$b.vcf && rm -v $vcfdir/$b.vcf.tmp",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
       $jobname="sort$b"; # the thing that bgzip waits on to finish
