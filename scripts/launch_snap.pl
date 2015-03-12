@@ -108,9 +108,10 @@ sub mapReads{
     # mapping ###
     # SNAP gives weird permissions to the output file. Avoid it by
     # creating the file yourself first.
+    my $snap=`which snap`; chomp($snap);
     system("touch $tmpOut");
     die if $?;
-    my $command="snap paired $ref.snap '$prefix.1.fastq.gz' '$prefix.2.fastq.gz' -t $$settings{numcpus} -so -o $tmpOut -h 1 -C++ -M";
+    my $command="$snap paired $ref.snap '$prefix.1.fastq.gz' '$prefix.2.fastq.gz' -t $$settings{numcpus} -so -o $tmpOut -h 1 -C++ --b -I";
     system($command);
     die "ERROR with command: $!\n $command" if $?;
 

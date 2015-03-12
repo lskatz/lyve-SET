@@ -337,7 +337,7 @@ sub indexReference{
     die if $?;
   } elsif($$settings{mapper} eq 'snap'){
     return $ref if(-d "$ref.snap" && -e "$ref.snap/GenomeIndex");
-    system("snap index $ref $ref.snap -s 16");
+    system("snap index $ref $ref.snap -s 13 -exact -large");
     die if $?;
   }
   return $ref;
