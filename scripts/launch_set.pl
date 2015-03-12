@@ -62,7 +62,6 @@ sub main{
   $$settings{mapper}||="smalt";
   $$settings{snpcaller}||="varscan";
   # queue stuff
-  $$settings{vcfToAlignment_xopts}||="-l mem_free=100G -q highmem.q";
   $$settings{numcpus}||=1;
   $$settings{numnodes}||=20;
   $$settings{qsubxopts}||="";
