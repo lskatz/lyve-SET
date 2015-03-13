@@ -23,17 +23,24 @@ for my $path(glob("$datadir/*")){
 
 exit main();
 sub main{
-  my $settings={};
-  GetOptions($settings,qw(help do-nothing numcpus=i fast)) or die $!;
+  my $settings={importasm=>1};
+  GetOptions($settings,qw(help do-nothing numcpus=i numnodes=i importasm! fast)) or die $!;
   $$settings{numcpus}||=1;
+  $$settings{numnodes}||=20;
 
   my ($dataset,$project,@setArgv)=@ARGV;
   die usage() if(!@ARGV || $$settings{help});
   die "ERROR: need a dataset name\n".usage() if(!$dataset);
-  push(@setArgv,"--fast") if($$settings{fast});
   $project||=$dataset;
   #push(@setArgv,qw(--rename-taxa s/\\\\\\..*//)); # doesn't seem to put in the backslashes into the final processMsa command yet
 
+  # Put all 'fast' options here
+  if($$settings{fast}){
+    $$settings{numnodes}=9999 if($$settings{numnodes}<9999);
+    $$settings{importasm}=0;
+    push(@setArgv,"--fast");
+  }
+  
   if(!-d $project){
     getData($dataset,$project,$settings);
   }
@@ -63,7 +70,7 @@ sub getData{
 
   # All steps after this are only gravy and so skip them
   # if we are trying to be fast.
-  return if($$settings{fast});
+  return if(!$$settings{importasm});
 
   #link the assemblies
   for(glob("$datadir/$dataset/asm/*.fasta")){
@@ -74,7 +81,7 @@ sub getData{
 sub launchSet{
   my($project,$setArgv,$settings)=@_;
   my $setArgvStr=join(" ",@$setArgv);
-  command("launch_set.pl $project --numcpus $$settings{numcpus} $setArgvStr",$settings);
+  command("launch_set.pl $project --numcpus $$settings{numcpus} --numnodes $$settings{numnodes} $setArgvStr",$settings);
 }
 
 sub command{
@@ -95,10 +102,11 @@ sub usage{
   dataset names could be one of the following:\n    ".join(", ",@dataname)."
   NOTE: project is the output directory for Lyve-SET
 
-  --numcpus 1  # How many cpus you want to use
-  --do-nothing # To print the commands but do not run system calls
-  --fast       # Use some shortcuts: do not simulate reads; use --fast for launch_set.pl
-  -- [......]  # Put any parameters for launch_set.pl after a double dash and a space
-               # If used, then the user must specify [project]
+  --numcpus 1   # How many cpus you want to use
+  --numnodes 20 # How many maximum nodes to use
+  --do-nothing  # To print the commands but do not run system calls
+  --noimportasm # Do not import assmblies and simulate reads
+  --fast        # Same as: --noimportasm --numnodes 9999 -- --fast
+  -- [......]   # Put any parameters for launch_set.pl after a double dash and a space
   "
 }
