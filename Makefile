@@ -48,10 +48,10 @@ install: install-prerequisites
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET v$(VERSION) complete."
 
-install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-phispy install-samtools install-bcftools install-smalt install-raxml
+install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-phispy install-samtools install-bcftools install-smalt install-snap install-raxml
 	@echo DONE installing prerequisites
 
-clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-phispy clean-samtools clean-bcftools clean-smalt clean-raxml
+clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-phispy clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml
 	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
 
 install-mkdir:
@@ -159,6 +159,15 @@ install-smalt:
 
 clean-smalt:
 	rm -rvf $(PREFIX)/lib/smalt*
+
+install-snap:
+	git clone https://github.com/amplab/snap.git $(PREFIX)/lib/snap
+	cd $(PREFIX)/lib/snap && make && make snapxl
+	ln -sv $(PREFIX)/lib/snap/snap   $(PREFIX)/scripts/
+	ln -sv $(PREFIX)/lib/snap/snapxl $(PREFIX)/scripts/
+  
+clean-snap:
+	rm -rvf $(PREFIX)/lib/snap $(PREFIX)/scripts/snap $(PREFIX)/scripts/snapxl
 
 install-raxml:
 	wget 'https://github.com/stamatak/standard-RAxML/archive/v8.1.16.tar.gz' -O $(TMPDIR)/raxml_v8.1.16.tar.gz
