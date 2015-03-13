@@ -65,6 +65,7 @@ sub mapReads{
   my $tmpOut="$bam.sam";
   logmsg "$bam not found. I'm really doing the mapping now!\n  Outfile: $tmpOut";
 
+  my $snap=`which snap`; chomp($snap);
   # PE reads or not?  Mapping differently for different types.
   if(is_fastqPE($query)){
     ###########
@@ -79,40 +80,15 @@ sub mapReads{
     system("gzip -vf1 $prefix.1.fastq $prefix.2.fastq");
     die "ERROR with gzip" if $?;
 
-#    # SNAP checks the read IDs and is incorrectly reading them as wrongly paired.
-#    # Therefore I need to make them more kosher with new IDs.
-#    # Unfortunately this removes the original information but I am not sure how to
-#    # retain it properly while removing information that trips up snap.
-#    my $filecount=0;
-#    for my $file("$prefix.1.fastq","$prefix.2.fastq"){
-#      $filecount++;  # this will be used as the /1 or /2 in the identifier
-#      move($file,"$file.tmp");
-#      open(FASTQMODDED,">",$file) or die "ERROR: could not open for writing: $file: $!";
-#      open(FASTQ,"$file.tmp") or die "ERROR: could not open for reading $file.tmp: $!";
-#      my $i=0;
-#      my $identifier;
-#      while(<FASTQ>){
-#        my $mod=++$i % 4;
-#        if($mod==1){
-#          $identifier="\@$i/$filecount";
-#          s/.*/$identifier/;  #just replace the defline with whatever as long as it's consistent
-#        } elsif($mod==3){
-#          s/.*/\+/;
-#        }
-#        print FASTQMODDED $_;
-#      }
-#      close FASTQ;
-#      close FASTQMODDED;
-#    }
-
     # mapping ###
     # SNAP gives weird permissions to the output file. Avoid it by
     # creating the file yourself first.
-    my $snap=`which snap`; chomp($snap);
     system("touch $tmpOut");
     die if $?;
-    my $command="$snap paired $ref.snap '$prefix.1.fastq.gz' '$prefix.2.fastq.gz' -t $$settings{numcpus} -so -o $tmpOut -h 1 -C++ --b -I";
-    system($command);
+    my $snap_command="$snap paired $ref.snap '$prefix.1.fastq.gz' '$prefix.2.fastq.gz' -t $$settings{numcpus} -so -o $tmpOut -h 1 -C++ --b -I";
+    my $snapxl_command=$snap_command;
+    $snapxl_command=~s/snap/snapxl/;
+    system("$snap_command || $snapxl_command");
     die "ERROR with command: $!\n $command" if $?;
 
     system("rm -v '$prefix.1.fastq.gz' '$prefix.2.fastq.gz'"); die if $?;
@@ -124,13 +100,12 @@ sub mapReads{
     die "Problem with gunzip" if $?;
     system("touch $tmpOut $tmpOut.bai");
     die if $?;
-    system("snap single $ref.snap '$prefix.SE.fastq' -t $$settings{numcpus} -so -o $tmpOut -h 1");
-    if($?){
-      # longer reads will cause an error.  Try the snapxl binary instead just in case
-      logmsg "Snap failed with an error.  Trying snapxl";
-      system("snapxl single $ref.snap '$prefix.SE.fastq' -t $$settings{numcpus} -so -o $tmpOut");
-      die "ERROR: snpxl failed. Maybe you don't have it in your path? It can be compiled from snap using 'make snapxl' from the snap package (https://github.com/amplab/snap)" if $?;
-    }
+    my $snap_command="$snap single $ref.snap '$prefix.SE.fastq' -t $$settings{numcpus} -so -o $tmpOut -h 1 --b -I"; # -C parameter was causing segfault
+    my $snapxl_command=$snap_command;
+    $snapxl_command=~s/snap/snapxl/;
+
+    system("$snap_command || $snapxl_command");
+    die "ERROR: snap failed! $!   $snap_command || $snapxl_command" if($?);
 
     system("rm -v '$prefix.SE.fastq'"); die if $?;
   }
