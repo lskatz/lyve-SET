@@ -105,6 +105,10 @@ sub mapReads{
     $snapxl_command=~s/snap/snapxl/;
 
     system("$snap_command || $snapxl_command");
+    # try one more time
+    if($?){
+      system("$snap_command || $snapxl_command");
+    }
     die "ERROR: snap failed! $!   $snap_command || $snapxl_command" if($?);
 
     system("rm -v '$prefix.SE.fastq'"); die if $?;
