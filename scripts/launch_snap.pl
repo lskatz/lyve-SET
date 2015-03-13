@@ -9,7 +9,7 @@ use Bio::Perl;
 use File::Copy qw/copy move/;
 
 $0=fileparse $0;
-sub logmsg{print STDERR "@_\n";}
+sub logmsg{print STDERR "$0: @_\n";}
 exit(main());
 
 sub main{
