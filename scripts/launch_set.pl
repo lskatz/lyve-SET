@@ -48,7 +48,7 @@ exit(main());
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --notrees
   my $settings={trees=>1,msa=>1, matrix=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s info=s@ mask-phages! rename-taxa=s fast downsample)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s info=s@ mask-phages! rename-taxa=s fast downsample sample-sites)) or die $!;
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
@@ -58,6 +58,7 @@ sub main{
   $$settings{'mask-phages'}=1 if(!defined($$settings{'mask-phages'}));
   $$settings{'rename-taxa'}||="";
   $$settings{downsample}||=0;
+  $$settings{'sample-sites'}||=0;
   # modules defaults
   $$settings{mapper}||="smalt";
   $$settings{snpcaller}||="varscan";
@@ -72,6 +73,7 @@ sub main{
     $$settings{mapper}="snap";
     $$settings{'mask-phages'}=0;
     $$settings{downsample}=1;
+    $$settings{'sample-sites'}=1;
   }
 
   # Some things need to just be lowercase to make things easier downstream
@@ -411,7 +413,7 @@ sub variantCalls{
   # variant sites in that genome and use those regions 
   # for the next SNP-calling instances.
   my $regionsFile="";
-  if($$settings{fast}){
+  if($$settings{'sample-sites'}){
     my $initBam=$bam[0];
     $regionsFile="$$settings{tmpdir}/initialSnpSites.bed";
     logmsg "--fast was specified: finding initial variant sites to make the downstream SNP calling faster. Using $initBam";
@@ -578,8 +580,9 @@ sub usage{
     --nomsa                          Do not make a multiple sequence alignment
     --notrees                        Do not make phylogenies
     OTHER SHORTCUTS
-    --fast                           Shorthand for --downsample --mapper snap --nomask-phages
+    --fast                           Shorthand for --downsample --mapper snap --nomask-phages --sample-sites
     --downsample                     Downsample all reads to 50x. Approximated according to the ref genome assembly
+    --sample-sites                   Randomly choose a genome and find SNPs in a quick and dirty way. Then on the SNP-calling stage, only interrogate those sites for SNPs for each genome (including the randomly-sampled genome).
     MODULES
     --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap";
     #--snpcaller    $$settings{snpcaller}   Which SNP caller? Choices: freebayes, varscan
