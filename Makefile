@@ -83,7 +83,7 @@ install-CGP:
 
 clean-CGP:
 	rm -rvf $(PREFIX)/lib/cg-pipeline
-	rm -v $(PREFIX)/scripts/run_assembly_*
+	rm -vf $(PREFIX)/scripts/run_assembly_*
 
 install-vcftools:
 	wget 'http://downloads.sourceforge.net/project/vcftools/vcftools_0.1.12b.tar.gz?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fvcftools%2Ffiles%2F&ts=1409260024&use_mirror=ufpr' -O $(TMPDIR)/vcftools_0.1.12b.tar.gz
