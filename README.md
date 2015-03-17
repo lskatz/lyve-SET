@@ -5,36 +5,11 @@ LYVE version of the Snp Extraction Tool (SET), a method of using hqSNPs to creat
 
 NML, part of PHAC, has the original version of SET (https://github.com/apetkau).  However, I have been updating it since inception and so the results might differ slightly.
 
-Requirements
-------------
-* **Must-have** and not installed with `make install`
-  * **Perl, multithreaded**
-  * **BLAST+**
-  * **GIT**, **SVN** (for installation and updating)
-* **Requirements installed with `make install`**
-  * CG-Pipeline
-  * Schedule::SGELK
-  * VCF Tools and Vcf.pm
-  * Samtools v1.1 or newer
-    * bcftools
-    * wgsim if you are simulating reads
-    * bgzip
-    * tabix
-  * PHAST
-  * Varscan
-  * SNAP
-  * RAxML
-  * Smalt
-* Optional "requirements"
-  * PhyML
-  * FreeBayes
-
 Installation
 ------------
 * `make install`
-* `make check` - check and see if you have all the prerequisites
-* `make test` - run a test phage dataset provided by CFSAN
 * `make help` - for other `make` options
+* See [INSTALL.md](docs/INSTALL.md) for more information including prerequisite software
 
 For the impatient
 -----------------
