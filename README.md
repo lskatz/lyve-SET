@@ -41,9 +41,12 @@ Here is a way to just try out the test dataset.
 
     set_test.pl lambda --numcpus 8 # or however many cpus you want
     set_test.pl listeria_monocytogenes --numcpus 8 # or another dataset
+    set_test.pl listeria_monocytogenes --numcpus 8 --fast # Make Lyve-SET go quickly!
 
 Usage
 -----
+To see the help for any script, run it without options or with `--help`.  For example, `set_test.pl -h`.  The following is the help for the main script, `launch_set.pl`:
+
     Usage: launch_set.pl [project] [-ref reference.fasta]
     If project is not given, then it is assumed to be the current working directory.
     If reference is not given, then it is assumed to be proj/reference/reference.fasta
@@ -58,23 +61,30 @@ Usage
     -asm      asmdir/         directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
 
     SNP MATRIX OPTIONS
-    --allowedFlanking  0               allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.  Set to -1 to let SET determine this distance using snpDistribution.pl
+    --allowedFlanking  0               allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
     --min_alt_frac     0.75  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
     --min_coverage     10  Minimum coverage needed before a SNP is called. Otherwise, 'N'
+    --rename-taxa      ''  A perl regex to rename taxa in the MSA. See set_processMsa.pl for details and examples.  Use additional escapes for special characters, e.g. 's/\\..*//'
 
     SKIP CERTAIN STEPS
-    --noclean to not clean reads before mapping (faster, but you need to have clean reads to start with; removes the requirement for CG-Pipeline)
-    --nomatrix to not create an hqSNP matrix
-    --nomsa to not make a multiple sequence alignment
-    --notrees to not make phylogenies
+    --nomask-phages                  Do not search for and mask phages in the reference genome
+    --nomatrix                       Do not create an hqSNP matrix
+    --nomsa                          Do not make a multiple sequence alignment
+    --notrees                        Do not make phylogenies
+    OTHER SHORTCUTS
+    --fast                           Shorthand for --downsample --mapper snap --nomask-phages --sample-sites
+    --downsample                     Downsample all reads to 50x. Approximated according to the ref genome assembly
+    --sample-sites                   Randomly choose a genome and find SNPs in a quick and dirty way. Then on the SNP-calling stage, only interrogate those sites for SNPs for each genome (including the randomly-sampled genome).
     MODULES
     --mapper       smalt             Which mapper? Choices: smalt, snap
-    --snpcaller    freebayes         Which SNP caller? Choices: freebayes, varscan
     SCHEDULER AND MULTITHREADING OPTIONS
-    --queue     all.q         The default queue to use.
-    --qsubxopts '-N lyve-set' extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
-    --numnodes  20  maximum number of nodes
-    --numcpus   1  number of cpus
+    --queue        all.q             The default queue to use.
+    --numnodes     20                maximum number of nodes
+    --numcpus      1                 number of cpus
+    --qsubxopts    '-N lyve-set'     Extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
+    OTHER
+    --info         version           Display information about Lyve-SET. The only option right now is 'version' and it is turned on by default
+
 
 Run a test dataset
 ------------------
