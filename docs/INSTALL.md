@@ -1,6 +1,12 @@
 Installation
 ============
 
+Quickie Installation
+--------------------
+
+1. Run `make install` while you are in the Lyve-SET directory. This step probably takes 10-20 minutes.
+2. Update the path to include the scripts subdirectory. You can do this yourself if you are comfortable or run `make env` followed by `source ~/.bashrc`
+
 Requirements
 ------------
 * **Must-have** and not installed with `make install`
@@ -28,6 +34,7 @@ Requirements
 Installation
 ------------
 * `make install`
+* `make env` - update `PATH` and `PERL5LIB` in the `~/.bashrc` file.
 * `make check` - check and see if you have all the prerequisites
 * `make test` - run a test phage dataset provided by CFSAN
 * `make help` - for other `make` options
