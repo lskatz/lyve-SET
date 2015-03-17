@@ -21,6 +21,7 @@ Output files
 ||`*.sorted.bam.bai` | samtools index file || 
 ||`*.sorted.bam.depth` | samtools depth output | It is a three-column format: seqname, pos, depth. Sites with zero-depth have been filled in using Lyve-SET. |
 |project/vcf/unfiltered|| Output VCF files||
-||`*.vcf.gz`|VCF files |Have the same file format as the `*.sorted.bam` files, so that they can be matched easily when running Lyve-SET. These files are sorted with vcftools and compressed with bgzip.|
+||`*.vcf.gz`|VCF files |Filtered VCF files|These filtered VCF files are deprecated in favor of `project/vcf/*.vcf` and will probably not be continued in future versions of Lyve-SET|
 ||`*.vcf.gz.tbi`| Tabix index files||
-|project/vcf||Filtered VCF files|These filtered VCF files are deprecated and will probably not be continued in future versions of Lyve-SET|
+|project/vcf|*.vcf|VCF files|Have the same file format as the `*.sorted.bam` files, so that they can be matched easily when running Lyve-SET. These files are sorted with vcftools and compressed with bgzip.|
+||`*.vcf.gz.tbi`| Tabix index files||
