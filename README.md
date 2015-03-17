@@ -9,9 +9,7 @@ Requirements
 ------------
 * **Must-have** and not installed with `make install`
   * **Perl, multithreaded**
-  * **RAxML**
   * **BLAST+**
-  * **Smalt**
   * **GIT**, **SVN** (for installation and updating)
 * **Requirements installed with `make install`**
   * CG-Pipeline
@@ -24,6 +22,8 @@ Requirements
   * PHAST
   * Varscan
   * SNAP
+  * RAxML
+  * Smalt
 * Optional "requirements"
   * PhyML
   * FreeBayes
