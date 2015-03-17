@@ -17,7 +17,10 @@ Here is a way to just try out the test dataset.
 
     set_test.pl lambda --numcpus 8 # or however many cpus you want
     set_test.pl listeria_monocytogenes --numcpus 8 # or another dataset
-    set_test.pl listeria_monocytogenes --numcpus 8 --fast # Make Lyve-SET go quickly!
+
+Make Lyve-SET go quickly with `--fast`!  This option is shorthand for several other options that save on computational time. See `launch_set.pl` usage below for more details.
+
+    set_test.pl listeria_monocytogenes --numcpus 8 --fast
 
 Usage
 -----
