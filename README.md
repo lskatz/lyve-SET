@@ -120,6 +120,7 @@ Getting help
 ------------
 * Check out the [FAQ](docs/FAQ.md) first to see if your question has already been asked
 * Join the [Google Group](https://groups.google.com/forum/#!forum/lyve-set) at https://groups.google.com/forum/#!forum/lyve-set 
+* [Tips and tricks](docs/TIPS.md)
 
 Citing lyve-SET
 -----
