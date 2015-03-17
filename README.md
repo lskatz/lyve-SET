@@ -11,7 +11,7 @@ Requirements
   * **Perl, multithreaded**
   * **RAxML**
   * **BLAST+**
-  * **Smalt** (must get separately when using the latest release but not cutting edge version)
+  * **Smalt**
   * **GIT**, **SVN** (for installation and updating)
 * **Requirements installed with `make install`**
   * CG-Pipeline
@@ -23,10 +23,10 @@ Requirements
     * tabix
   * PHAST
   * Varscan
+  * SNAP
 * Optional "requirements"
   * PhyML
   * FreeBayes
-  * SNAP
 
 Installation
 ------------
