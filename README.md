@@ -16,6 +16,7 @@ Requirements
   * Schedule::SGELK
   * VCF Tools and Vcf.pm
   * Samtools v1.1 or newer
+    * bcftools
     * wgsim if you are simulating reads
     * bgzip
     * tabix
