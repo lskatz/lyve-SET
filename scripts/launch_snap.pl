@@ -114,17 +114,17 @@ sub mapReads{
     system("rm -v '$prefix.SE.fastq'"); die if $?;
   }
 
-  # SNAP includes the entire defline for some reason, but the 
-  # part in the defline after the space needs to be removed for 
-  # compatibility with samtools
-  my $seqin=Bio::SeqIO->new(-file=>$ref);
-  while(my $seq=$seqin->next_seq){
-    my $desc=$seq->desc;
-    $desc=~s/\s/_/g;
-    logmsg "Removing _$desc from sam file";
-    system("sed -i 's/_$desc//' $tmpOut");
-    logmsg "WARNING: could not replace a desc from the defline: $!\n  The temporary sam file might not be compatible with the rest of the automation." if $?;
-  }
+  ## SNAP includes the entire defline for some reason, but the 
+  ## part in the defline after the space needs to be removed for 
+  ## compatibility with samtools
+  #my $seqin=Bio::SeqIO->new(-file=>$ref);
+  #while(my $seq=$seqin->next_seq){
+  #  my $desc=$seq->desc;
+  #  $desc=~s/\s/_/g;
+  #  logmsg "Removing _$desc from sam file";
+  #  system("sed -i 's/_$desc//' $tmpOut");
+  #  logmsg "WARNING: could not replace a desc from the defline: $!\n  The temporary sam file might not be compatible with the rest of the automation." if $?;
+  #}
 
 
   # Do some post-mapping filtering
@@ -134,8 +134,9 @@ sub mapReads{
     logmsg "Found bed file of regions to accept and so I am using it! $regions";
     $$settings{samtoolsxopts}.="-L $regions ";
   }
-  system("mv -v $tmpOut $tmpOut.unfiltered && samtools view $$settings{samtoolsxopts} -bSh -T $ref $tmpOut.unfiltered > $tmpOut.bam");
-  die "ERROR with samtools view" if $?;
+  my $samtoolsView="mv -v $tmpOut $tmpOut.unfiltered && samtools view $$settings{samtoolsxopts} -bSh -T $ref $tmpOut.unfiltered > $tmpOut.bam";
+  system($samtoolsView);
+  die "ERROR with samtools view\n  $samtoolsView" if $?;
   unlink("$tmpOut.unfiltered");
 
   # Sort/index
