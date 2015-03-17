@@ -416,7 +416,7 @@ sub variantCalls{
   if($$settings{'sample-sites'}){
     my $initBam=$bam[0];
     $regionsFile="$$settings{tmpdir}/initialSnpSites.bed";
-    logmsg "--fast was specified: finding initial variant sites to make the downstream SNP calling faster. Using $initBam";
+    logmsg "--sample-sites was specified: finding initial variant sites to make the downstream SNP calling faster. Using $initBam";
 
     # This complicated command does multithreaded samtools mpileup
     # using xargs and one cpu per contig.
