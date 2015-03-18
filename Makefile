@@ -48,10 +48,10 @@ install: install-prerequisites
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET v$(VERSION) complete."
 
-install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-phispy install-samtools install-bcftools install-smalt install-snap install-raxml
+install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-phispy install-samtools install-bcftools install-smalt install-snap install-raxml install-quake
 	@echo DONE installing prerequisites
 
-clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-phispy clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml
+clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-phispy clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-quake
 	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
 
 install-mkdir:
@@ -178,6 +178,15 @@ install-raxml:
 
 clean-raxml:
 	rm -rvf $(PREFIX)/lib/standard-RAxML-8.1.16
+
+install-quake:
+	wget http://www.cbcb.umd.edu/software/quake/downloads/quake-0.3.5.tar.gz -O $(PREFIX)/build/quake-0.3.5.tar.gz
+	cd $(PREFIX)/build && tar zxvf quake-0.3.5.tar.gz
+	cd $(PREFIX)/build/Quake/src && make && cp -Lvn ../bin/* $(PREFIX)/scripts
+	rm -rfv $(PREFIX)/build/Quake/src
+
+clean-quake:
+	cd $(PREFIX)/scripts && rm -vf build_bithash count-kmers cov_model.py cov_model.r quake.py correct count-qmers cov_model_qmer.r kmer_hist.r
 
 cuttingedge: install-mkdir cuttingedge-gitclone install-prerequisites
 	@echo "DONE installing the cutting edge version"
