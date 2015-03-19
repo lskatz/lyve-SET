@@ -14,13 +14,14 @@ exit(main());
 
 sub main{
   my $settings={clean=>0};
-  GetOptions($settings,qw(help reference=s fastq=s bam=s tempdir=s clean! numcpus=i));
+  GetOptions($settings,qw(help reference=s fastq=s bam=s tempdir=s clean! numcpus=i pairedend=i));
   for(qw(reference fastq bam)){
     die "ERROR: need option $_\n".usage() if(!$$settings{$_});
   }
   $$settings{numcpus}||=1;
   $$settings{tempdir}||="tmp";
   $$settings{samtoolsxopts}||="";
+  $$settings{pairedend}||=0;
 
   mkdir $$settings{tempdir} if(!-d $$settings{tempdir});
   logmsg "Temporary directory is $$settings{tempdir}";
@@ -67,7 +68,7 @@ sub mapReads{
 
   my $snap=`which snap`; chomp($snap);
   # PE reads or not?  Mapping differently for different types.
-  if(is_fastqPE($query)){
+  if(is_fastqPE($query,$settings)){
     ###########
     # PE reads
     # #########
@@ -185,6 +186,12 @@ sub mapReads{
 sub is_fastqPE($;$){
   my($fastq,$settings)=@_;
 
+  # If PE was specified, return true for the value 2 (PE)
+  # and 0 for the value 1 (SE)
+  if($$settings{pairedend}){
+    return ($$settings{pairedend}-1);
+  }
+
   # if checkFirst is undef or 0, this will cause it to check at least the first 50 entries.
   # 50 reads is probably enough to make sure that it's shuffled (1/2^25 chance I'm wrong)
   $$settings{checkFirst}||=50;
@@ -199,6 +206,7 @@ sub usage{
   Usage: $0 -f file.fastq -b file.bam -t tmp/ -r reference.fasta
   -t tmp to set the temporary directory as 'tmp'
   --numcpus 1 number of cpus to use
+  --pairedend <0|1|2> For 'auto', single-end, or paired-end respectively. Default: auto (0).
   "
 }
 
