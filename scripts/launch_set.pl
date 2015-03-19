@@ -360,7 +360,7 @@ sub mapReads{
   my $smaltxopts="";
   if($$settings{singleend}){
     $smaltxopts.="--pairedend 1";
-    # TODO something similar for snap
+    $snapxopts.= "--pairedend 1";
   }
 
   my @job;
@@ -377,7 +377,7 @@ sub mapReads{
     if($$settings{mapper} eq 'smalt'){
       $sge->pleaseExecute("$scriptsdir/launch_smalt.pl $smaltxopts -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} ",{jobname=>"smalt$b"});
     } elsif($$settings{mapper} eq 'snap'){
-      $sge->pleaseExecute("$scriptsdir/launch_snap.pl -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} ",{jobname=>"snap$b"});
+      $sge->pleaseExecute("$scriptsdir/launch_snap.pl $snapxopts -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} ",{jobname=>"snap$b"});
     } else {
       die "ERROR: I do not understand the mapper $$settings{mapper}";
     }
