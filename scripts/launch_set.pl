@@ -48,7 +48,7 @@ exit(main());
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --notrees
   my $settings={trees=>1,msa=>1, matrix=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s info=s@ mask-phages! rename-taxa=s fast downsample sample-sites)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s info=s@ mask-phages! rename-taxa=s fast downsample sample-sites singleend)) or die $!;
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
@@ -59,6 +59,7 @@ sub main{
   $$settings{'rename-taxa'}||="";
   $$settings{downsample}||=0;
   $$settings{'sample-sites'}||=0;
+  $$settings{singleend}||=0;
   # modules defaults
   $$settings{mapper}||="smalt";
   $$settings{snpcaller}||="varscan";
@@ -355,6 +356,13 @@ sub mapReads{
 
   downsampleReads($ref,\@file,$settings) if($$settings{downsample});
 
+  my $snapxopts="";
+  my $smaltxopts="";
+  if($$settings{singleend}){
+    $smaltxopts.="--pairedend 1";
+    # TODO something similar for snap
+  }
+
   my @job;
   for my $fastq(@file){
     my $b=fileparse $fastq;
@@ -367,7 +375,7 @@ sub mapReads{
     }
 
     if($$settings{mapper} eq 'smalt'){
-      $sge->pleaseExecute("$scriptsdir/launch_smalt.pl -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} ",{jobname=>"smalt$b"});
+      $sge->pleaseExecute("$scriptsdir/launch_smalt.pl $smaltxopts -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} ",{jobname=>"smalt$b"});
     } elsif($$settings{mapper} eq 'snap'){
       $sge->pleaseExecute("$scriptsdir/launch_snap.pl -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} ",{jobname=>"snap$b"});
     } else {
@@ -579,6 +587,7 @@ sub usage{
     --nomatrix                       Do not create an hqSNP matrix
     --nomsa                          Do not make a multiple sequence alignment
     --notrees                        Do not make phylogenies
+    --singleend                      Treat everything like single-end. Useful for when you think there is a single-end/paired-end bias.
     OTHER SHORTCUTS
     --fast                           Shorthand for --downsample --mapper snap --nomask-phages --sample-sites
     --downsample                     Downsample all reads to 50x. Approximated according to the ref genome assembly
