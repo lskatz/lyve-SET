@@ -141,6 +141,17 @@ sub pairwiseDistance{
     logmsg "$outfile was found. I will not perform pairwise distances again without --force";
     return $outfile;
   }
+
+  # Before calculating pairwise distances, take a shortcut by
+  # removing only invariant sites.
+  logmsg "Removing invariant sites, as they do not contribute toward pairwise distances.";
+  system("removeUninformativeSites.pl --gaps-allowed --ambiguities-allowed '$infile' > $$settings{tempdir}/variantSites.fasta");
+  if($?){
+    logmsg "Warning: could not remove invariant sites. Pairwise distance counting might go slower than intended."
+  } else {
+    $infile="$$settings{tempdir}/variantSites.fasta";
+  }
+
   logmsg "Calculating pairwise distances";
   system("pairwiseDistances.pl --numcpus $$settings{numcpus} '$infile' | sort -k3,3n > '$outfile'");
   die if $?;
