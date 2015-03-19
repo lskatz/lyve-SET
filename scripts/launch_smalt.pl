@@ -15,9 +15,10 @@ exit(main());
 
 sub main{
   my $settings={clean=>0};
-  GetOptions($settings,qw(help reference=s fastq=s bam=s tempdir=s clean! numcpus=i smaltxopts=s)) or die $!;
+  GetOptions($settings,qw(help reference=s fastq=s bam=s tempdir=s clean! numcpus=i smaltxopts=s pairedend=i)) or die $!;
   $$settings{numcpus}||=1;
   $$settings{tempdir}||="tmp";
+  $$settings{pairedend}||=0;
 
   # smalt extra options
   $$settings{smaltxopts}||="";
@@ -86,7 +87,7 @@ sub mapReads{
   $$settings{samtoolsxopts}.="-F 4 "; # only keep mapped reads to save on space
 
   # PE reads or not?  Mapping differently for different types.
-  if(is_fastqPE($query)){
+  if(is_fastqPE($query,$settings)){
     # deshuffle the reads
     logmsg "Deshuffling to $prefix.1.fastq and $prefix.2.fastq";
     system("run_assembly_shuffleReads.pl -d '$query' 1>'$prefix.1.fastq' 2>'$prefix.2.fastq'");
@@ -137,6 +138,12 @@ sub mapReads{
 sub is_fastqPE($;$){
   my($fastq,$settings)=@_;
 
+  # If PE was specified, return true for the value 2 (PE)
+  # and 0 for the value 1 (SE)
+  if($$settings{pairedend}){
+    return ($$settings{pairedend}-1);
+  }
+
   # if checkFirst is undef or 0, this will cause it to check at least the first 50 entries.
   # 50 reads is probably enough to make sure that it's shuffled (1/2^25 chance I'm wrong)
   $$settings{checkFirst}||=50;
@@ -154,6 +161,7 @@ sub usage{
   -t tmp to set the temporary directory as 'tmp'
   --numcpus 1 number of cpus to use
   -s '' Extra smalt map options (not validated). Default: $$settings{smaltxopts} 
+  --pairedend <0|1|2> For 'auto', single-end, or paired-end respectively. Default: auto (0).
   "
 }
 
