@@ -86,7 +86,7 @@ sub mapReads{
     # creating the file yourself first.
     system("touch $tmpOut");
     die if $?;
-    my $snap_command="$snap paired $ref.snap '$prefix.1.fastq.gz' '$prefix.2.fastq.gz' -t $$settings{numcpus} -so -o $tmpOut -h 1 -C++ --b -I";
+    my $snap_command="$snap paired $ref.snap '$prefix.1.fastq.gz' '$prefix.2.fastq.gz' -t $$settings{numcpus} -so -o $tmpOut -x -f -C++ --b -I";
     my $snapxl_command=$snap_command;
     $snapxl_command=~s/snap/snapxl/;
     system("$snap_command || $snapxl_command");
