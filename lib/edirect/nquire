@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # ===========================================================================
 #
@@ -46,6 +46,10 @@ use URI::Escape;
 
 use constant false => 0;
 use constant true  => 1;
+
+# nquire version number
+
+$version = "2.30";
 
 # utility subroutines
 
@@ -188,6 +192,12 @@ sub do_uri_escape {
 
 # nquire executes an external URL query from command line arguments
 
+my $nquire_help = qq{
+-url     Base URL for external search
+-http    "get" uses HTTP GET instead of POST
+
+};
+
 sub nquire {
 
   # nquire -url http://... -tag value -tag value | ...
@@ -200,6 +210,17 @@ sub nquire {
 
   @args = @ARGV;
   $max = scalar @args;
+
+  if ( $max > 0 and $ARGV[0] eq "-help" ) {
+    print "nquire $version\n";
+    print $nquire_help;
+    return;
+  }
+
+  if ( $max > 0 and $ARGV[0] eq "-version" ) {
+    print "$version\n";
+    return;
+  }
 
   if ( $max < 2 ) {
     return;
@@ -257,6 +278,18 @@ sub nquire {
         $url = map_macros ($url);
         $i++;
       }
+    } elsif ( $pat eq "-hydra" ) {
+      # internal citation match request (undocumented)
+      $i++;
+      if ( $i < $max ) {
+        $url = "http://intranet.ncbi.nlm.nih.gov/projects/hydra/hydra_search.cgi";
+        $pat = $args[$i];
+        $pat = map_macros ($pat);
+        $enc = do_uri_escape ($pat);
+        $arg="search=pubmed_search_citation_top_20.1&query=$enc";
+        $amp = "&";
+        $i++;
+      }
     }
   }
 
@@ -267,13 +300,18 @@ sub nquire {
   # hard-coded URL aliases for common NCBI web sites
 
   if ( $url =~ /\(#/ ) {
+
     $ky = "ncbi_url";
-    $vl = "http://www.ncbi.nlm.nih.gov";
-    $url =~ s/\((\#$ky)\)/$vl/g;
+    if ( $url =~ /\(#$ky\)/ ) {
+      $vl = "http://www.ncbi.nlm.nih.gov";
+      $url =~ s/\((\#$ky)\)/$vl/g;
+    }
 
     $ky = "eutils_url";
-    $vl = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils";
-    $url =~ s/\((\#$ky)\)/$vl/g;
+    if ( $url =~ /\(#$ky\)/ ) {
+      $vl = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils";
+      $url =~ s/\((\#$ky)\)/$vl/g;
+    }
   }
 
   # arguments before next minus are added to base URL as /value
@@ -301,7 +339,7 @@ sub nquire {
     } else {
       $pat =~ s/^\\-/-/g;
       $pat = map_macros ($pat);
-      $enc = do_uri_escape($pat);
+      $enc = do_uri_escape ($pat);
       $arg .= $pfx . $enc;
       $pfx = ",";
       $amp = "&";

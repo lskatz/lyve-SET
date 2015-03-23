@@ -1,0 +1,54 @@
+Sorry, we have to rerun the configuration dialog for CPAN.pm due to
+some missing parameters. Configuration will be written to
+ <</home/lkatz/bin/Lyve-SET/build/edirect/_cpan/CPAN/MyConfig.pm>>
+
+ <install_help>
+
+Warning: You do not have write permission for Perl library directories.
+
+To install modules, you need to configure a local Perl library directory or
+escalate your privileges.  CPAN can help you by bootstrapping the local::lib
+module or by configuring itself to use 'sudo' (if available).  You may also
+resolve this problem manually if you need to customize your setup.
+
+What approach do you want?  (Choose 'local::lib', 'sudo' or 'manual')
+ [manual] manual
+
+Your 'urllist' is already configured. Type 'o conf init urllist' to change it.
+
+Autoconfiguration complete.
+
+commit: wrote '/home/lkatz/bin/Lyve-SET/build/edirect/_cpan/CPAN/MyConfig.pm'
+
+You can re-run configuration any time with 'o conf init' in the CPAN shell
+Fetching with LWP:
+http://www.perl.org/CPAN/authors/01mailrc.txt.gz
+Reading '/home/lkatz/bin/Lyve-SET/build/edirect/_cpan/sources/authors/01mailrc.txt.gz'
+............................................................................DONE
+Fetching with LWP:
+http://www.perl.org/CPAN/modules/02packages.details.txt.gz
+Reading '/home/lkatz/bin/Lyve-SET/build/edirect/_cpan/sources/modules/02packages.details.txt.gz'
+  Database was generated on Mon, 23 Mar 2015 17:17:02 GMT
+..............
+  New CPAN.pm version (v2.10) available.
+  [Currently running version is v2.00]
+  You might want to try
+    install CPAN
+    reload cpan
+  to both upgrade CPAN.pm and run the new version without leaving
+  the current session.
+
+
+..............................................................DONE
+Fetching with LWP:
+http://www.perl.org/CPAN/modules/03modlist.data.gz
+Reading '/home/lkatz/bin/Lyve-SET/build/edirect/_cpan/sources/modules/03modlist.data.gz'
+DONE
+Writing /home/lkatz/bin/Lyve-SET/build/edirect/_cpan/Metadata
+Running get for module 'local::lib'
+Fetching with LWP:
+http://www.perl.org/CPAN/authors/id/H/HA/HAARG/local-lib-2.000015.tar.gz
+Fetching with LWP:
+http://www.perl.org/CPAN/authors/id/H/HA/HAARG/CHECKSUMS
+Checksum for /home/lkatz/bin/Lyve-SET/build/edirect/_cpan/sources/authors/id/H/HA/HAARG/local-lib-2.000015.tar.gz ok
+Can't call method "inst_file" on an undefined value at /home/lkatz/bin/Lyve-SET/build/edirect/setup-deps.pl line 47.

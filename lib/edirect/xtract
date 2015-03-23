@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # ===========================================================================
 #
@@ -44,7 +44,7 @@ use constant true  => 1;
 
 # xtract version number
 
-$version = "1.00";
+$version = "2.30";
 
 # initialize memory hash
 
@@ -868,7 +868,7 @@ sub has_element {
   }
 
 
-  # regular expression search for element@attribute:value (undocumented)
+  # regular expression search for element@attribute:value
 
   if ( $str =~ /(.+)@(.+)\:(.+)/ ) {
     my $ptrn = $1;
@@ -877,7 +877,7 @@ sub has_element {
 
     if ( $line =~ /<$ptrn ([^>]+)>/i ) {
       my $atts = $1;
-      if ( $1 =~ /$attr=\"$chld\"/ ) {
+      if ( $atts =~ /$attr=\"$chld\"/ ) {
         return true;
       }
     }
@@ -886,7 +886,24 @@ sub has_element {
   }
 
 
-  # regular expression search for element@attribute (undocumented)
+  # regular expression search for @attribute:value
+
+  if ( $str =~ /@(.+)\:(.+)/ ) {
+    my $attr = $1;
+    my $chld = $2;
+
+    if ( $line =~ /<\S+ ([^>]+)>/i ) {
+      my $atts = $1;
+      if ( $atts =~ /$attr=\"$chld\"/ ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+
+  # regular expression search for element@attribute
 
   if ( $str =~ /(.+)@(.+)/ ) {
     my $ptrn = $1;
@@ -894,7 +911,23 @@ sub has_element {
 
     if ( $line =~ /<$ptrn ([^>]+)>/i ) {
       my $atts = $1;
-      if ( $1 =~ /$attr=\"([^\"]+)\"/ ) {
+      if ( $atts =~ /$attr=\"([^\"]+)\"/ ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+
+  # regular expression search for @attribute
+
+  if ( $str =~ /@(.+)/ ) {
+    my $attr = $1;
+
+    if ( $line =~ /<\S+ ([^>]+)>/i ) {
+      my $atts = $1;
+      if ( $atts =~ /$attr=\"([^\"]+)\"/ ) {
         return true;
       }
     }
@@ -1407,11 +1440,26 @@ sub process_level {
       # normal non-greedy pattern matching for non-nested XML
 
       my @vals = ($line =~ /(<$pat(?:\s+.+?)?>.+?<\/$pat>)/g);
-      my $curr = 0;
-      my $totl = scalar @vals;
-      foreach $val (@vals) {
-        $curr++;
-        ( $tab, $ret ) = process_level ( $val, $pat, $chd, \@group, $tab, $ret, $level - 1, $curr, $totl );
+
+      if ( scalar @vals > 0 ) {
+
+        my $curr = 0;
+        my $totl = scalar @vals;
+        foreach $val (@vals) {
+          $curr++;
+          ( $tab, $ret ) = process_level ( $val, $pat, $chd, \@group, $tab, $ret, $level - 1, $curr, $totl );
+        }
+
+      } else {
+
+        @vals = ($line =~ /(<$pat(?:\s+.+?)\/>)/g);
+
+        my $curr = 0;
+        my $totl = scalar @vals;
+        foreach $val (@vals) {
+          $curr++;
+          ( $tab, $ret ) = process_level ( $val, $pat, $chd, \@group, $tab, $ret, $level - 1, $curr, $totl );
+        }
       }
 
     } elsif ( $tmp[$start] eq $capname and $stop - $start >= 2 ) {
@@ -1502,49 +1550,134 @@ sub process_level {
 
 sub process_insd {
 
-  # xtract -insd mat_peptide "%peptide" product peptide
+  # ... | xtract -insd [+/-] mat_peptide "%peptide" product peptide
 
+  my $quot = shift (@_);
   my @args = @{shift (@_)};
 
   my $max = scalar @args;
 
-  if ( $max < 2 ) {
-    print STDERR "Must supply a feature key and at least one qualifier name\n";
-    return;
-  }
+  my @working = ();
 
-  # read feature key
+  # print common arguments
 
-  my $feat = $args[1];
+  push (@working, "-pattern");
+  push (@working, "INSDSeq");
+  push (@working, "-ACCN");
+  push (@working, "INSDSeq_accession-version");
 
-  print "xtract -pattern INSDSeq -ACCN INSDSeq_accession-version \\\n";
-  print "  -group INSDFeature \\\n";
-  print "    -match \"INSDFeature_key:$feat\" \\\n";
-  print "    -pfx \"\\n\" -element \"&ACCN\" \\\n";
+  # collect descriptors
 
-  for ( my $i = 2; $i < $max; $i++ ) {
+  if ( $args[1] =~ /INSD/ ) {
 
-    # read qualifier names
+    push (@working, "-pfx");
+    push (@working, "$quot\\n$quot");
+    push (@working, "-element");
+    push (@working, "$quot\&ACCN$quot");
 
-    my $qual = $args[$i];
+    for ( my $i = 1; $i < $max; $i++ ) {
+      my $val = $args[$i];
 
-    print "    -block INSDQualifier";
-
-    if ( $qual =~ /^%(.+)/ ) {
-      $qual = $1;
-      print " -match \"INSDQualifier_name:$qual\"";
-      print " -element \"\%INSDQualifier_value\"";
-    } else {
-      print " -match \"INSDQualifier_name:$qual\"";
-      print " -element INSDQualifier_value";
+      push (@working, "-block");
+      push (@working, "INSDSeq");
+      push (@working, "-element");
+      push (@working, "$quot$val$quot");
     }
 
-    if ( $i == $max - 1 ) {
-      print " | \\\n";
+    return @working;
+  }
+
+  # collect qualifiers
+
+  my @qualifiers = ();
+  my @required = ();
+
+  my $feat = "";
+  my $partial = 0;
+
+  for ( my $i = 1; $i < $max; $i++ ) {
+    my $val = $args[$i];
+
+    if ( $feat eq "" ) {
+      if ( $val eq "+" or $val eq "complete" ) {
+        $partial = 1;
+      } elsif ( $val eq "-" or $val eq "partial" ) {
+        $partial = -1;
+      } else {
+        $feat = $val;
+      }
     } else {
-      print " \\\n";
+      if ( $val =~ /^\+(.+)/ ) {
+        $val = $1;
+        push (@required, $val);
+      }
+      push (@qualifiers, $val);
     }
   }
+
+  push (@working, "-group");
+  push (@working, "INSDFeature");
+
+  my @itms = split (',', $feat);
+  my $fcmd = "-match";
+  foreach $itm (@itms) {
+    push (@working, "$fcmd");
+    push (@working, "INSDFeature_key:$itm");
+    $fcmd = "-or";
+  }
+
+  if ( $partial == 1 ) {
+    push (@working, "-avoid");
+    push (@working, "INSDFeature_partial5");
+    push (@working, "-and");
+    push (@working, "INSDFeature_partial3");
+  } elsif ( $partial == -1 ) {
+    push (@working, "-match");
+    push (@working, "INSDFeature_partial5");
+    push (@working, "-or");
+    push (@working, "INSDFeature_partial3");
+  }
+
+  my $rcmd = "-match";
+  foreach my $val (@required) {
+    push (@working, "$rcmd");
+    push (@working, "INSDQualifier_name:$val");
+    $rcmd = "-and";
+  }
+
+  push (@working, "-pfx");
+  push (@working, "$quot\\n$quot");
+  push (@working, "-element");
+  push (@working, "$quot&ACCN$quot");
+
+  foreach my $val (@qualifiers) {
+    if ( $val =~ /INSD/ ) {
+      push (@working, "-block");
+      push (@working, "INSDFeature");
+      push (@working, "-element");
+      push (@working, "$quot$val$quot");
+
+    } else {
+
+      push (@working, "-block");
+      push (@working, "INSDQualifier");
+
+      if ( $val =~ /^%(.+)/ ) {
+        $val = $1;
+        push (@working, "-match");
+        push (@working, "INSDQualifier_name:$val");
+        push (@working, "-element");
+        push (@working, "$quot\%INSDQualifier_value$quot");
+      } else {
+        push (@working, "-match");
+        push (@working, "INSDQualifier_name:$val");
+        push (@working, "-element");
+        push (@working, "INSDQualifier_value");
+      }
+    }
+  }
+
+  return @working;
 }
 
 sub process_make {
@@ -1613,19 +1746,21 @@ sub process_fuse {
   my @args = @{shift (@_)};
 
   my $max = scalar @args;
+  if ( $max < 2 ) {
+    die "Need argument for database\n";
+  }
+  my $db = $args[1];
 
   my $thisline = "";
   my $laststr = "";
   my $str = "";
   my $uid = "";
+  my $uidlist = "";
   my $count = 0;
-  my $is_first = true;
-  my $db = "pubmed";
 
-  if ( $max == 1 ) {
-    $db = $args[1];
-  }
-  my $pfx = "<p/><a href=\"http://www.ncbi.nlm.nih.gov/$db/";
+  my $base = "http://www.ncbi.nlm.nih.gov";
+
+  my $pfx = "";
 
   while ($thisline = <STDIN>) {
     $thisline =~ s/\r//;
@@ -1635,43 +1770,101 @@ sub process_fuse {
       $uid = $1;
       $str = $2;
 
-      if ( $is_first ) {
-        print "<p/>";
-      }
-
-      if ( $str ne $laststr and $laststr ne "" ) {
+      if ( lc ($str) ne lc ($laststr) and $laststr ne "" ) {
         $laststr =~ s/\t/, /g;
-        print "\">($count)</a> - $laststr\n";
-        $pfx = "<p/><a href=\"http://www.ncbi.nlm.nih.gov/$db/";
+        print "<p>(<a href=\"$base/$db/$uidlist\"> $count </a>) - $laststr</p>\n";
+        $pfx = "";
         $count = 0;
+        $uidlist = "";
       }
       $laststr = $str;
-      print "$pfx$uid";
+
+      $uidlist .= "$pfx$uid";
       $pfx = ",";
       $count++;
-      $is_first = false;
     }
   }
 
   if ( $laststr ne "" ) {
     $laststr =~ s/\t/, /g;
-    print "\">($count)</a> - $laststr\n";
+    print "<p>(<a href=\"$base/$db/$uidlist\"> $count </a>) - $laststr</p>\n";
   }
 }
+
+my $xtract_help = qq{
+Exploration Argument Hierarchy
+
+  -pattern        (Highest Rank)
+  -division
+  -group
+  -branch
+  -block
+  -section
+  -subset
+  -unit           (Lowest Rank)
+
+Conditional Execution
+
+  -match          Element [\@attribute] [:value] required
+  -avoid          Skips if element matches
+  -present        Requires indicated data pattern
+  -absent         Pattern must not be present
+  -and            All tests must pass
+  -or             Any passing test suffices
+  -position       Must be at given location in list
+
+Format Customization
+
+  -ret            Overrides line break between patterns
+  -tab            Replaces tab character between fields
+  -sep            Separator between group members
+  -pfx            Prefix to print before group
+  -sfx            Suffix to print after group
+
+Item Selection
+
+  -element        Print all items that match tag name
+  -first          Only prints value of first item
+  -last           Only prints value of last item
+
+Miscellaneous Arguments
+
+  -outline        Display outline of XML structure
+  -synopsis       Display count of unique XML paths
+  -format         Repair XML format and indentation
+
+  -insd           Generate INSDSeq extraction commands
+
+  -lbl            Inserts arbitrary text
+
+-element Construct Examples
+
+  Tag             Caption
+  Group           Initials,LastName
+  Parent/Child    MedlineCitation/PMID
+  Attribute       DescriptorName\@MajorTopicYN
+  Object Count    "#Author"
+  Item Length     "%Title"
+  Variable        "&ACCN"
+
+};
 
 sub xtract {
 
   # ... | xtract -pattern ... -group ... -block ... -subset ... -element ...
 
+  my $compress_spaces = true;
+
   my $max = scalar @ARGV;
 
-  if ( $max > 0 and $ARGV[0] eq "-version" ) {
-    print "$version\n";
+  if ( $max > 0 and $ARGV[0] eq "-help" ) {
+    print "xtract $version\n";
+    print $xtract_help;
     return;
   }
 
-  if ( $max > 0 and $ARGV[0] eq "-insd" ) {
-    process_insd ( \@ARGV );
+  if ( $max > 0 and $ARGV[0] eq "-version" ) {
+    print "$version\n";
     return;
   }
 
@@ -1685,6 +1878,48 @@ sub xtract {
     return;
   }
 
+  # -nocompress allows reading of BLAST XML match data with internal runs of spaces (undocumented)
+
+  if ( $max > 0 and $ARGV[0] eq "-nocompress" ) {
+    @ARGV = splice (@ARGV, 1, $max - 1);
+    $max = scalar @ARGV;
+    $compress_spaces = false;
+  }
+
+  # -insd to simplify extraction of INSDSeq qualifiers
+
+  if ( $max > 0 and $ARGV[0] eq "-insd" ) {
+    if ( $max < 3 and $ARGV[1] !~ /INSD/) {
+      print STDERR "Must supply a feature key and at least one qualifier name\n";
+      return;
+
+    } elsif ( -t STDIN ) {
+
+      # -insd without piped input will generate an extraction script
+
+      @ARGV = process_insd ( "\"", \@ARGV );
+      print "xtract ";
+      foreach $itm (@ARGV) {
+        print "$itm ";
+      }
+      print "| \\\n";
+      return;
+
+    } else {
+
+      # -insd with piped input will dynamically execute the extraction
+
+      @ARGV = process_insd ( "", \@ARGV );
+      $max = scalar @ARGV;
+    }
+  }
+
+  # recommended nested organizer levels are -group, -block, and -subset
+
+  # intermediate levels (-division, -branch, -section, and -unit) kept in reserve
+
+  # initial capitalized versions (-Group, -Block, etc.) use tokenized pattern matching
+
   if ( $max > 1 and $ARGV[0] eq "-split" ) {
 
     # -split reads data stream and writes chunks on separate lines
@@ -1697,8 +1932,10 @@ sub xtract {
       $thisline =~ s/\r//g;
       $thisline =~ s/\n//g;
       $thisline =~ s/\t//g;
-      $thisline =~ s/ +/ /g;
-      $thisline =~ s/> </></g;
+      if ( $compress_spaces ) {
+        $thisline =~ s/ +/ /g;
+      }
+      $thisline =~ s/> +</></g;
 
       my @tokens = split (/(?<=>)(?=<)/, $thisline);
       foreach $tkn (@tokens) {
@@ -1708,7 +1945,15 @@ sub xtract {
         if ( $tkn =~ /^(.+) +$/ ) {
           $tkn = $1;
         }
-        if ( $tkn =~ /<$pat(?:\s+.+?)?>/ ) {
+        if ( $tkn =~ /<$pat(?:\s+.+?)?>(.+?)<\/$pat>/ ) {
+          if ( scalar @working > 0 ) {
+            my $str = join ("", @working);
+            print "$str\n";
+            @working = ();
+          }
+          $in_pat = false;
+          print "$tkn\n";
+        } elsif ( $tkn =~ /<$pat(?:\s+.+?)?>/ ) {
           push (@working, $tkn);
           $in_pat = true;
         } elsif ( $tkn =~ /<\/$pat>/ ) {
@@ -1730,28 +1975,186 @@ sub xtract {
     return;
   }
 
+  if ( $max > 0 and $ARGV[0] eq "-format" ) {
+
+    my $lvl = 0;
+
+    my $xml_ok = true;
+    my $doctype_ok = true;
+
+    my $root_token = "";
+    my $print_head = false;
+    my $print_tail = false;
+
+    my $xml = "";
+    my $doctype = "";
+    my $pfx = "";
+    my $sfx = "";
+
+    my $go_on = true;
+
+    # support -pfx, -sfx, -xml, and -doctype arguments
+
+    for ( my $i = 1; $i < $max; $i++ ) {
+
+      if ( $ARGV[$i] eq "-pfx" ) {
+        $i++;
+        $pfx = convert_slash ( $ARGV[$i] );
+      } elsif ( $ARGV[$i] eq "-sfx" ) {
+        $i++;
+        $sfx = convert_slash ( $ARGV[$i] );
+      } elsif ( $ARGV[$i] eq "-xml" ) {
+        $i++;
+        $xml = convert_slash ( $ARGV[$i] );
+      } elsif ( $ARGV[$i] eq "-doctype" ) {
+        $i++;
+        $doctype = convert_slash ( $ARGV[$i] );
+      }
+    }
+
+    while ( $go_on ) {
+
+      $thisline = "";
+      if ( $xml ne "" ) {
+        $thisline = $xml;
+        $xml = "";
+      } elsif ( $doctype ne "" ) {
+        $thisline = $doctype;
+        $doctype = "";
+      } elsif ( $pfx ne "" ) {
+        $thisline = $pfx;
+        $pfx = "";
+      } elsif ( defined($thisline = <STDIN>) ) {
+      } elsif ( $sfx ne "" ) {
+        $thisline = $sfx;
+        $sfx = "";
+      } else {
+        $go_on = false;
+      }
+
+      if ( $go_on and $thisline ne "" ) {
+        $thisline =~ s/\r//g;
+        $thisline =~ s/\n//g;
+        $thisline =~ s/\t//g;
+        if ( $compress_spaces ) {
+          $thisline =~ s/ +/ /g;
+        }
+        $thisline =~ s/> +</></g;
+
+        my @tokens = split (/(?<=>)(?=<)/, $thisline);
+        foreach $tkn (@tokens) {
+          if ( $tkn =~ /^ +(.+)$/ ) {
+            $tkn = $1;
+          }
+          if ( $tkn =~ /^(.+) +$/ ) {
+            $tkn = $1;
+          }
+          if ( $lvl < 0 ) {
+            # ignore remainder if level drops below zero
+          } elsif ( $tkn =~ /^<\?xml/ ) {
+            if ( $xml_ok ) {
+              # only print first xml line
+              print "$tkn\n";
+              $xml_ok = false;
+            }
+          } elsif ( $tkn =~ /^<!DOCTYPE (\S+)/ ) {
+            if ( $doctype_ok ) {
+              # only print first DOCTYPE line, extract root token
+              $root_token = $1;
+              print "$tkn\n";
+              $doctype_ok = false;
+              $print_head = true;
+            }
+          } elsif ( $tkn =~ /^<\?.+\?>$/ ) {
+            # processing instruction
+            $lvl++;
+            for ( $i = 1; $i < $lvl; $i++ ) {
+              print "  ";
+            }
+            print "$tkn\n";
+            $lvl--;
+          } elsif ( $tkn =~ /^<\!--.+-->$/ ) {
+            # comment
+            $lvl++;
+            for ( $i = 1; $i < $lvl; $i++ ) {
+              print "  ";
+            }
+            print "$tkn\n";
+            $lvl--;
+          } elsif ( $tkn =~ /^<.+?>.+?<\/(.+?)>$/ ) {
+            # content-containing tag
+            if ( $tkn =~ /^<(\S+).*?>.*>$/ ) {
+              $lvl++;
+              for ( $i = 1; $i < $lvl; $i++ ) {
+                print "  ";
+              }
+              print "$tkn\n";
+              $lvl--;
+            }
+          } elsif ( $tkn =~ /^<.+?\/>$/ ) {
+            # self-closing token
+            if ( $tkn =~ /^<(\S+).*?\/>$/ ) {
+              $lvl++;
+              for ( $i = 1; $i < $lvl; $i++ ) {
+                print "  ";
+              }
+              print "$tkn\n";
+              $lvl--;
+            }
+          } elsif ( $tkn =~ /^<[^\/]/ ) {
+            # open tag increments level
+            $lvl++;
+            if ( $tkn eq "<$root_token>" ) {
+              if ( $print_head ) {
+                print "<$root_token>\n";
+                $print_head = false;
+                $print_tail = true;
+              }
+            } else {
+              if ( $tkn =~ /^<(\S+).*?>$/ ) {
+                for ( $i = 1; $i < $lvl; $i++ ) {
+                  print "  ";
+                }
+                print "$tkn\n";
+              }
+            }
+          } elsif ( $tkn =~ /^<\// ) {
+            # close tag decrements level
+            if ( $tkn ne "</$root_token>" ) {
+              for ( $i = 1; $i < $lvl; $i++ ) {
+                print "  ";
+              }
+              print "$tkn\n";
+            }
+            $lvl--;
+          }
+        }
+      }
+    }
+
+    if ( $print_tail ) {
+      print "</$root_token>\n";
+    }
+
+    return;
+  }
+
   my $ret = "";
   my $tab = "";
 
-  my $rpt = 1;
-
-  # recommended nested organizer levels are -group, -block, and -subset
-
-  # intermediate levels (-division, -branch, -section, and -unit) kept in reserve
-
-  # initial capitalized versions (-Group, -Block, etc.) use tokenized pattern matching
-
   if ( $max > 2 and $ARGV[0] eq "-pipe" ) {
 
-    # -pipe reads data that has already been compressed by xtract with no arguments
+    # -pipe reads data that has already been compressed by xtract -split
 
     @ARGV = splice (@ARGV, 1, $max - 1);
     while ( defined($thisline = <STDIN>) ) {
       $thisline =~ s/\r//g;
       $thisline =~ s/\n//g;
       $thisline =~ s/\t//g;
-      $thisline =~ s/ +/ /g;
-      $thisline =~ s/> </></g;
+      if ( $compress_spaces ) {
+        $thisline =~ s/ +/ /g;
+      }
+      $thisline =~ s/> +</></g;
 
       my @tmp = @ARGV;
       %memory = ();
@@ -1761,6 +2164,86 @@ sub xtract {
 
     return;
   }
+
+  if ( $max > 2 and $ARGV[0] eq "-pattern" ) {
+
+    # simple -pattern reads data stream and processes one pattern at a time
+
+    my $pat = $ARGV[1];
+    my $chd = "";
+    if ( $pat =~ /(.+)\/(.+)/ ) {
+      $pat = $1;
+      $chd = $2;
+    }
+
+    @ARGV = splice (@ARGV, 2, $max - 2);
+
+    my $in_pat = false;
+    my @working = ();
+
+    while ( defined($thisline = <STDIN>) ) {
+      $thisline =~ s/\r//g;
+      $thisline =~ s/\n//g;
+      $thisline =~ s/\t//g;
+      if ( $compress_spaces ) {
+        $thisline =~ s/ +/ /g;
+      }
+      $thisline =~ s/> +</></g;
+
+      my @tokens = split (/(?<=>)(?=<)/, $thisline);
+      foreach $tkn (@tokens) {
+        if ( $tkn =~ /^ +(.+)$/ ) {
+          $tkn = $1;
+        }
+        if ( $tkn =~ /^(.+) +$/ ) {
+          $tkn = $1;
+        }
+        if ( $tkn =~ /<$pat(?:\s+.+?)?>/ ) {
+          if ( $tkn =~ /<$pat(?:\s+.+?)?>(.+?)<\/$pat>/ ) {
+            if ( scalar @working > 0 ) {
+              my $str = join ("", @working);
+              @working = ();
+              my @tmp = @ARGV;
+              %memory = ();
+              ( $tab, $ret ) = process_level ( $str, $pat, $chd, \@tmp, "", "", $initial_level, 1, 1 );
+              print "$ret";
+            }
+            $in_pat = false;
+            my @tmp = @ARGV;
+            %memory = ();
+            ( $tab, $ret ) = process_level ( $tkn, $pat, $chd, \@tmp, "", "", $initial_level, 1, 1 );
+            print "$ret";
+          } else {
+            push (@working, $tkn);
+            $in_pat = true;
+          }
+        } elsif ( $tkn =~ /<\/$pat>/ ) {
+          push (@working, $tkn);
+          $in_pat = false;
+          my $str = join ("", @working);
+          @working = ();
+          my @tmp = @ARGV;
+          %memory = ();
+          ( $tab, $ret ) = process_level ( $str, $pat, $chd, \@tmp, "", "", $initial_level, 1, 1 );
+          print "$ret";
+        } elsif ( $in_pat) {
+          push (@working, $tkn);
+        }
+      }
+    }
+    if ( scalar @working > 0 ) {
+      my $str = join ("", @working);
+      @working = ();
+      my @tmp = @ARGV;
+      %memory = ();
+      ( $tab, $ret ) = process_level ( $str, $pat, $chd, \@tmp, "", "", $initial_level, 1, 1 );
+      print "$ret";
+    }
+
+    return;
+  }
+
+  my $rpt = 1;
 
   # read entire XML input stream into a single string
 
@@ -1774,8 +2257,10 @@ sub xtract {
   $data =~ s/\r//g;
   $data =~ s/\n//g;
   $data =~ s/\t//g;
-  $data =~ s/ +/ /g;
-  $data =~ s/> </></g;
+  if ( $compress_spaces ) {
+   $data =~ s/ +/ /g;
+  }
+  $data =~ s/> +</></g;
 
   if ( $max == 0 or ( $max == 1 and $ARGV[0] ne "-outline" and $ARGV[0] ne "-synopsis" )) {
 

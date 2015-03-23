@@ -1,0 +1,23 @@
+#!/bin/sh
+
+# Usage: ftp-cp SERVER PATH FILE...
+
+mydir=`dirname "$0"`
+addr=`"$mydir"/eaddress`
+server="$1"
+shift
+
+make_ftp_commands()
+{
+    cat <<EOF
+user anonymous "$addr"
+cd "$1"
+EOF
+    shift
+    for file in "$@"; do
+        echo "get $file"
+    done
+    echo exit
+}
+
+make_ftp_commands "$@" | ftp -n -V -i "$server"

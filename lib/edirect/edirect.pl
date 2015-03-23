@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # ===========================================================================
 #
@@ -37,11 +37,34 @@
 # use strict;
 use warnings;
 
+my ($LibDir, $ScriptName);
+
+use File::Spec;
+
+BEGIN
+{
+  my $Volume;
+  ($Volume, $LibDir, $ScriptName) = File::Spec->splitpath($0);
+  $LibDir = File::Spec->catpath($Volume, $LibDir, '');
+  if (my $RealPathname = eval {readlink $0}) {
+    do {
+      $RealPathname = File::Spec->rel2abs($RealPathname, $LibDir);
+      ($Volume, $LibDir, undef) = File::Spec->splitpath($RealPathname);
+      $LibDir = File::Spec->catpath($Volume, $LibDir, '')
+    } while ($RealPathname = eval {readlink $RealPathname});
+  } else {
+    $LibDir = File::Spec->rel2abs($LibDir)
+  }
+  $LibDir .= '/aux/lib/perl5';
+}
+use lib $LibDir;
+
 # usage - edirect.pl -function arguments
 
 use Data::Dumper;
 use Encode;
 use Getopt::Long;
+use HTML::Entities;
 use LWP::Simple;
 use LWP::UserAgent;
 use Net::hostent;
@@ -62,6 +85,10 @@ $begin_time = Time::HiRes::time();
 use constant false => 0;
 use constant true  => 1;
 
+# EDirect version number
+
+$version = "2.30";
+
 # URL address components
 
 $base = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/";
@@ -71,11 +98,8 @@ $einfo    = "einfo.fcgi";
 $elink    = "elink.fcgi";
 $epost    = "epost.fcgi";
 $esearch  = "esearch.fcgi";
+$espell   = "espell.fcgi";
 $esummary = "esummary.fcgi";
-
-# EDirect version number
-
-$version = "1.00";
 
 # utility subroutines
 
@@ -86,6 +110,7 @@ sub clearflags {
   $alias = "";
   $basx = "";
   $batch = false;
+  $clean = false;
   $cmd = "";
   $complexity = 0;
   $db = "";
@@ -93,12 +118,14 @@ sub clearflags {
   $dbs = "";
   $dbto = "";
   $debug = false;
+  $drop = false;
   $dttype = "";
   $emaddr = "";
   $email = "";
   $err = "";
   $extrafeat = -1;
   $field = "";
+  $help = false;
   $holding = "";
   $http = "";
   $id = "";
@@ -122,13 +149,18 @@ sub clearflags {
   $seq_start = 0;
   $seq_stop = 0;
   $silent = false;
+  $sort = "";
+  $spell = false;
   $stp = "";
   $strand = "";
   $tool = "";
+  $trim = false;
+  $trunc = false;
   $tuul = "";
   $type = "";
   $verbose = false;
   $web = "";
+  $word = false;
 }
 
 # gets a live UID for any database
@@ -379,11 +411,11 @@ sub get_count {
   $url .= "&edirect=$version";
 
   if ( $tulx eq "" ) {
-    $tulx = "edirect";
+    $tulx = "entrez-direct";
   }
   if ( $tulx ne "" ) {
     $tulx =~ s/\s+/\+/g;
-    $url .= "&tool=$tulx";
+    $url .= "&tool=$tulx-count";
   }
 
   if ( $emlx eq "" ) {
@@ -851,6 +883,12 @@ sub write_edirect {
 
 # ecntc prepares the requested tool and email arguments for an EUtils pipe
 
+my $cntc_help = qq{
+-email    Contact person's address
+-tool     Name of script or program
+
+};
+
 sub ecntc {
 
   # ... | edirect.pl -contact -email darwin@beagle.edu -tool edirect_test | ...
@@ -860,6 +898,7 @@ sub ecntc {
   GetOptions (
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
+    "help" => \$help,
     "silent" => \$silent,
     "verbose" => \$verbose,
     "debug" => \$debug,
@@ -868,6 +907,12 @@ sub ecntc {
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
+
+  if ( $help ) {
+    print "econtact $version\n";
+    print $cntc_help;
+    return;
+  }
 
   if ( -t STDIN and not @ARGV ) {
   } else {
@@ -889,6 +934,18 @@ sub ecntc {
 
 # efilt performs ESearch query refinement on the EUtils history server
 
+my $filt_help = qq{
+-query       Query string
+
+-days        Number of days in the past
+-datetype    Date field abbreviation
+-mindate     Start of date range
+-maxdate     End of date range
+
+-label       Alias for query step
+
+};
+
 sub efilt {
 
   # ... | edirect.pl -filter -query "bacteria [ORGN]" -days 365 | ...
@@ -904,6 +961,7 @@ sub efilt {
     "label=s" => \$lbl,
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
+    "help" => \$help,
     "silent" => \$silent,
     "verbose" => \$verbose,
     "debug" => \$debug,
@@ -912,6 +970,12 @@ sub efilt {
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
+
+  if ( $help ) {
+    print "efilter $version\n";
+    print $filt_help;
+    return;
+  }
 
   if ( $query eq "" && $rldate < 1 and $mndate eq "" and $mxdate eq "" ) {
     die "Must supply -query or -days or -mindate and -maxdate arguments on command line\n";
@@ -923,7 +987,12 @@ sub efilt {
   adjust_base ();
 
   if ( $err ne "" ) {
-    die "ERROR in filt input: $err\n\n";
+    write_edirect ( "", "", "", "", "", $err, "", "" );
+    close (STDOUT);
+    if ( ! $silent ) {
+      die "ERROR in filt input: $err\n\n";
+    }
+    return;
   }
 
   if ( $tuul ne "" ) {
@@ -998,7 +1067,10 @@ sub efilt {
   if ( $err ne "" ) {
     write_edirect ( "", "", "", "", "", $err, "", "" );
     close (STDOUT);
-    die "ERROR in filt output: $err\nURL: $arg\nResult: $output\n\n";
+    if ( ! $silent) {
+      die "ERROR in filt output: $err\nURL: $arg\nResult: $output\n\n";
+    }
+    return;
   }
 
   if ( $web eq "" ) {
@@ -1035,6 +1107,7 @@ sub esmry {
   my $key = shift (@_);
   my $num = shift (@_);
   my $id = shift (@_);
+  my $mode = shift (@_);
   my $min = shift (@_);
   my $max = shift (@_);
   my $tool = shift (@_);
@@ -1060,6 +1133,9 @@ sub esmry {
 
     $arg = "db=$dbase&id=$id";
     $arg .= "&version=2.0";
+    if ( $mode ne "" and $mode ne "text" ) {
+      $arg .= "&retmode=$mode";
+    }
 
     $data = do_post ($url, $arg, $tool, $email, true);
 
@@ -1074,6 +1150,9 @@ sub esmry {
       $data =~ s/<DocumentSummary uid=\"(\d+)\">/<DocumentSummary><Id>$1<\/Id>/g;
 
       Encode::_utf8_on($data);
+
+      $data =~ s/&amp;/&/g;
+      HTML::Entities::decode_entities($data);
 
       print "$data";
     }
@@ -1090,6 +1169,12 @@ sub esmry {
 
   $stpminusone = $stp - 1;
 
+  if ( $max == 0 ) {
+    if ( $silent ) {
+      return;
+    }
+  }
+
   # use larger chunk for document summaries
   $chunk = 1000;
   for ( $start = $min; $start < $max; $start += $chunk ) {
@@ -1102,6 +1187,9 @@ sub esmry {
 
     $arg = "db=$dbase&query_key=$key&WebEnv=$web";
     $arg .= "&retstart=$start&retmax=$chkx&version=2.0";
+    if ( $mode ne "" and $mode ne "text" ) {
+      $arg .= "&retmode=$mode";
+    }
 
     $data = "";
     $retry = true;
@@ -1178,6 +1266,9 @@ sub esmry {
 
       Encode::_utf8_on($data);
 
+      $data =~ s/&amp;/&/g;
+      HTML::Entities::decode_entities($data);
+
       print "$data";
     }
 
@@ -1186,6 +1277,20 @@ sub esmry {
 }
 
 # eftch can read all arguments from the command line or participate in an EUtils pipe
+
+my $ftch_help = qq{
+-format        Format of record or report
+-mode          text, xml, asn.1, json
+
+-db            Database name
+-id            Unique identifier or accession number
+
+-seq_start     First sequence position to retrieve
+-seq_stop      Last sequence position to retrieve
+-strand        Strand of DNA to retrieve
+-complexity    0 = default, 1 = bioseq, 3 = nuc-prot set
+
+};
 
 sub eftch {
 
@@ -1208,6 +1313,7 @@ sub eftch {
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
     "pipe" => \$pipe,
+    "help" => \$help,
     "silent" => \$silent,
     "verbose" => \$verbose,
     "debug" => \$debug,
@@ -1216,6 +1322,12 @@ sub eftch {
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
+
+  if ( $help ) {
+    print "efetch $version\n";
+    print $ftch_help;
+    return;
+  }
 
   # convert spaces between UIDs to commas
 
@@ -1239,7 +1351,10 @@ sub eftch {
   adjust_base ();
 
   if ( $err ne "" ) {
-    die "ERROR in fetch input: $err\n\n";
+    if ( ! $silent ) {
+      die "ERROR in fetch input: $err\n\n";
+    }
+    return;
   }
 
   if ( $dbase eq "" ) {
@@ -1284,7 +1399,7 @@ sub eftch {
 
   if ( $type eq "docsum" or $fnc eq "-summary" ) {
 
-    esmry ( $dbase, $web, $key, $num, $id, $min, $max, $tool, $email,
+    esmry ( $dbase, $web, $key, $num, $id, $mode, $min, $max, $tool, $email,
             $silent, $verbose, $debug, $log, $http, $alias, $basx );
 
     return;
@@ -1317,6 +1432,12 @@ sub eftch {
       write_edirect ( $dbase, $web, $key, $num, $stp, $err, $tool, $email );
     }
 
+    if ( $max == 0 ) {
+      if ( $silent ) {
+        return;
+      }
+    }
+
     # use larger chunk for UID format
     $chunk = 1000;
     for ( $start = $min; $start < $max; $start += $chunk ) {
@@ -1335,6 +1456,55 @@ sub eftch {
     if ( $id ne "" ) {
 
       my @ids = split (',', $id);
+      $url = "http://www.ncbi.nlm.nih.gov/";
+      $url .= "$dbase/";
+      my $pfx = "";
+      foreach $uid (@ids) {
+        $url .= "$pfx$uid";
+        $pfx = ",";
+      }
+      print "$url\n";
+
+      return;
+    }
+
+    if ( $web eq "" ) {
+      die "WebEnv value not found in fetch input\n";
+    }
+
+    if ( $pipe ) {
+      write_edirect ( $dbase, $web, $key, $num, $stp, $err, $tool, $email );
+    }
+
+    if ( $max == 0 ) {
+      if ( $silent ) {
+        return;
+      }
+    }
+
+    # use larger chunk for URL format
+    $chunk = 1000;
+    for ( $start = $min; $start < $max; $start += $chunk ) {
+
+      my @ids = get_uids ( $dbase, $web, $key, $start, $chunk, $max, $tool, $email );
+      $url = "http://www.ncbi.nlm.nih.gov/";
+      $url .= "$dbase/";
+      my $pfx = "";
+      foreach $uid (@ids) {
+        $url .= "$pfx$uid";
+        $pfx = ",";
+      }
+      print "$url\n";
+    }
+
+    return;
+  }
+
+  if ( $dbase ne "" and ( $type eq "URLS" or $type eq "urls" ) ) {
+
+    if ( $id ne "" ) {
+
+      my @ids = split (',', $id);
       foreach $uid (@ids) {
         print "http://www.ncbi.nlm.nih.gov/$dbase/$uid\n";
       }
@@ -1348,6 +1518,12 @@ sub eftch {
 
     if ( $pipe ) {
       write_edirect ( $dbase, $web, $key, $num, $stp, $err, $tool, $email );
+    }
+
+    if ( $max == 0 ) {
+      if ( $silent ) {
+        return;
+      }
     }
 
     # use larger chunk for URL format
@@ -1418,6 +1594,12 @@ sub eftch {
   test_edirect ( $dbase, $web, $key, $num, "fetch" );
 
   $stpminusone = $stp - 1;
+
+  if ( $max == 0 ) {
+    if ( $silent ) {
+      return;
+    }
+  }
 
   # use small chunk because fetched records could be quite large
   $chunk = 100;
@@ -1538,6 +1720,12 @@ sub eftch {
 
 # einfo obtains names of databases or names of fields and links per database
 
+my $info_help = qq{
+-db     Database name
+-dbs    Get all database names
+
+};
+
 sub einfo {
 
   # ... | edirect.pl -info -db pubmed | ...
@@ -1549,6 +1737,7 @@ sub einfo {
     "dbs" => \$dbs,
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
+    "help" => \$help,
     "silent" => \$silent,
     "verbose" => \$verbose,
     "debug" => \$debug,
@@ -1557,6 +1746,12 @@ sub einfo {
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
+
+  if ( $help ) {
+    print "einfo $version\n";
+    print $info_help;
+    return;
+  }
 
   read_aliases ();
   adjust_base ();
@@ -1714,7 +1909,10 @@ sub process_history_link {
   if ( $err ne "" ) {
     write_edirect ( "", $wb, "", "", "", $err, "", "" );
     close (STDOUT);
-    die "ERROR in link output: $err\nWebEnv: $wb\nURL: $arg\nResult: $output\n\n";
+    if ( ! $silent ) {
+      die "ERROR in link output: $err\nWebEnv: $wb\nURL: $arg\nResult: $output\n\n";
+    }
+    return;
   }
 
   if ( $web eq "" ) {
@@ -1773,6 +1971,14 @@ sub batch_elink {
 
   my %seen = ();
   my @uniq = ();
+
+  if ( $num == 0 ) {
+    if ( $silent ) {
+      write_edirect ( "", "", "", "", "", $err, "", "" );
+      close (STDOUT);
+      return;
+    }
+  }
 
   $chunk = 200;
   for ( $start = 0; $start < $num; $start += $chunk ) {
@@ -1895,6 +2101,24 @@ sub batch_elink {
 
 # elink without a target uses the source database for neighboring
 
+my $link_help = qq{
+-related    Neighbors in same database
+-target     Links in different database
+-name       Link name (e.g., pubmed_protein_refseq)
+
+-db         Database name
+-id         Unique identifier(s)
+
+-cmd        Command type (returns eLinkResult XML)
+-mode       "ref" uses LinkOut provider's web site
+-holding    Name of LinkOut provider
+
+-batch      Bypass Entrez history mechanism
+
+-label      Alias for query step
+
+};
+
 sub elink {
 
   # ... | edirect.pl -link -target structure | ...
@@ -1915,6 +2139,7 @@ sub elink {
     "label=s" => \$lbl,
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
+    "help" => \$help,
     "silent" => \$silent,
     "verbose" => \$verbose,
     "debug" => \$debug,
@@ -1923,6 +2148,12 @@ sub elink {
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
+
+  if ( $help ) {
+    print "elink $version\n";
+    print $link_help;
+    return;
+  }
 
   # convert spaces between UIDs to commas
 
@@ -1939,7 +2170,12 @@ sub elink {
   adjust_base ();
 
   if ( $err ne "" ) {
-    die "ERROR in link input: $err\n\n";
+    write_edirect ( "", "", "", "", "", $err, "", "" );
+    close (STDOUT);
+    if ( ! $silent ) {
+      die "ERROR in link input: $err\n\n";
+    }
+    return;
   }
 
   if ( $dbase eq "" ) {
@@ -2026,6 +2262,12 @@ sub elink {
   if ( $cmd ne "neighbor_history" ) {
 
     # if not neighbor_history, write eLinkResult XML instead of ENTREZ_DIRECT
+
+    if ( $num == 0 ) {
+      if ( $silent ) {
+        return;
+      }
+    }
 
     $chunk = 200;
     for ( $start = 0; $start < $num; $start += $chunk ) {
@@ -2193,6 +2435,12 @@ sub emmdb {
 
 # entfy sends e-mail
 
+my $ntfy_help = qq{
+-email    Contact person's address
+-tool     Name of script or program
+
+};
+
 sub entfy {
 
   # ... | edirect.pl -notify
@@ -2202,6 +2450,7 @@ sub entfy {
   GetOptions (
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
+    "help" => \$help,
     "silent" => \$silent,
     "verbose" => \$verbose,
     "debug" => \$debug,
@@ -2210,6 +2459,12 @@ sub entfy {
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
+
+  if ( $help ) {
+    print "enotify $version\n";
+    print $ntfy_help;
+    return;
+  }
 
   ( $dbase, $web, $key, $num, $stp, $err, $tool, $email, $just_num, @rest ) = read_edirect ();
 
@@ -2341,6 +2596,14 @@ sub post_chunk {
   return $webx, $keyx;
 }
 
+my $post_help = qq{
+-db        Database name
+-id        Unique identifier(s) or accession number(s)
+-format    uid or acc
+-label     Alias for query step
+
+};
+
 sub epost {
 
   # ... | edirect.pl -post -db nucleotide -format uid | ...
@@ -2354,6 +2617,7 @@ sub epost {
     "label=s" => \$lbl,
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
+    "help" => \$help,
     "silent" => \$silent,
     "verbose" => \$verbose,
     "debug" => \$debug,
@@ -2362,6 +2626,12 @@ sub epost {
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
+
+  if ( $help ) {
+    print "epost $version\n";
+    print $post_help;
+    return;
+  }
 
   # convert spaces between UIDs to commas
 
@@ -2405,6 +2675,14 @@ sub epost {
   my $pfx = "";
   my $loops = 0;
 
+  my $accession_mode = false;
+  if ( $field eq "ACCN" or $field eq "accn" or $field eq "ACC" or $field eq "acc" ) {
+    if ( $dbase eq "nucleotide" or $dbase eq "nuccore" or $dbase eq "est" or
+         $dbase eq "gss" or $dbase eq "protein" ) {
+      $accession_mode = true;
+    }
+  }
+
   if ( $field eq "UID" or $field eq "uid" ) {
 
     if ( $id ne "" ) {
@@ -2422,6 +2700,10 @@ sub epost {
 
         $ids = join (',', @chunk);
 
+        if ( ! $just_num ) {
+          die "Non-numeric value found in post input\n";
+        }
+
         ( $web, $key ) = post_chunk ( $dbase, $web, $key, $tool, $email, $ids, "" );
 
         $combo .= $pfx . "#" . $key;
@@ -2432,32 +2714,58 @@ sub epost {
 
   } else {
 
-    while ( @rest ) {
-      my @chunk = splice(@rest, 0, 2000);
+    if ( $id ne "" ) {
 
-      $query = join (' OR ', @chunk);
+      my @chunk = split (',', $id);
 
-      if ( $query eq "" ) {
-        die "Must pipe data into stdin\n";
+      if ( $accession_mode ) {
+        $query = join (' [ACCN] OR ', @chunk);
+        $query .= " [ACCN]";
+        $query =~ s/\./_/g;
+      } else {
+        $query = join (' OR ', @chunk);
+        $query .= " [$field]";
       }
-
-      if ( $field eq "ACCN" or $field eq "accn" or $field eq "ACC" or $field eq "acc" ) {
-        if ( $dbase eq "nucleotide" or $dbase eq "nuccore" or $dbase eq "est" or
-             $dbase eq "gss" or $dbase eq "protein" ) {
-          $query =~ s/\./_/g;
-          $field = "ACCN";
-        }
-      } elsif ( ! $just_num ) {
-        die "Non-numeric value found in post input\n";
-      }
-
-      $query .= " [$field]";
 
       ( $web, $key ) = post_chunk ( $dbase, $web, $key, $tool, $email, "", $query );
 
       $combo .= $pfx . "#" . $key;
       $pfx = " OR ";
       $loops++;
+
+    } else {
+
+      while ( @rest ) {
+        my @chunk = splice(@rest, 0, 2000);
+
+        if ( $accession_mode ) {
+          $query = join (' [ACCN] OR ', @chunk);
+        } else {
+          $query = join (' OR ', @chunk);
+        }
+
+        if ( $query eq "" ) {
+          die "Must pipe data into stdin\n";
+        }
+
+        if ( $accession_mode ) {
+        } elsif ( ! $just_num ) {
+          die "Non-numeric value found in post input\n";
+        }
+
+        if ( $accession_mode ) {
+          $query .= " [ACCN]";
+          $query =~ s/\./_/g;
+        } else {
+          $query .= " [$field]";
+        }
+
+        ( $web, $key ) = post_chunk ( $dbase, $web, $key, $tool, $email, "", $query );
+
+        $combo .= $pfx . "#" . $key;
+        $pfx = " OR ";
+        $loops++;
+      }
     }
   }
 
@@ -2496,16 +2804,26 @@ sub epost {
   write_edirect ( $dbase, $web, $key, $num, $stp, $err, $tool, $email );
 }
 
-# eprxy reads a file of query proxies, can also pipe from stdin
+# espel performs an ESpell search
 
-sub eprxy {
+my $spell_help = qq{
+-db       Database name
+-query    Query string
 
-  # ... | edirect.pl -proxy -file file_name | ...
+};
+
+sub espel {
+
+  # ... | edirect.pl -spell -db pubmed -query "asthmaa OR alergies" | ...
 
   clearflags ();
 
   GetOptions (
-    "pipe" => \$pipe,
+    "db=s" => \$db,
+    "query=s" => \$query,
+    "email=s" => \$emaddr,
+    "tool=s" => \$tuul,
+    "help" => \$help,
     "silent" => \$silent,
     "verbose" => \$verbose,
     "debug" => \$debug,
@@ -2514,6 +2832,97 @@ sub eprxy {
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
+
+  if ( $help ) {
+    print "espell $version\n";
+    print $spell_help;
+    return;
+  }
+
+  # convert spaces between UIDs to commas
+
+  $id =~ s/ /,/g;
+  $id =~ s/,,/,/g;
+
+  if ( -t STDIN and not @ARGV ) {
+  } else {
+    ( $dbase, $web, $key, $num, $stp, $err, $tool, $email, $just_num, @rest ) = read_edirect ();
+  }
+
+  read_aliases ();
+  adjust_base ();
+
+  if ( $err ne "" ) {
+    die "ERROR in spell input: $err\n\n";
+  }
+
+  if ( $dbase eq "" ) {
+    $dbase = $db;
+  }
+
+  if ( $dbase eq "" ) {
+    die "Must supply -db database on command line\n";
+  }
+
+  if ( $tuul ne "" ) {
+    $tool = $tuul;
+  }
+  if ( $emaddr ne "" ) {
+    $email = $emaddr;
+  }
+
+  binmode STDOUT, ":utf8";
+
+  if ( $query eq "" ) {
+    die "Must supply -query term expression on command line\n";
+  }
+
+  $url = $base . $espell;
+
+  $enc = uri_escape($query);
+  $arg = "db=$dbase&term=$enc";
+
+  $data = do_post ($url, $arg, $tool, $email, true);
+
+  Encode::_utf8_on($data);
+
+  $data =~ s/&amp;/&/g;
+  HTML::Entities::decode_entities($data);
+
+  print "$data";
+}
+
+# eprxy reads a file of query proxies, can also pipe from stdin
+
+my $prxy_help = qq{
+-alias    File of aliases
+-pipe     Read aliases from stdin
+
+};
+
+sub eprxy {
+
+  # ... | edirect.pl -proxy -alias file_name | ...
+
+  clearflags ();
+
+  GetOptions (
+    "pipe" => \$pipe,
+    "help" => \$help,
+    "silent" => \$silent,
+    "verbose" => \$verbose,
+    "debug" => \$debug,
+    "log" => \$log,
+    "http=s" => \$http,
+    "alias=s" => \$alias,
+    "base=s" => \$basx
+  );
+
+  if ( $help ) {
+    print "eproxy $version\n";
+    print $prxy_help;
+    return;
+  }
 
   if ( -t STDIN and not @ARGV ) {
   } elsif ( $pipe ) {
@@ -2544,6 +2953,233 @@ sub eprxy {
 
 # esrch performs a new EUtils search, but can read a previous web environment value
 
+my $srch_help = qq{
+-db          Database name
+-query       Query string
+
+-sort        Result presentation order
+
+-days        Number of days in the past
+-datetype    Date field abbreviation
+-mindate     Start of date range
+-maxdate     End of date range
+
+-label       Alias for query step
+
+};
+
+sub field_each_word {
+
+  my $fld = shift (@_);
+  my $qury = shift (@_);
+
+  my @words = split (' ', $qury);
+  $qury = "";
+  my $pfx = "";
+
+  foreach $term (@words) {
+    $qury .= "$pfx$term [$fld]";
+    $pfx = " AND ";
+  }
+
+  return $qury;
+}
+
+sub spell_check_query {
+
+  my $db = shift (@_);
+  my $qury = shift (@_);
+
+  my $url = $base . $espell;
+
+  my $enc = uri_escape($query);
+  $arg = "db=$db&term=$enc";
+
+  my $data = do_post ($url, $arg, $tool, $email, true);
+
+  Encode::_utf8_on($data);
+
+  $data =~ s/&amp;/&/g;
+  HTML::Entities::decode_entities($data);
+
+  $qury = $1 if ( $data =~ /<CorrectedQuery>(.+)<\/CorrectedQuery>/ );
+
+  return $qury;
+}
+
+sub remove_punctuation {
+
+  my $qury = shift (@_);
+
+  $qury =~ s/[^a-zA-Z0-9]/ /g;
+  $qury =~ s/ +/ /g;
+
+  return $qury;
+}
+
+sub remove_stop_words {
+
+  my $qury = shift (@_);
+
+  my @stop_word_array = (
+    "a",
+    "about",
+    "again",
+    "all",
+    "almost",
+    "also",
+    "although",
+    "always",
+    "among",
+    "an",
+    "and",
+    "another",
+    "any",
+    "are",
+    "as",
+    "at",
+    "be",
+    "because",
+    "been",
+    "before",
+    "being",
+    "between",
+    "both",
+    "but",
+    "by",
+    "can",
+    "could",
+    "did",
+    "do",
+    "does",
+    "done",
+    "due",
+    "during",
+    "each",
+    "either",
+    "enough",
+    "especially",
+    "etc",
+    "for",
+    "found",
+    "from",
+    "further",
+    "had",
+    "has",
+    "have",
+    "having",
+    "here",
+    "how",
+    "however",
+    "i",
+    "if",
+    "in",
+    "into",
+    "is",
+    "it",
+    "its",
+    "itself",
+    "just",
+    "kg",
+    "km",
+    "made",
+    "mainly",
+    "make",
+    "may",
+    "mg",
+    "might",
+    "ml",
+    "mm",
+    "most",
+    "mostly",
+    "must",
+    "nearly",
+    "neither",
+    "no",
+    "nor",
+    "obtained",
+    "of",
+    "often",
+    "on",
+    "our",
+    "overall",
+    "perhaps",
+    "pmid",
+    "quite",
+    "rather",
+    "really",
+    "regarding",
+    "seem",
+    "seen",
+    "several",
+    "should",
+    "show",
+    "showed",
+    "shown",
+    "shows",
+    "significantly",
+    "since",
+    "so",
+    "some",
+    "such",
+    "than",
+    "that",
+    "the",
+    "their",
+    "theirs",
+    "them",
+    "then",
+    "there",
+    "therefore",
+    "these",
+    "they",
+    "this",
+    "those",
+    "through",
+    "thus",
+    "to",
+    "upon",
+    "use",
+    "used",
+    "using",
+    "various",
+    "very",
+    "was",
+    "we",
+    "were",
+    "what",
+    "when",
+    "which",
+    "while",
+    "with",
+    "within",
+    "without",
+    "would"
+  );
+
+  # split to protect against regular expression artifacts
+  $qury =~ s/[^a-zA-Z0-9]/ /g;
+  $qury =~ s/ +/ /g;
+
+  my @words = split (' ', $qury);
+  my $dropped = "";
+  my $pfx = "";
+
+  foreach $term (@words) {
+
+    if ( ! grep( /^$term$/, @stop_word_array ) ) {
+      $dropped .= "$pfx$term";
+      $pfx = " ";
+    }
+  }
+
+  if ( $dropped ne "" ) {
+    $qury = $dropped;
+  }
+
+  return $qury;
+}
+
 sub esrch {
 
   # ... | edirect.pl -search -db nucleotide -query "M6506* [ACCN] OR 1322283 [UID]" -days 365 | ...
@@ -2553,13 +3189,22 @@ sub esrch {
   GetOptions (
     "db=s" => \$db,
     "query=s" => \$query,
+    "sort=s" => \$sort,
     "days=i" => \$rldate,
     "mindate=s" => \$mndate,
     "maxdate=s" => \$mxdate,
     "datetype=s" => \$dttype,
     "label=s" => \$lbl,
+    "clean" => \$clean,
+    "word" => \$word,
+    "drop" => \$drop,
+    "trim" => \$trim,
+    "trunc" => \$trunc,
+    "spell" => \$spell,
+    "split=s" => \$field,
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
+    "help" => \$help,
     "silent" => \$silent,
     "verbose" => \$verbose,
     "debug" => \$debug,
@@ -2568,6 +3213,12 @@ sub esrch {
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
+
+  if ( $help ) {
+    print "esearch $version\n";
+    print $srch_help;
+    return;
+  }
 
   if ( -t STDIN and not @ARGV ) {
   } else {
@@ -2606,12 +3257,77 @@ sub esrch {
 
   $query = map_labels ($query);
   $query = map_macros ($query);
+
+  # multi-step query cleaning (undocumented)
+  if ( $clean ) {
+    if ( $query =~ /^(.*)\(.+\)(.*)$/ ) {
+      $query = "$1 $2";
+    }
+    if ( $query =~ /^ +(.+)$/ ) {
+      $query = $1;
+    }
+    if ( $query =~ /^(.+) +$/ ) {
+      $query = $1;
+    }
+    $query =~ s/ +/ /g;
+    $query = remove_stop_words ($query);
+    $query = spell_check_query ($dbase, $query);
+  }
+
+  # remove punctuation from query (undocumented)
+  if ( $word ) {
+    $query = remove_punctuation ($query);
+  }
+
+  # drop stop words from query (undocumented)
+  if ( $drop ) {
+    $query = remove_stop_words ($query);
+  }
+
+  # trim words within parentheses (undocumented)
+  if ( $trim ) {
+    if ( $query =~ /^(.*)\(.+\)(.*)$/ ) {
+      $query = "$1 $2";
+    }
+  }
+
+  # truncate words at first parenthesis (undocumented)
+  if ( $trunc ) {
+    if ( $query =~ /^(.+)\(.*$/ ) {
+      $query = $1;
+    }
+  }
+
+  # remove leading, trailing, and multiple spaces
+  if ( $query =~ /^ +(.+)$/ ) {
+    $query = $1;
+  }
+  if ( $query =~ /^(.+) +$/ ) {
+    $query = $1;
+  }
+  $query =~ s/ +/ /g;
+
+  # spell check each query word (undocumented)
+  if ( $spell ) {
+    $query = spell_check_query ($dbase, $query);
+  }
+
+  # force each query word to be separately fielded (undocumented)
+  if ( $field ne "" ) {
+    $query = field_each_word ($field, $query);
+  }
+
   $enc = uri_escape($query);
   $arg = "db=$dbase&term=$enc";
   if ( $web ne "" ) {
     $arg .= "&WebEnv=$web";
   }
+
+  if ( $sort ne "" ) {
+    $arg .= "&sort=$sort";
+  }
   $arg .= "&retmax=0&usehistory=y";
+
   if ( $rldate > 0 ) {
     $arg .= "&reldate=$rldate";
     if ( $dttype ne "" ) {
@@ -2673,6 +3389,13 @@ sub esrch {
   write_edirect ( $dbase, $web, $key, $num, $stp, $err, $tool, $email );
 }
 
+#  eaddr returns the current user's e-mail address
+
+sub eaddr {
+  my $addr = get_email ();
+  print "$addr\n";
+}
+
 #  etest is an unadvertised function for development
 
 sub etest {
@@ -2698,12 +3421,16 @@ if ( scalar @ARGV > 0 and $ARGV[0] eq "-version" ) {
   einfo ();
 } elsif ( $fnc eq "-post" ) {
   epost ();
+} elsif ( $fnc eq "-spell" ) {
+  espel ();
 } elsif ( $fnc eq "-proxy" ) {
   eprxy ();
 } elsif ( $fnc eq "-contact" ) {
   ecntc ();
 } elsif ( $fnc eq "-notify" ) {
   entfy ();
+} elsif ( $fnc eq "-address" ) {
+  eaddr ();
 } elsif ( $fnc eq "-test" ) {
   etest ();
 } else {
