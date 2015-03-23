@@ -32,3 +32,7 @@ One-liners for finding SNPs via the MSA directory
 Conditions: the first genome alt must not be equal to the second's.  Also, neither position can be "N"
 
     cat out.bcftoolsquery.tsv | perl -lane 'BEGIN{$header=<>; chomp($header);} ($contig,$pos,$ref,@alt)=@F; chomp(@F,@alt); for($i=0;$i<@alt;$i++){$alt[$i]=substr($alt[$i],0,1); $alt[$i]=$ref if($alt[$i] eq ".");} print if($alt[0] ne $alt[1] && $alt[0] ne "N" && $alt[1] ne "N");'
+
+NOTE: I just put this command effectively into a Lyve-SET script like so:
+    
+    filterMatrix.pl --noambiguities --noinvariant  < out.bcftoolsquery.tsv
