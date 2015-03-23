@@ -3,7 +3,7 @@
 
 PREFIX := $(PWD)
 PROFILE := $(HOME)/.bashrc
-VERSION := 1.0.3
+VERSION := 1.0.4
 PROJECT := "setTestProject"
 NUMCPUS := 1
 SHELL   := /bin/bash
@@ -48,10 +48,10 @@ install: install-prerequisites
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET v$(VERSION) complete."
 
-install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-phispy install-samtools install-bcftools install-smalt install-snap install-raxml install-quake
+install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-phispy install-samtools install-bcftools install-smalt install-snap install-raxml
 	@echo DONE installing prerequisites
 
-clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-phispy clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-quake
+clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-phispy clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml
 	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
 
 install-mkdir:
@@ -187,6 +187,14 @@ install-quake:
 
 clean-quake:
 	cd $(PREFIX)/scripts && rm -vf build_bithash count-kmers cov_model.py cov_model.r quake.py correct count-qmers cov_model_qmer.r kmer_hist.r
+
+install-edirect:
+	cd $(PREFIX)/build && perl -MNet::FTP -e '$$ftp = new Net::FTP("ftp.ncbi.nlm.nih.gov", Passive => 1); $$ftp->login; $$ftp->binary; $$ftp->get("/entrez/entrezdirect/edirect.zip");' && unzip -u -q edirect.zip && rm edirect.zip
+	cd $(PREFIX)/build/edirect && sh setup.sh
+	mv -v $(PREFIX)/build/edirect $(PREFIX)/lib
+
+clean-edirect:
+	rm -rvf $(PREFIX)/lib/edirect
 
 cuttingedge: install-mkdir cuttingedge-gitclone install-prerequisites
 	@echo "DONE installing the cutting edge version"
