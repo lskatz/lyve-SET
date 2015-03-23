@@ -68,6 +68,7 @@ sub mapReads{
   logmsg "$bam not found. I'm really doing the mapping now!\n  Outfile: $tmpOut";
 
   my $snap=`which snap`; chomp($snap);
+  my $snapxopts="-t $$settings{numcpus} -so -o $tmpOut --b -I -x";
   # PE reads or not?  Mapping differently for different types.
   if(is_fastqPE($query,$settings)){
     ###########
@@ -78,7 +79,9 @@ sub mapReads{
     logmsg "Deshuffling to $prefix.1.fastq and $prefix.2.fastq";
     system("run_assembly_shuffleReads.pl -d '$query' 1>'$prefix.1.fastq' 2>'$prefix.2.fastq'");
     die "Problem with deshuffling reads! I am assuming paired end reads." if $?;
-    # SNAP 
+
+    # SNAP has a problem trying to compare filesizes of uncompressed fastq
+    # files. Therefore, compress them with max speed.
     system("gzip -vf1 $prefix.1.fastq $prefix.2.fastq");
     die "ERROR with gzip" if $?;
 
@@ -87,7 +90,7 @@ sub mapReads{
     # creating the file yourself first.
     system("touch $tmpOut");
     die if $?;
-    my $snap_command="$snap paired $ref.snap '$prefix.1.fastq.gz' '$prefix.2.fastq.gz' -t $$settings{numcpus} -so -o $tmpOut -x -f -F s --b -I -C++";
+    my $snap_command="$snap paired $ref.snap '$prefix.1.fastq.gz' '$prefix.2.fastq.gz' $snapxopts";
     my $snapxl_command=$snap_command;
     $snapxl_command=~s/snap/snapxl/;
     system("$snap_command || $snapxl_command");
@@ -102,8 +105,7 @@ sub mapReads{
     die "Problem with gunzip" if $?;
     system("touch $tmpOut $tmpOut.bai");
     die if $?;
-    my $snap_command="$snap single $ref.snap '$prefix.SE.fastq' -t $$settings{numcpus} -so -o $tmpOut --b -I -x -f "; # -C parameter was causing segfault
-    #my $snap_command="$snap single $ref.snap '$prefix.SE.fastq' -t $$settings{numcpus} -so -o $tmpOut -x -f -F s --b -I -C++"; # -C parameter was causing segfault
+    my $snap_command="$snap single $ref.snap '$prefix.SE.fastq' $snapxopts";
     my $snapxl_command=$snap_command;
     $snapxl_command=~s/snap/snapxl/;
 
@@ -137,7 +139,10 @@ sub mapReads{
     logmsg "Found bed file of regions to accept and so I am using it! $regions";
     $$settings{samtoolsxopts}.="-L $regions ";
   }
-  my $samtoolsView="mv -v $tmpOut $tmpOut.unfiltered && samtools view $$settings{samtoolsxopts} -bSh -T $ref $tmpOut.unfiltered > $tmpOut.bam";
+  # Use -q 4 because the author of SNAP says that unambiguous matches happen
+  # with mapping quality <=3.
+  # https://groups.google.com/forum/#!topic/snap-user/ppZRDeUkiL0
+  my $samtoolsView="mv -v $tmpOut $tmpOut.unfiltered && samtools view $$settings{samtoolsxopts} -q 4 -bSh -T $ref $tmpOut.unfiltered > $tmpOut.bam";
   system($samtoolsView);
   die "ERROR with samtools view\n  $samtoolsView" if $?;
   unlink("$tmpOut.unfiltered");
