@@ -341,7 +341,10 @@ sub indexReference{
     die if $?;
   } elsif($$settings{mapper} eq 'snap'){
     return $ref if(-d "$ref.snap" && -e "$ref.snap/GenomeIndex");
-    system("snap index $ref $ref.snap -exact -large");
+    # -bSpace to make sure the deflines match up with what samtools expects
+    # -exact -large to take the time to make a fast but somewhat smaller db
+    # Must specify the number of CPUs or else it greedily takes them all instead of what the user specifies
+    system("snap index $ref $ref.snap -exact -large -bSpace -t$$settings{numcpus}");
     die if $?;
   }
   return $ref;
