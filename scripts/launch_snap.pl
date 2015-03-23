@@ -7,6 +7,7 @@ use Getopt::Long;
 use File::Basename qw/fileparse dirname basename/;
 use Bio::Perl;
 use File::Copy qw/copy move/;
+use FindBin qw/$RealBin/;
 
 $0=fileparse $0;
 sub logmsg{print STDERR "$0: @_\n";}
@@ -86,7 +87,7 @@ sub mapReads{
     # creating the file yourself first.
     system("touch $tmpOut");
     die if $?;
-    my $snap_command="$snap paired $ref.snap '$prefix.1.fastq.gz' '$prefix.2.fastq.gz' -t $$settings{numcpus} -so -o $tmpOut -x -f -C++ --b -I";
+    my $snap_command="$snap paired $ref.snap '$prefix.1.fastq.gz' '$prefix.2.fastq.gz' -t $$settings{numcpus} -so -o $tmpOut -x -f -F s --b -I -C++";
     my $snapxl_command=$snap_command;
     $snapxl_command=~s/snap/snapxl/;
     system("$snap_command || $snapxl_command");
@@ -101,7 +102,8 @@ sub mapReads{
     die "Problem with gunzip" if $?;
     system("touch $tmpOut $tmpOut.bai");
     die if $?;
-    my $snap_command="$snap single $ref.snap '$prefix.SE.fastq' -t $$settings{numcpus} -so -o $tmpOut -h 1 --b -I"; # -C parameter was causing segfault
+    my $snap_command="$snap single $ref.snap '$prefix.SE.fastq' -t $$settings{numcpus} -so -o $tmpOut --b -I -x -f "; # -C parameter was causing segfault
+    #my $snap_command="$snap single $ref.snap '$prefix.SE.fastq' -t $$settings{numcpus} -so -o $tmpOut -x -f -F s --b -I -C++"; # -C parameter was causing segfault
     my $snapxl_command=$snap_command;
     $snapxl_command=~s/snap/snapxl/;
 
