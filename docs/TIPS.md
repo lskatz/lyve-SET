@@ -24,3 +24,11 @@ In the case where you have all pileups finished and want to call SNPs on a singl
     cd vcf; 
     ls *.vcf| xargs -I {} -P 24 -n 1 sh -c "vcf-sort < {} > {}.tmp && mv -v {}.tmp {} && bgzip {} && tabix {}.gz"
 
+One-liners for finding SNPs via the MSA directory
+-------------------------------------------------
+
+### Find actual SNPs of high quality (assuming only two genomes)
+
+Conditions: the first genome alt must not be equal to the second's.  Also, neither position can be "N"
+
+    cat out.bcftoolsquery.tsv | perl -lane 'BEGIN{$header=<>; chomp($header);} ($contig,$pos,$ref,@alt)=@F; chomp(@F,@alt); for($i=0;$i<@alt;$i++){$alt[$i]=substr($alt[$i],0,1); $alt[$i]=$ref if($alt[$i] eq ".");} print if($alt[0] ne $alt[1] && $alt[0] ne "N" && $alt[1] ne "N");'
