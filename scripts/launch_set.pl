@@ -1,13 +1,15 @@
 #!/usr/bin/env perl
 
 # Update paths
-use FindBin;
+use FindBin qw/$RealBin/;
 use lib "$FindBin::RealBin/../lib";
 # Make sure the path is set up correctly but do not take priority 
 # over what the user truly wants, as dictated by the already-existing path.
 # This cannot be used as a solution if the user has the incorrect
 # software version in the path (e.g., samtools 0.1.19)
-$ENV{PATH}="$ENV{PATH}:$FindBin::RealBin";
+#$ENV{PATH}="$ENV{PATH}:$FindBin::RealBin";
+# Aw, screw it.  Force the path on the user.
+$ENV{PATH}="$RealBin:$ENV{PATH}";
 
 use strict;
 use warnings;
