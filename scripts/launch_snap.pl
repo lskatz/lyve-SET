@@ -133,7 +133,7 @@ sub mapReads{
 
 
   # Do some post-mapping filtering
-  $$settings{samtoolsxopts}.="-F 4 ";
+  $$settings{samtoolsxopts}.="-F 4 -q 4";
   my $regions="$$settings{refdir}/unmaskedRegions.bed";
   if(-e $regions && -s $regions > 0){
     logmsg "Found bed file of regions to accept and so I am using it! $regions";
@@ -142,7 +142,7 @@ sub mapReads{
   # Use -q 4 because the author of SNAP says that unambiguous matches happen
   # with mapping quality <=3.
   # https://groups.google.com/forum/#!topic/snap-user/ppZRDeUkiL0
-  my $samtoolsView="mv -v $tmpOut $tmpOut.unfiltered && samtools view $$settings{samtoolsxopts} -q 4 -bSh -T $ref $tmpOut.unfiltered > $tmpOut.bam";
+  my $samtoolsView="mv -v $tmpOut $tmpOut.unfiltered && samtools view $$settings{samtoolsxopts} -bSh -T $ref $tmpOut.unfiltered > $tmpOut.bam";
   system($samtoolsView);
   die "ERROR with samtools view\n  $samtoolsView" if $?;
   unlink("$tmpOut.unfiltered");
