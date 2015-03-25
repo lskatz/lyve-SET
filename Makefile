@@ -3,7 +3,7 @@
 
 PREFIX := $(PWD)
 PROFILE := $(HOME)/.bashrc
-VERSION := 1.0.4
+VERSION := 1.0.5
 PROJECT := "setTestProject"
 NUMCPUS := 1
 SHELL   := /bin/bash
@@ -165,7 +165,7 @@ install-snap:
 	cd $(PREFIX)/lib/snap && make && make snapxl
 	cp -vn $(PREFIX)/lib/snap/snap   $(PREFIX)/scripts/
 	cp -vn $(PREFIX)/lib/snap/snapxl $(PREFIX)/scripts/
-  
+
 clean-snap:
 	rm -rvf $(PREFIX)/lib/snap $(PREFIX)/scripts/snap $(PREFIX)/scripts/snapxl
 
