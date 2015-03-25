@@ -266,11 +266,19 @@ sub Fst{
     logmsg "Tree was not created. Will not perform Fst on an empty tree";
     return "";
   }
+
+  # Make a warning message if Fst doesn't complete. It's not necessary 
+  # for the rest of the pipeline, so don't die on error.
+  my $warningMsg="Warning: Fst could not be calculated either due to an error in the script 'applyFstToTree.pl', or because too many taxa are in one polytomy, or some other error I haven't uncovered yet.";
+  my $exit_codes=0;
+
+  # Run Fst, once for averages and once per data point.
   # TODO multithread this?
   system("applyFstToTree.pl --numcpus $$settings{numcpus} -t $treePrefix.RAxML_bipartitions -p $pairwisePrefix.tsv --outprefix $fstPrefix --outputType averages > $fstPrefix.avg.tsv");
-  die if $?;
+  $exit_codes+=$?;
   system("applyFstToTree.pl --numcpus $$settings{numcpus} -t $treePrefix.RAxML_bipartitions -p $pairwisePrefix.tsv --outprefix $fstPrefix --outputType samples > $fstPrefix.samples.tsv");
-  die if $?;
+  $exit_codes+=$?;
+  logmsg $warningMsg if $exit_codes;
   return $fstTree;
 }
 
