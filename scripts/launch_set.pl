@@ -359,6 +359,11 @@ sub mapReads{
   my $log=$$settings{logdir};
   my @file=(glob("$readsdir/*.fastq"),glob("$readsdir/*.fastq.gz"),glob("$readsdir/*.fq"),glob("$readsdir/*.fq.gz"));
 
+  if(!@file){
+    logmsg "ERROR: no files were found in $readsdir/. However, in case you are continuing Lyve-SET after all the bam files have already been created and you just happened to delete all the input files, I will continue";
+    return 0;
+  }
+
   downsampleReads($ref,\@file,$settings) if($$settings{downsample});
 
   my $snapxopts="";
@@ -417,6 +422,11 @@ sub variantCalls{
   my($ref,$bamdir,$vcfdir,$settings)=@_;
   logmsg "Calling variants with $$settings{snpcaller}";
   my @bam=glob("$bamdir/*.sorted.bam");
+
+  if(!@bam){
+    logmsg "ERROR: no bam files were found in $bamdir/. However, in case you are continuing Lyve-SET after all the vcf files have already been created and you just happened to delete all the bam files, I will continue";
+    return 0;
+  }
 
   # see if bgzip and tabix exist
   my $bgzip=`which bgzip 2>/dev/null`; chomp($bgzip);
