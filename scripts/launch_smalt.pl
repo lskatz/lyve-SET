@@ -15,15 +15,17 @@ exit(main());
 
 sub main{
   my $settings={clean=>0};
-  GetOptions($settings,qw(help reference=s fastq=s bam=s tempdir=s clean! numcpus=i smaltxopts=s pairedend=i)) or die $!;
+  GetOptions($settings,qw(help reference=s fastq=s bam=s tempdir=s clean! numcpus=i smaltxopts=s pairedend=i minPercentIdentity=i)) or die $!;
   $$settings{numcpus}||=1;
   $$settings{tempdir}||="tmp";
   $$settings{pairedend}||=0;
+  $$settings{minPercentIdentity}||=95;
+  $$settings{minPercentIdentity}=sprintf("%0.2f",$$settings{minPercentIdentity}/100);
 
   # smalt extra options
   $$settings{smaltxopts}||="";
   #$$settings{smaltxopts}.=" -i 1000 -y 0.95 -f samsoft -n $$settings{numcpus}";
-  $$settings{smaltxopts}.=" -i 1000 -y 0.95 -r -1 -f samsoft -n $$settings{numcpus}";
+  $$settings{smaltxopts}.=" -i 1000 -y $$settings{minPercentIdentity} -r -1 -f samsoft -n $$settings{numcpus}";
   $$settings{samtoolsxopts}||="";
 
   for(qw(reference fastq bam)){
@@ -162,6 +164,7 @@ sub usage{
   --numcpus 1 number of cpus to use
   -s '' Extra smalt map options (not validated). Default: $$settings{smaltxopts} 
   --pairedend <0|1|2> For 'auto', single-end, or paired-end respectively. Default: auto (0).
+  --minPercentIdentity 95  The percent identity between a read and its match before it can be mapped
   "
 }
 
