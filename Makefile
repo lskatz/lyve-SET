@@ -3,7 +3,7 @@
 
 PREFIX := $(PWD)
 PROFILE := $(HOME)/.bashrc
-VERSION := 1.0.6
+VERSION := 1.0.7
 PROJECT := "setTestProject"
 NUMCPUS := 1
 SHELL   := /bin/bash
