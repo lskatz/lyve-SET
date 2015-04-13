@@ -21,6 +21,7 @@ use File::Spec;
 use threads;
 use Thread::Queue;
 use Schedule::SGELK;
+use Config::Simple;
 
 my ($name,$scriptsdir,$suffix)=fileparse($0);
 $scriptsdir=File::Spec->rel2abs($scriptsdir);
@@ -50,7 +51,7 @@ exit(main());
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --notrees
   my $settings={trees=>1,msa=>1, matrix=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s info=s@ mask-phages! rename-taxa=s fast downsample sample-sites singleend)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s info=s@ mask-phages! rename-taxa=s fast downsample sample-sites singleend presets=s)) or die $!;
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
@@ -77,6 +78,18 @@ sub main{
     $$settings{'mask-phages'}=0;
     $$settings{downsample}=1;
     $$settings{'sample-sites'}=1;
+  }
+
+  # If the user wants to use preset configurations
+  if($$settings{presets}){
+    # Load the configuration
+    my $confPath="$FindBin::RealBin/../config/presets.conf";
+    my $cfg=new Config::Simple($confPath) or die "ERROR: could not open $confPath";
+    # Find the configuration that was specified
+    my $block=$cfg->block($$settings{presets});
+    die "ERROR: configuration $$settings{presets} was not found in $confPath!" if(!keys(%$block));
+    # Put the presets into the current settings
+    $$settings{$_}=$$block{$_} for(keys(%$block));
   }
 
   # Some things need to just be lowercase to make things easier downstream
@@ -605,6 +618,7 @@ sub usage{
     --singleend                      Treat everything like single-end. Useful for when you think there is a single-end/paired-end bias.
     OTHER SHORTCUTS
     --fast                           Shorthand for --downsample --mapper snap --nomask-phages --sample-sites
+    --presets \"\"                   See presets.conf for more information
     --downsample                     Downsample all reads to 50x. Approximated according to the ref genome assembly
     --sample-sites                   Randomly choose a genome and find SNPs in a quick and dirty way. Then on the SNP-calling stage, only interrogate those sites for SNPs for each genome (including the randomly-sampled genome).
     MODULES
@@ -621,3 +635,4 @@ sub usage{
   ";
   return $help;
 }
+
