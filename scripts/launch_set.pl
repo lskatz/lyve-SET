@@ -51,7 +51,7 @@ exit(main());
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --notrees
   my $settings={trees=>1,msa=>1, matrix=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s info=s@ mask-phages! rename-taxa=s fast downsample sample-sites singleend presets=s)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s info=s@ mask-phages! rename-taxa=s fast downsample sample-sites singleend presets=s read_cleaner=s)) or die $!;
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
@@ -64,6 +64,7 @@ sub main{
   $$settings{'sample-sites'}||=0;
   $$settings{singleend}||=0;
   # modules defaults
+  $$settings{read_cleaner}||="";
   $$settings{mapper}||="smalt";
   $$settings{snpcaller}||="varscan";
   # queue stuff
@@ -93,7 +94,7 @@ sub main{
   }
 
   # Some things need to just be lowercase to make things easier downstream
-  $$settings{$_}=lc($$settings{$_}) for(qw(snpcaller mapper));
+  $$settings{$_}=lc($$settings{$_}) for(qw(snpcaller mapper read_cleaner));
 
   ##########################################################
   ### Other defaults: reference genome; default directories#
@@ -378,6 +379,7 @@ sub mapReads{
   }
 
   downsampleReads($ref,\@file,$settings) if($$settings{downsample});
+  cleanReads(\@file,$settings) if($$settings{read_cleaner});
 
   my $snapxopts="";
   my $smaltxopts="";
@@ -414,19 +416,50 @@ sub downsampleReads{
   my($ref,$reads,$settings)=@_;
   my $coverage=50;
   my $reducedBases=(-s $ref) * $coverage;
-  logmsg "Downsampling the reads to ${coverage}x. Backup of the original files will be renamed to *.orig";
+  logmsg "Downsampling the reads to ${coverage}x.";
   for my $file(@$reads){
     # downsample into tmpdir
     # move the original reads to "$file.orig"
-    my $b=basename($file,qw(.downsampled.fastq.gz .fastq.gz));
+    my $b=basename($file,qw(.cleaned.fastq.gz .downsampled.fastq.gz .fastq.gz));
     my $d=dirname($file);
-    my $backup="$d/$b.fastq.gz.orig";
+    my $backupDir="$d/notDownsampled";
+    mkdir($backupDir);
+    my $backup="$backupDir/$b.fastq.gz";
     next if(-e $backup);
     logmsg "Did not find $backup. Downsampling...";
     # 1. Downsample to file.downsampled
     # 2. Mv un-downsampled file to file.orig
     # 3. Mv file.downsampled to file
     $sge->pleaseExecute("run_assembly_removeDuplicateReads.pl -size $reducedBases $file | gzip -c > $file.downsampled && mv -v $file $backup && mv -v $file.downsampled $file",{numcpus=>1,jobname=>"downsample$b"});
+  }
+  $sge->wrapItUp();
+}
+
+sub cleanReads{
+  my($reads,$settings)=@_;
+  for my $file(@$reads){
+    # Clean into tmpdir
+    # move the original reads to "$file.orig"
+    my $b=basename($file,qw(.cleaned.fastq.gz .downsampled.fastq.gz .fastq.gz));
+    my $d=dirname($file);
+    my $backupDir="$d/notCleaned";
+    mkdir($backupDir);
+    my $backup="$backupDir/$b.fastq.gz";
+    my $tmp="$$settings{tmpdir}/$b.fastq.gz";
+    next if(-e $backup);
+    # 1. Clean to tmp/cleaned
+    # 2. Mv uncleaned to backup/file.fastq.gz
+    # 3. mv tmp/cleaned to ./file.fastq.gz
+    if($$settings{read_cleaner} eq "cgp"){
+      logmsg "Did not find $backup. Cleaning with CGP...";
+      $sge->pleaseExecute("run_assembly_trimClean.pl -i $file -o $tmp --auto --nosingletons --numcpus $$settings{numcpus} 2>&1 && mv -v $file $backup && mv -v $tmp $file",{numcpus=>$$settings{numcpus},jobname=>"clean$b"});
+    } elsif($$settings{read_cleaner} eq "bayeshammer"){
+      logmsg "Did not find $backup. Cleaning with BayesHammer...";
+      ...;
+    } else {
+      logmsg "ERROR: I do not understand the read cleaner $$settings{read_cleaner}";
+      die;
+    }
   }
   $sge->wrapItUp();
 }
@@ -622,6 +655,7 @@ sub usage{
     --downsample                     Downsample all reads to 50x. Approximated according to the ref genome assembly
     --sample-sites                   Randomly choose a genome and find SNPs in a quick and dirty way. Then on the SNP-calling stage, only interrogate those sites for SNPs for each genome (including the randomly-sampled genome).
     MODULES
+    --read_cleaner $$settings{read_cleaner}   Which read cleaner?  Choices: none, CGP, BayesHammer
     --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap";
     #--snpcaller    $$settings{snpcaller}   Which SNP caller? Choices: freebayes, varscan
     $help.="
