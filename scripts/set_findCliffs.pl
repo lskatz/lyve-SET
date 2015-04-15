@@ -180,17 +180,22 @@ sub findCliffsInRegion{
   # Is anything lower than a cutoff for what I'd expect?
   # Cliffs don't happen all to often, so maybe it's in the bottom 1%
   my $lo=$avg - 3*$stdev;
-  #my $hi=$avg + 2*$stdev;
-  #for($lo,$hi){
   for($lo){
     $_=0 if($_<0);
     $_=sprintf("%0.2f",$_);
   }
+
+  # Figure out the cliffs using $lo as a cutoff
   my @region;
-  while(my($start,$depth)=each(%depth)){
+  # I don't want to look at the edges of the larger window, and
+  # anything I miss will be encompassed in the next cascading
+  # window anyway.
+  my @sortedStart=sort {$a<=>$b} keys(%depth);
+  shift(@sortedStart); pop(@sortedStart);
+  for(my $i=0;$i<@sortedStart;$i++){
+    my $start=$sortedStart[$i];
+    my $depth=$depth{$start};
     next if($depth > $lo); # don't call this a cliff it's not too low
-    #next if($depth<$hi && $depth>$lo);
-    #push(@{$region{$seqname}},[$start,$start+$windowSize]);
     push(@region,{depth=>$depth,CI=>[$lo,9999],region=>[$seqname,$start,$start+$windowSize]});
   }
   #logmsg "TID:".threads->tid." $seqname:$pos-$lastPos  Depth 95% CI interval: [$lo,$hi]";
