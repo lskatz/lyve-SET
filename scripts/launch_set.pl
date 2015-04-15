@@ -78,6 +78,7 @@ sub main{
   if($$settings{fast}){
     $$settings{mapper}="snap";
     $$settings{'mask-phages'}=0;
+    $$settings{'mask-cliffs'}=0;
     $$settings{downsample}=1;
     $$settings{'sample-sites'}=1;
   }
@@ -671,7 +672,7 @@ sub usage{
     --notrees                        Do not make phylogenies
     --singleend                      Treat everything like single-end. Useful for when you think there is a single-end/paired-end bias.
     OTHER SHORTCUTS
-    --fast                           Shorthand for --downsample --mapper snap --nomask-phages --sample-sites
+    --fast                           Shorthand for --downsample --mapper snap --nomask-phages --nomask-cliffs --sample-sites
     --presets \"\"                   See presets.conf for more information
     --downsample                     Downsample all reads to 50x. Approximated according to the ref genome assembly
     --sample-sites                   Randomly choose a genome and find SNPs in a quick and dirty way. Then on the SNP-calling stage, only interrogate those sites for SNPs for each genome (including the randomly-sampled genome).
