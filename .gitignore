@@ -1,0 +1,6 @@
+testdata/*/reference/*
+testdata/*/asm/*
+testdata/*/reads/*
+build/*
+lib/Schedule/*
+
