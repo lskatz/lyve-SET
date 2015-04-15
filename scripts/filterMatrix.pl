@@ -87,7 +87,7 @@ sub filterSites{
     $bcfMatrixLine=join("\t",$CONTIG,$POS,$REF,@GT);
 
     # Mask any site found in the BED files
-    $hqSite=0 if($$maskedRanges{$CONTIG}->inrange($POS));
+    $hqSite=0 if(defined($$maskedRanges{$CONTIG}) && $$maskedRanges{$CONTIG}->inrange($POS));
 
     # High-quality sites are far enough away from each other, as defined by the user
     $hqSite=0 if($POS - $currentPos < $$settings{allowed});
