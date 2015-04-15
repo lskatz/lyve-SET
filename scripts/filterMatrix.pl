@@ -6,17 +6,24 @@ use Data::Dumper;
 use Getopt::Long;
 use Bio::Perl;
 use File::Basename;
+use File::Temp qw/tempdir/;
+use List::Util qw/min max/;
+
+use FindBin;
+use lib "$FindBin::RealBin/../lib";
+use LyveSET qw/logmsg/;
+use Number::Range;
 
 $0=fileparse $0;
-sub logmsg{print STDERR "$0: @_\n";}
 
 exit main();
 sub main{
   my $settings={ambiguities=>1,invariant=>1};
-  GetOptions($settings,qw(help ambiguities! invariant! tempdir=s allowed=i)) or die $!;
+  GetOptions($settings,qw(help ambiguities! invariant! tempdir=s allowed=i mask=s@)) or die $!;
   die usage() if($$settings{help});
-  $$settings{tempdir}||="tmp";
+  $$settings{tempdir}||=tempdir("$0XXXXXX",TMPDIR=>1,CLEANUP=>1);
   $$settings{allowed}||=0;
+  $$settings{mask}||=();
 
   my($in)=@ARGV;
 
@@ -30,12 +37,17 @@ sub main{
 sub filterSites{
   my($bcfqueryFile,$settings)=@_;
 
+  # Open the unfiltered BCF query file
   my $fp;
   if($bcfqueryFile){
     open($fp,"<",$bcfqueryFile) or die "ERROR: could not open bcftools query file $bcfqueryFile for reading: $!";
   } else {
     $fp=*STDIN;
   }
+
+  # If there are any coordinates explicitly listed for masking,
+  # combine them all into a single range object, one per seqname.
+  my $maskedRanges=readBedFiles($bcfqueryFile,$$settings{mask},$settings);
 
   # Read in the header with genome labels
   my $header=<$fp>;
@@ -73,6 +85,9 @@ sub filterSites{
     }
     # Alter the bcf line after the seeking line, so that the correct seek length can be established.
     $bcfMatrixLine=join("\t",$CONTIG,$POS,$REF,@GT);
+
+    # Mask any site found in the BED files
+    $hqSite=0 if($$maskedRanges{$CONTIG}->inrange($POS));
 
     # High-quality sites are far enough away from each other, as defined by the user
     $hqSite=0 if($POS - $currentPos < $$settings{allowed});
@@ -128,6 +143,42 @@ sub diploidGtToHaploid{
   return $gt;
 }
 
+# Turn bed-defined ranges into range objects
+sub readBedFiles{
+  my($bcfqueryFile,$maskFile,$settings)=@_;
+  my %range;
+
+  # Find what seqnames there are out there first,
+  # so that every expected range object will be defined.
+  if(-e $bcfqueryFile){
+    my $command="grep -v '^#' $bcfqueryFile | cut -f 1 | sort | uniq";
+    my $seqname=`$command`;
+    die "ERROR getting sequence names from $bcfqueryFile: $!\n  $command" if $?;
+    my @seqname=split(/\n/,$seqname);
+    chomp(@seqname);
+    undef($seqname);
+
+    # Initialize ranges
+    $range{$_}=Number::Range->new() for(@seqname);
+  }
+
+  # Read the bed files
+  for my $bed(@$maskFile){
+    open(BED,$bed) or die "ERROR: could not open $bed: $!";
+    while(<BED>){
+      chomp;
+      my($seqname,$start,$stop)=split(/\t/);
+      $range{$seqname}=Number::Range->new() if(!$range{$seqname});
+      my $lo=min($start,$stop);
+      my $hi=max($start,$stop);
+      $range{$seqname}->addrange("$lo..$hi");
+    }
+    close BED;
+  }
+
+  return \%range;
+}
+
 sub usage{
   "Multiple VCF format to alignment
   $0: filters a bcftools query matrix. The first three columns of the matrix are contig/pos/ref, and the next columns are all GT.
@@ -138,5 +189,6 @@ sub usage{
   --noinvariant       Remove any site whose alts are all equal
   --allowed 0         How close SNPs can be from each other before being thrown out
   --tempdir tmp       temporary directory
+  --mask file.bed     BED-formatted file of regions to exclude. Multiple --mask flags are allowed for multiple bed files.
   "
 }
