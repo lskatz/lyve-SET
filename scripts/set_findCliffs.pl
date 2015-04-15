@@ -48,7 +48,7 @@ sub findCliffs{
   });
 
   # Generate the regions that will be looked at
-  my $windowSize=500;
+  my $windowSize=250;
   my $stepSize=int($windowSize/2);
   my $seqinfo=getSeqInfo($bam,$settings);
   my @region; # set of coordinates to analyze for depth
@@ -74,11 +74,11 @@ sub findCliffs{
   $depth=readBamDepth($depthfile,$settings);
   $thr[$_]=threads->new(\&findCliffsInRegionWorker,$depth,$Q,$settings) for(0..$$settings{numcpus}-1);
   $Q->enqueue(undef) for(@thr);
-  $Q->end;
 
   # Gather results from the threads by making
   # a set of ranges
   for my $t(@thr){
+    logmsg "Combining ranges found in TID".$t->tid;
     my $ranges=$t->join;
     # Add whatever coordinates the analysis showed us
     for my $setOfRanges(@$ranges){
@@ -106,21 +106,28 @@ sub findCliffsInRegionWorker{
   my($depth,$Q,$settings)=@_;
   my $tid=threads->tid;
 
+  # Make a copy of depth so that this thread isn't in competition
+  # with the other threads.
+  my %depth=%$depth;
+  undef($depth); # free up memory
+
   my @region; # array of hashes
   my $i=0;
   DEQUEUE:
-  while(my @dequeued=$Q->dequeue(100)){
-    for my $tmp(@dequeued){ 
-      last DEQUEUE if(!defined($tmp));
-      my($bam,$seqname,$pos,$lastPos)=@$tmp;
-      my @r=findCliffsInRegion($bam,$depth,$seqname,$pos,$lastPos,$settings);
-      push(@region,@r);
-      #logmsg "TID$tid: $seqname:$pos-$lastPos";
-      #logmsg $tid;
-      $i++;
-    }
+  while(my $tmp=$Q->dequeue){
+    last DEQUEUE if(!defined($tmp));
+    my($bam,$seqname,$pos,$lastPos)=@$tmp;
+    my @r=findCliffsInRegion($bam,\%depth,$seqname,$pos,$lastPos,$settings);
+    push(@region,@r);
+    #logmsg "TID$tid: $seqname:$pos-$lastPos";
+    #logmsg $tid;
+    $i++;
+    
+    #if($i % 1000 == 0){
+    #  #sleep 1; # give the other threads time to dequeue
+    #}
   }
-  logmsg "TID$tid: finished $i regions";
+  logmsg "TID$tid: finished looking at $i regions";
   return \@region;
 }
 
