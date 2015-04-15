@@ -48,7 +48,7 @@ sub findCliffs{
   });
 
   # Generate the regions that will be looked at
-  my $windowSize=5000;
+  my $windowSize=500;
   my $stepSize=int($windowSize/2);
   my $seqinfo=getSeqInfo($bam,$settings);
   my @region; # set of coordinates to analyze for depth
@@ -69,9 +69,12 @@ sub findCliffs{
   # Start off the threads and enqueue those defined regions
   my $Q=Thread::Queue->new(@region);
   my @thr;
-  my $depth=readBamDepth($depthfile,$settings);
+  my $depth={};
+  share($depth);
+  $depth=readBamDepth($depthfile,$settings);
   $thr[$_]=threads->new(\&findCliffsInRegionWorker,$depth,$Q,$settings) for(0..$$settings{numcpus}-1);
   $Q->enqueue(undef) for(@thr);
+  $Q->end;
 
   # Gather results from the threads by making
   # a set of ranges
@@ -86,6 +89,7 @@ sub findCliffs{
       }
     }
   }
+  undef($depth); # free up some memory
   # DONE gathering and combining ranges
 
   # Print the results in BED format
@@ -105,14 +109,14 @@ sub findCliffsInRegionWorker{
   my @region; # array of hashes
   my $i=0;
   DEQUEUE:
-  while(my @dequeued=$Q->dequeue_nb(10000)){
+  while(my @dequeued=$Q->dequeue(100)){
     for my $tmp(@dequeued){ 
       last DEQUEUE if(!defined($tmp));
       my($bam,$seqname,$pos,$lastPos)=@$tmp;
       my @r=findCliffsInRegion($bam,$depth,$seqname,$pos,$lastPos,$settings);
       push(@region,@r);
       #logmsg "TID$tid: $seqname:$pos-$lastPos";
-      logmsg $tid;
+      #logmsg $tid;
       $i++;
     }
   }
@@ -144,7 +148,7 @@ sub findCliffsInRegion{
               #                    [start,stop],
               #                  ]
 
-  my $windowSize=50;
+  my $windowSize=15;
   my $stepSize=int($windowSize/2);
 
   # Find the average of average depths
@@ -166,18 +170,21 @@ sub findCliffsInRegion{
   $stat->add_data(values(%depth));
   my($avg,$stdev)=($stat->mean,$stat->standard_deviation);
 
-  # Is anything lower than the 5% cutoff?
-  my $lo=$avg - 2*$stdev;
-  my $hi=$avg + 2*$stdev;
-  for($lo,$hi){
+  # Is anything lower than a cutoff for what I'd expect?
+  # Cliffs don't happen all to often, so maybe it's in the bottom 1%
+  my $lo=$avg - 3*$stdev;
+  #my $hi=$avg + 2*$stdev;
+  #for($lo,$hi){
+  for($lo){
     $_=0 if($_<0);
     $_=sprintf("%0.2f",$_);
   }
   my @region;
   while(my($start,$depth)=each(%depth)){
-    next if($depth<$hi && $depth>$lo);
+    next if($depth > $lo); # don't call this a cliff it's not too low
+    #next if($depth<$hi && $depth>$lo);
     #push(@{$region{$seqname}},[$start,$start+$windowSize]);
-    push(@region,{depth=>$depth,CI=>[$lo,$hi],region=>[$seqname,$start,$start+$windowSize]});
+    push(@region,{depth=>$depth,CI=>[$lo,9999],region=>[$seqname,$start,$start+$windowSize]});
   }
   #logmsg "TID:".threads->tid." $seqname:$pos-$lastPos  Depth 95% CI interval: [$lo,$hi]";
   return \@region;
