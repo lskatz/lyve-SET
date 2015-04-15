@@ -51,7 +51,7 @@ exit(main());
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --notrees
   my $settings={trees=>1,msa=>1, matrix=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s info=s@ mask-phages! rename-taxa=s fast downsample sample-sites singleend presets=s read_cleaner=s)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s info=s@ mask-phages! mask-cliffs! rename-taxa=s fast downsample sample-sites singleend presets=s read_cleaner=s)) or die $!;
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
@@ -59,6 +59,7 @@ sub main{
   $$settings{min_coverage}||=10;
   $$settings{info}||=['version']; #info that the user requests to see
   $$settings{'mask-phages'}=1 if(!defined($$settings{'mask-phages'}));
+  $$settings{'mask-cliffs'}=1 if(!defined($$settings{'mask-cliffs'}));
   $$settings{'rename-taxa'}||="";
   $$settings{downsample}||=0;
   $$settings{'sample-sites'}||=0;
@@ -388,10 +389,12 @@ sub mapReads{
     $snapxopts.= "--pairedend 1";
   }
 
-  my @job;
+  my (@bam,@job);
   for my $fastq(@file){
     my $b=fileparse $fastq;
     my $bamPrefix="$bamdir/$b-".basename($ref,qw(.fasta .fna .fa));
+    push(@bam,"$bamPrefix.sorted.bam");
+
     if(-e "$bamPrefix.sorted.bam"){
       logmsg "Found $bamPrefix.sorted.bam. Skipping.";
       next;
@@ -409,6 +412,23 @@ sub mapReads{
   }
   logmsg "All mapping jobs have been submitted. Waiting on them to finish.";
   $sge->wrapItUp();
+
+  # Look for cliffs in coverage levels
+  if($$settings{'mask-cliffs'}){
+    # Make the directory where these masking coordinates go
+    my $maskDir="$$settings{refdir}/maskedRegions";
+    mkdir($maskDir) if(!-d $maskDir);
+    logmsg "Finding regions to mask, and recording them in $maskDir/*";
+
+    for my $bam(@bam){
+      my $b=basename($bam,qw(.sorted.bam));
+      my $bed="$maskDir/$b.cliffs.bed";
+      next if(-e $bed);
+      $sge->pleaseExecute("$scriptsdir/set_findCliffs.pl --numcpus $$settings{numcpus} $bam > $bed",{jobname=>"maskCliff$b",numcpus=>$$settings{numcpus}});
+    }
+    $sge->wrapItUp();
+  }
+
   return 1;
 }
 
@@ -645,6 +665,7 @@ sub usage{
     $help.="
     SKIP CERTAIN STEPS
     --nomask-phages                  Do not search for and mask phages in the reference genome
+    --nomask-cliffs                  Do not search for and mask 'Cliffs' in pileups
     --nomatrix                       Do not create an hqSNP matrix
     --nomsa                          Do not make a multiple sequence alignment
     --notrees                        Do not make phylogenies
