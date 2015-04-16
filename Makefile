@@ -3,7 +3,6 @@
 
 PREFIX := $(PWD)
 PROFILE := $(HOME)/.bashrc
-VERSION := 1.0.8
 PROJECT := "setTestProject"
 NUMCPUS := 1
 SHELL   := /bin/bash
@@ -46,7 +45,7 @@ all: install env clean
 install: install-prerequisites
 	@echo "Don't forget to set up update PATH and PERL5LIB to $(PREFIX)/scripts and $(PREFIX)/lib"
 	@echo "'make env' performs this step for you"
-	@echo "DONE: installation of Lyve-SET v$(VERSION) complete."
+	@echo "DONE: installation of Lyve-SET complete."
 
 install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-phispy install-samtools install-bcftools install-smalt install-snap install-raxml
 	@echo DONE installing prerequisites
