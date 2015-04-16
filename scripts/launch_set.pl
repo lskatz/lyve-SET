@@ -51,13 +51,13 @@ exit(main());
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --notrees
   my $settings={trees=>1,msa=>1, matrix=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s info=s@ mask-phages! mask-cliffs! rename-taxa=s fast downsample sample-sites singleend presets=s read_cleaner=s)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! rename-taxa=s fast downsample sample-sites singleend presets=s read_cleaner=s)) or die $!;
+  # TODO put these global options into LyveSET.conf, now that it exists
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
   $$settings{keep}||=0;
   $$settings{min_alt_frac}||=0.75;
   $$settings{min_coverage}||=10;
-  $$settings{info}||=['version']; #info that the user requests to see
   $$settings{'mask-phages'}=1 if(!defined($$settings{'mask-phages'}));
   $$settings{'mask-cliffs'}=1 if(!defined($$settings{'mask-cliffs'}));
   $$settings{'rename-taxa'}||="";
@@ -98,18 +98,19 @@ sub main{
   # Some things need to just be lowercase to make things easier downstream
   $$settings{$_}=lc($$settings{$_}) for(qw(snpcaller mapper read_cleaner));
 
-  ##########################################################
-  ### Other defaults: reference genome; default directories#
-  ##########################################################
+  ###########################################################
+  ### Other defaults: reference genome; default directories #
+  ###########################################################
   my $project=shift(@ARGV) || '.'; # by default the user is in the project directory
   die usage($settings) if($$settings{help});
-  logmsg "Project was defined as $project"; # No period at the end of sentence to avoid ambiguous '..' in the logmsg
+  logmsg "Project was defined as $project";
   # Checks to make sure that this is a project
   #system("set_manage.pl '$project'"); die if $?;
   # Set the defaults if they aren't set already
   $$settings{ref}||="$project/reference/reference.fasta";
   $$settings{refdir}||=dirname($$settings{ref});
   # Check SET directories' existence and set their defaults
+  die "ERROR: could not find dir $project" if(!-e $project);
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir logdir)){
     my $b=$param;
     $b=~s/dir$//;  # e.g., vcfdir => vcf
@@ -136,13 +137,14 @@ sub main{
   #####################################
   # Go through the major steps of SET #
   # ###################################
-  printSetInfo($settings);
+  $settings=readGlobalSettings(0,$settings);
   simulateReads($settings);
   maskReference($ref,$settings);
   indexReference($ref,$settings);
   mapReads($ref,$$settings{readsdir},$$settings{bamdir},$settings);
   variantCalls($ref,$$settings{bamdir},$$settings{vcfdir},$settings);
 
+  # TODO put all the tree-making stuff into its own subroutine too
   my $pooled;
   if($$settings{matrix}){
     $pooled=variantsToMatrix($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
@@ -176,35 +178,30 @@ sub main{
   return 0;
 }
 
-# Pick information about SET from the Makefile where it is stored
-sub printSetInfo{
-  my($settings)=@_;
-  my $makefile="$FindBin::RealBin/../Makefile";
-  if(!-e $makefile){
-    logmsg "ERROR: I could not find the makefile at $makefile and so I could not display information about SET";
-    return 0;
-  }
+# Pick information about SET from the Makefile where it is stored.
+# If overwrite is set to true, then existing settings will be 
+# overwritten. Otherwise, settings will be applied if no other
+# value was there beforehand.
+sub readGlobalSettings{
+  my($overwrite,$settings)=@_;
+  # make a copy of settings to avoid ridiculousness
+  my %settingsCopy=%$settings;
 
-  # Get the contents of the makefile
-  open(MAKEFILE,$makefile) or die "ERROR: I could not open the makefile ($makefile): $!";
-  my @contents=<MAKEFILE>;
-  chomp(@contents);
-  close MAKEFILE;
-
-  # For each bit of requested information, see if it's in the makefile under some variable
-  for my $info(@{$$settings{info}}){
-    my @infoLine=grep {/\Q$info\E/i} @contents;
-    my($var,$value);
-    for(my $i=0;$i<@infoLine;$i++){
-      if($infoLine[$i]=~/(\w+)\s*:=\s*(.+)/){
-        ($var,$value)=($1,$2);
-      }
+  my $confPath="$FindBin::RealBin/../config/LyveSET.conf";
+  my $cfg=new Config::Simple($confPath) or die "ERROR: could not open $confPath";
+  # Find the configuration that was specified
+  my $block=$cfg->block("global");
+  die "ERROR: configuration [global] was not found in $confPath!" if(!keys(%$block));
+  # Put the presets into the current settings
+  for(keys(%$block)){
+    if($$settings{'overwrite-config'}){
+      $settingsCopy{$_}=$$block{$_};
+    } else {
+      $settingsCopy{$_}=$$block{$_} if(!defined($settingsCopy{$_}));
     }
-    next if(!$var);
-    logmsg "LYVE-SET $var = $value";
-
   }
-  return 1;
+
+  return \%settingsCopy;
 }
 
 sub simulateReads{
@@ -686,8 +683,6 @@ sub usage{
     --numnodes     $$settings{numnodes}                maximum number of nodes
     --numcpus      $$settings{numcpus}                 number of cpus
     --qsubxopts    '-N lyve-set'     Extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
-    OTHER
-    --info         version           Display information about Lyve-SET. The only option right now is 'version' and it is turned on by default
   ";
   return $help;
 }
