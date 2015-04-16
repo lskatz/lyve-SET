@@ -194,10 +194,10 @@ sub readGlobalSettings{
   die "ERROR: configuration [global] was not found in $confPath!" if(!keys(%$block));
   # Put the presets into the current settings
   for(keys(%$block)){
-    if($$settings{'overwrite-config'}){
+    if($overwrite){
       $settingsCopy{$_}=$$block{$_};
     } else {
-      $settingsCopy{$_}=$$block{$_} if(!defined($settingsCopy{$_}));
+      $settingsCopy{$_}=$$block{$_} if(!$settingsCopy{$_});
     }
   }
 
