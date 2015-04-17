@@ -130,10 +130,10 @@ install-samtools:
 	mv $(TMPDIR)/samtools-1.1 $(PREFIX)/lib
 	cd $(PREFIX)/lib/samtools-1.1 && make
 	cd $(PREFIX)/lib/samtools-1.1/htslib-1.1 && make
-	ln -s $(PREFIX)/lib/samtools-1.1/samtools $(PREFIX)/scripts/
-	ln -s $(PREFIX)/lib/samtools-1.1/misc/wgsim $(PREFIX)/scripts/
-	ln -s $(PREFIX)/lib/samtools-1.1/htslib-1.1/bgzip $(PREFIX)/scripts
-	ln -s $(PREFIX)/lib/samtools-1.1/htslib-1.1/tabix $(PREFIX)/scripts
+	ln -sf $(PREFIX)/lib/samtools-1.1/samtools $(PREFIX)/scripts/
+	ln -sf $(PREFIX)/lib/samtools-1.1/misc/wgsim $(PREFIX)/scripts/
+	ln -sf $(PREFIX)/lib/samtools-1.1/htslib-1.1/bgzip $(PREFIX)/scripts
+	ln -sf $(PREFIX)/lib/samtools-1.1/htslib-1.1/tabix $(PREFIX)/scripts
 
 clean-samtools:
 	rm -rvf $(PREFIX)/lib/samtools*
@@ -161,8 +161,9 @@ clean-smalt:
 
 install-snap:
 	git clone https://github.com/amplab/snap.git $(PREFIX)/lib/snap
-	cd $(PREFIX)/lib/snap && make && make snapxl
+	cd $(PREFIX)/lib/snap && make
 	cp -vn $(PREFIX)/lib/snap/snap   $(PREFIX)/scripts/
+	cd $(PREFIX)/lib/snap && make snapxl
 	cp -vn $(PREFIX)/lib/snap/snapxl $(PREFIX)/scripts/
 
 clean-snap:
