@@ -1,0 +1,23 @@
+# Index created by AutoSplit for blib/lib/Config/Simple.pm
+#    (file acts as timestamp)
+package Config::Simple;
+sub vars  ;
+sub import_names  ;
+sub import_from  ;
+sub error  ;
+sub dump  ;
+sub verbose  ;
+sub TIEHASH  ;
+sub FETCH  ;
+sub STORE  ;
+sub DELETE  ;
+sub CLEAR  ;
+sub EXISTS  ;
+sub FIRSTKEY  ;
+sub NEXTKEY  ;
+sub write_string  ;
+sub hashref  ;
+sub param_hash  ;
+sub errstr  ;
+sub block  ;
+1;
