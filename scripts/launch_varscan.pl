@@ -52,9 +52,12 @@ sub mpileup{
   logmsg "Creating a pileup $pileup";
   
   my $xopts="";
+  $xopts.="-Q 0 -B "; # assume that all reads have been properly filtered at this point and that mappings are good
   $xopts.="--positions $$settings{region} " if($$settings{region});
-  system("samtools mpileup -f '$reference' $xopts '$bam' 1>$pileup");
-  die "ERROR: problem with\n  samtools mpileup -f '$reference' '$bam'" if $?;
+  my $command="samtools mpileup -f '$reference' $xopts '$bam' 1>$pileup";
+  logmsg "Running mpileup:\n  $command";
+  system($command);
+  die "ERROR: problem with mpileup" if $?;
   return $pileup;
 }
 
