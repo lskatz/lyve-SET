@@ -109,7 +109,7 @@ sub kmerCount{
 
   # count kmers
   #my %kmer;
-  my @kmer;
+  my %kmer;
   my $i=0;
   while(my $read=<FILE>){
     $i++;
@@ -123,20 +123,22 @@ sub kmerCount{
     $read=~tr/ATCGatcg/01230123/;
     $read=~s/\D/4/g; # catch any other non-number character inc. N
     for(my $j=0;$j<$length;$j++){
-      $kmer[substr($read,$j,$kmerLength)]++;
+      # 1. get substr, ie, the kmer
+      # 2. convert to an integer
+      # 3. count the kmer alongside the others in %kmer
+      $kmer{int(substr($read,$j,$kmerLength))}++;
     }
 
   }
   close FILE;
 
   # remove kmers with low depth
-  for(@kmer){
-    next if(!defined($_));
-    $_=undef if($_<$minKCoverage);
+  while(my($kmer,$count)=each(%kmer)){
+    delete($kmer{$kmer}) if($count<$minKCoverage);
   }
-  logmsg "Found ".scalar(@kmer)." unique kmers of depth > $minKCoverage";
+  logmsg "Found ".scalar(values(%kmer))." unique kmers of depth >= $minKCoverage";
 
-  return @kmer;
+  return %kmer;
 }
 
 sub usage{
