@@ -7,7 +7,6 @@ use warnings;
 use Data::Dumper;
 use Getopt::Long;
 use File::Basename;
-use Math::BigInt;
 
 sub logmsg{ $|++; print STDERR "@_\n"; $|--;}
 exit(main());
@@ -19,7 +18,8 @@ sub main{
   my @asm=@ARGV;
   $$settings{coverage}||=2; 
   $$settings{coverage}=1 if($$settings{coverage}<1);
-  $$settings{kmerlength}||=18;
+  $$settings{kmerlength}||=6;
+  $$settings{kmerlength}=7 if($$settings{kmerlength}>7);
 
 
   jaccardDistance(\@asm,$settings);
@@ -31,10 +31,10 @@ sub jaccardDistance{
   my($genome,$settings)=@_;
   my %jDist;
   for(my $i=0;$i<@$genome-1;$i++){
-    my %k1=kmerCount($$genome[$i],$settings);
+    my @k1=kmerCount($$genome[$i],$settings);
     for(my $j=$i+1;$j<@$genome;$j++){
-      my %k2=kmerCount($$genome[$j],$settings);
-      my $jDist=jDist(\%k1,\%k2,$settings);
+      my @k2=kmerCount($$genome[$j],$settings);
+      my $jDist=jDist(\@k1,\@k2,$settings);
       print join("\t",@$genome[$i,$j],$jDist)."\n";
     }
   }
@@ -56,19 +56,34 @@ sub jDist{
 sub kmerSets{
   my($k1,$k2,$settings)=@_;
   
-  my($intersectionCount,%union);
+  my(%union);
+  my $intersectionCount=0;
+
+  # make an index for @$k2
+  my %k1;
+  for(@$k1){
+    next if(!$_);
+    $k1{$_}=1;
+  }
+
+  # make an index for @$k2
+  my %k2;
+  for(@$k2){
+    next if(!$_);
+    $k2{$_}=1;
+  }
 
   # Find uniq kmers in the first set of kmers.
   # Also find the union.
-  for my $kmer(keys(%$k1)){
-    $intersectionCount++ if(!$$k2{$kmer});
+  for my $kmer(keys(%k1)){
+    $intersectionCount++ if(!$k2{$kmer});
     $union{$kmer}=1;
   }
 
   # Find uniq kmers in the second set of kmers.
   # Also find the union.
-  for my $kmer(keys(%$k2)){
-    $intersectionCount++ if(!$$k1{$kmer});
+  for my $kmer(keys(%k2)){
+    $intersectionCount++ if(!$k1{$kmer});
     $union{$kmer}=1;
   }
 
@@ -92,7 +107,8 @@ sub kmerCount{
   }
 
   # count kmers
-  my %kmer;
+  #my %kmer;
+  my @kmer;
   my $i=0;
   while(my $read=<FILE>){
     $i++;
@@ -104,31 +120,24 @@ sub kmerCount{
     my $length=length($read)-$kmerLength+1;
     # Start saving on memory by converting the read immediately to a number.
     $read=~tr/ATCGNatcgn/0123401234/;
-    my @readKmer=(); 
+    $read=~s/\D/5/g; # catch any other non-number character
     for(my $j=0;$j<$length;$j++){
-      # Mess around with this smaller kmer array per read
-      # and hopefully save on cpu/memory.
-      push(@readKmer,
-        "1".substr($read,$j,$kmerLength) # make sure there is no zero in front
-      );
+      my $kmer=substr($read,$j,$kmerLength);
+      $kmer+=0; # change to an acutal int
+      $kmer[$kmer]++;
     }
 
-    # Now put back all those kmers into the large hash.
-    for my $kmer(@readKmer){
-      #$kmer{Math::BigInt->new($kmer)}++;
-      $kmer=$kmer+0; # convert to int
-      $kmer{$kmer}++;
-    }
   }
   close FILE;
 
   # remove kmers with low depth
-  while(my($kmer,$count)=each(%kmer)){
-    delete($kmer{$kmer}) if($count<$minKCoverage);
+  for(@kmer){
+    next if(!defined($_));
+    $_=undef if($_<$minKCoverage);
   }
+  logmsg "Found ".scalar(@kmer)." unique kmers of depth > $minKCoverage";
 
-  logmsg "Found ".scalar(keys(%kmer))." unique kmers of depth > $minKCoverage";
-  return %kmer;
+  return @kmer;
 }
 
 sub usage{
@@ -137,7 +146,7 @@ sub usage{
   Usage: $0 file.fastq.gz file2.fastq.gz [file3.fastq.gz ...]
   -q for minimal stdout
   -c minimum kmer coverage before it counts. Default: 2
-  -k kmer length. Default: 18
+  -k kmer length. Default: 6
   -n numcpus
   "
 }
