@@ -130,7 +130,7 @@ sub mapReads{
   system("mv -v $sorted $bam"); die if $?;
   system("mv -v $sorted.bai $bam.bai"); die if $?;
   system("mv -v $sorted.depth.gz $bam.depth.gz"); die if $?;
-  system("rm -v $tmpOut"); die if $?;
+  system("rm -v $tmpOut $tmpSamOut"); die if $?;
 
   return 1;
 }
