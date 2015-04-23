@@ -19,7 +19,8 @@ sub main{
   $$settings{coverage}||=2; 
   $$settings{coverage}=1 if($$settings{coverage}<1);
   $$settings{kmerlength}||=6;
-  $$settings{kmerlength}=7 if($$settings{kmerlength}>7);
+  $$settings{kmerlength}=8 if($$settings{kmerlength}>8);
+  $$settings{kmerlength}=1 if($$settings{kmerlength}<1);
 
 
   jaccardDistance(\@asm,$settings);
@@ -112,19 +113,17 @@ sub kmerCount{
   my $i=0;
   while(my $read=<FILE>){
     $i++;
-    logmsg "Finished with ".($i/4)." reads" if($i % 1000000 == 0);
     next if($i % 4 != 2);
+    logmsg "Finished with ".int($i/4)." reads" if($i % 1000000 == 2);
     chomp $read;
 
     # How long to read along the sequence
     my $length=length($read)-$kmerLength+1;
     # Start saving on memory by converting the read immediately to a number.
-    $read=~tr/ATCGNatcgn/0123401234/;
-    $read=~s/\D/5/g; # catch any other non-number character
+    $read=~tr/ATCGatcg/01230123/;
+    $read=~s/\D/4/g; # catch any other non-number character inc. N
     for(my $j=0;$j<$length;$j++){
-      my $kmer=substr($read,$j,$kmerLength);
-      $kmer+=0; # change to an acutal int
-      $kmer[$kmer]++;
+      $kmer[substr($read,$j,$kmerLength)]++;
     }
 
   }
