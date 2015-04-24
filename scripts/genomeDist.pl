@@ -6,11 +6,13 @@ use strict;
 use warnings;
 use Data::Dumper;
 use Getopt::Long;
-use File::Basename;
+use File::Basename qw/basename fileparse dirname/;
+use POSIX qw/ceil/;
 
 use threads;
 
-sub logmsg{ $|++; print STDERR "@_\n"; $|--;}
+local $0=basename($0);
+sub logmsg{ my $prefix="$0: "; if(my $tid=threads->tid){$prefix.="TID$tid: ";} $|++; print STDERR "$prefix@_\n"; $|--;}
 exit(main());
 
 sub main{
@@ -23,22 +25,52 @@ sub main{
   $$settings{kmerlength}||=8;
   $$settings{kmerlength}=10 if($$settings{kmerlength}>10);
   $$settings{kmerlength}=1 if($$settings{kmerlength}<1);
+  $$settings{numcpus}||=1;
 
 
-  jaccardDistance(\@asm,$settings);
+  my $jDist=jaccardDistance(\@asm,$settings);
 
   return 0;
 }
 
 sub jaccardDistance{
   my($genome,$settings)=@_;
+
+  # Find kmers for all genomes in a multithreaded way
+  my @genomeFile;
+  my @genome=@$genome; # make a copy
+  my $numPerThread=ceil(@$genome/$$settings{numcpus});
+  my @thr;
+  for(0..$$settings{numcpus}-1){
+    # Give a few genomes to each thread to count kmers
+    my @tmpGenome=splice(@genome,0,$numPerThread);
+    $thr[$_]=threads->new(sub{
+      my %kmerHash;
+      if(@tmpGenome){
+        logmsg "I will count kmers for ".join(", ",@tmpGenome);
+      } else {
+        logmsg "I was not given any genomes to count kmers.";
+      }
+      for my $g(@tmpGenome){
+        $kmerHash{$g}=kmerCount($g,$settings);
+        logmsg "Finished counting ".scalar(values(% {$kmerHash{$g}} ))." $$settings{kmerlength}-mers for $g";
+      }
+      return \%kmerHash;
+    });
+  }
+
+  # get all the results from the threads
+  my (%kmerPresence);
+  for my $t(@thr){
+    my $kmer=$t->join;
+    %kmerPresence=(%kmerPresence,%$kmer);
+    logmsg "Joined thread TID". $t->tid;
+  }
+
+  # Find the jaccard distance
   my %jDist;
-  my %kmerPresence;
   for(my $i=0;$i<@$genome-1;$i++){
-    $kmerPresence{$$genome[$i]}||=kmerCount($$genome[$i],$settings);
-    #my $g1Thread=threads->new(\&kmerCount,$$genome[$i],$settings);
     for(my $j=$i+1;$j<@$genome;$j++){
-      $kmerPresence{$$genome[$j]}||=kmerCount($$genome[$j],$settings);
       my $jDist=jDist($kmerPresence{$$genome[$i]},$kmerPresence{$$genome[$j]},$settings);
       print join("\t",@$genome[$i,$j],$jDist)."\n";
       $jDist{$$genome[$i]}{$$genome[$j]}=$jDist;
@@ -89,7 +121,6 @@ sub kmerCount{
   my($genome,$settings)=@_;
   my $kmerLength=$$settings{kmerlength};
   my $minKCoverage=$$settings{coverage};
-  logmsg "Counting $kmerLength-mers for $genome";
   my($name,$path,$suffix)=fileparse($genome,qw(.fastq.gz .fastq));
   if($suffix=~/\.fastq\.gz$/){
     open(FILE,"gunzip -c '$genome' | ") or die "I could not open $genome with gzip: $!";
@@ -106,7 +137,7 @@ sub kmerCount{
   while(<FILE>){
     my $read=<FILE>; # burn the defline and immediately move onto the read
     chomp $read;
-    logmsg "Finished with $i reads" if(++$i % 100000 == 0);
+    #logmsg "Finished with $i reads" if(++$i % 100000 == 0);
 
     # How long to read along the sequence
     my $length=length($read)-$kmerLength+1;
@@ -131,9 +162,8 @@ sub kmerCount{
       delete($kmer{$kmer});
       next;
     }
-    $kmer{$kmer}=1; # simplify to presence/absence
+    $kmer{$kmer}=1; # simplify to presence/absence, and hopefully save on memory (small int)
   }
-  logmsg "Found ".scalar(values(%kmer))." unique kmers of depth >= $minKCoverage";
 
   return \%kmer;
 }
