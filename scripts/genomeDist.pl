@@ -8,6 +8,8 @@ use Data::Dumper;
 use Getopt::Long;
 use File::Basename;
 
+use threads;
+
 sub logmsg{ $|++; print STDERR "@_\n"; $|--;}
 exit(main());
 
@@ -18,8 +20,8 @@ sub main{
   my @asm=@ARGV;
   $$settings{coverage}||=2; 
   $$settings{coverage}=1 if($$settings{coverage}<1);
-  $$settings{kmerlength}||=6;
-  $$settings{kmerlength}=8 if($$settings{kmerlength}>8);
+  $$settings{kmerlength}||=8;
+  $$settings{kmerlength}=10 if($$settings{kmerlength}>10);
   $$settings{kmerlength}=1 if($$settings{kmerlength}<1);
 
 
@@ -31,14 +33,18 @@ sub main{
 sub jaccardDistance{
   my($genome,$settings)=@_;
   my %jDist;
+  my %kmerPresence;
   for(my $i=0;$i<@$genome-1;$i++){
-    my @k1=kmerCount($$genome[$i],$settings);
+    $kmerPresence{$$genome[$i]}||=kmerCount($$genome[$i],$settings);
+    #my $g1Thread=threads->new(\&kmerCount,$$genome[$i],$settings);
     for(my $j=$i+1;$j<@$genome;$j++){
-      my @k2=kmerCount($$genome[$j],$settings);
-      my $jDist=jDist(\@k1,\@k2,$settings);
+      $kmerPresence{$$genome[$j]}||=kmerCount($$genome[$j],$settings);
+      my $jDist=jDist($kmerPresence{$$genome[$i]},$kmerPresence{$$genome[$j]},$settings);
       print join("\t",@$genome[$i,$j],$jDist)."\n";
+      $jDist{$$genome[$i]}{$$genome[$j]}=$jDist;
     }
   }
+  return \%jDist;
 }
 
 sub jDist{
@@ -60,31 +66,17 @@ sub kmerSets{
   my(%union);
   my $intersectionCount=0;
 
-  # make an index for @$k2
-  my %k1;
-  for(@$k1){
-    next if(!$_);
-    $k1{$_}=1;
-  }
-
-  # make an index for @$k2
-  my %k2;
-  for(@$k2){
-    next if(!$_);
-    $k2{$_}=1;
-  }
-
   # Find uniq kmers in the first set of kmers.
   # Also find the union.
-  for my $kmer(keys(%k1)){
-    $intersectionCount++ if(!$k2{$kmer});
+  for my $kmer(keys(%$k1)){
+    $intersectionCount++ if(!$$k2{$kmer});
     $union{$kmer}=1;
   }
 
   # Find uniq kmers in the second set of kmers.
   # Also find the union.
-  for my $kmer(keys(%k2)){
-    $intersectionCount++ if(!$k1{$kmer});
+  for my $kmer(keys(%$k2)){
+    $intersectionCount++ if(!$$k1{$kmer});
     $union{$kmer}=1;
   }
 
@@ -100,7 +92,7 @@ sub kmerCount{
   logmsg "Counting $kmerLength-mers for $genome";
   my($name,$path,$suffix)=fileparse($genome,qw(.fastq.gz .fastq));
   if($suffix=~/\.fastq\.gz$/){
-    open(FILE,"gunzip -c '$genome' |") or die "I could not open $genome with gzip: $!";
+    open(FILE,"gunzip -c '$genome' | ") or die "I could not open $genome with gzip: $!";
   } elsif($suffix=~/\.fastq$/){
     open(FILE,"<",$genome) or die "I could not open $genome: $!";
   } else {
@@ -111,17 +103,16 @@ sub kmerCount{
   #my %kmer;
   my %kmer;
   my $i=0;
-  while(my $read=<FILE>){
-    $i++;
-    next if($i % 4 != 2);
-    logmsg "Finished with ".int($i/4)." reads" if($i % 1000000 == 2);
+  while(<FILE>){
+    my $read=<FILE>; # burn the defline and immediately move onto the read
     chomp $read;
+    logmsg "Finished with $i reads" if(++$i % 100000 == 0);
 
     # How long to read along the sequence
     my $length=length($read)-$kmerLength+1;
     # Start saving on memory by converting the read immediately to a number.
     $read=~tr/ATCGatcg/01230123/;
-    $read=~s/\D/4/g; # catch any other non-number character inc. N
+    $read=~s/\D/4/g; # catch any other non-number character, e.g., N
     for(my $j=0;$j<$length;$j++){
       # 1. get substr, ie, the kmer
       # 2. convert to an integer
@@ -129,16 +120,22 @@ sub kmerCount{
       $kmer{int(substr($read,$j,$kmerLength))}++;
     }
 
+    <FILE>; # burn qual defline
+    <FILE>; # burn qual
   }
   close FILE;
 
   # remove kmers with low depth
   while(my($kmer,$count)=each(%kmer)){
-    delete($kmer{$kmer}) if($count<$minKCoverage);
+    if($count<$minKCoverage){
+      delete($kmer{$kmer});
+      next;
+    }
+    $kmer{$kmer}=1; # simplify to presence/absence
   }
   logmsg "Found ".scalar(values(%kmer))." unique kmers of depth >= $minKCoverage";
 
-  return %kmer;
+  return \%kmer;
 }
 
 sub usage{
@@ -147,7 +144,7 @@ sub usage{
   Usage: $0 file.fastq.gz file2.fastq.gz [file3.fastq.gz ...]
   -q for minimal stdout
   -c minimum kmer coverage before it counts. Default: 2
-  -k kmer length. Default: 6
+  -k kmer length. Default: 8
   -n numcpus
   "
 }
