@@ -507,7 +507,7 @@ sub variantCalls{
     for(my $i=0;$i<@bam;$i++){
       for(my $j=$i+1;$j<@bam;$j++){
         my $tmpName="$$settings{tmpdir}/".join("_","genomeDist",$i,$j,".tmp");
-        $sge->pleaseExecute("$scriptsdir/genomeDist.pl -n 1 $bam[$i] $bam[$j] > $tmpName",{numcpus=>1});
+        $sge->pleaseExecute("$scriptsdir/genomeDist.pl -n 1 $bam[$i] $bam[$j] > $tmpName",{numcpus=>1,jobname="genomeDist"});
       }
     }
     $sge->wrapItUp();
