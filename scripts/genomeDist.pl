@@ -121,11 +121,17 @@ sub kmerCount{
   my($genome,$settings)=@_;
   my $kmerLength=$$settings{kmerlength};
   my $minKCoverage=$$settings{coverage};
-  my($name,$path,$suffix)=fileparse($genome,qw(.fastq.gz .fastq));
+
+  # Open the file in different ways depending on the extension
+  my($name,$path,$suffix)=fileparse($genome,qw(.fastq.gz .fastq .bam .sam));
   if($suffix=~/\.fastq\.gz$/){
     open(FILE,"gunzip -c '$genome' | ") or die "I could not open $genome with gzip: $!";
   } elsif($suffix=~/\.fastq$/){
     open(FILE,"<",$genome) or die "I could not open $genome: $!";
+  } elsif($suffix=~/\.bam$/){
+    open(FILE,"samtools view '$genome' | perl -lane 'print \$F[9] for(1..4)' | ") or die "I could not use samtools on $genome: $!";
+  } elsif($suffix=~/\.sam$/){
+    open(FILE,"cat '$genome' | perl -lane 'print \$F[9] for(1..4)' | ") or die "I could not open $genome: $!";
   } else {
     die "I do not understand the extension on $genome";
   }
