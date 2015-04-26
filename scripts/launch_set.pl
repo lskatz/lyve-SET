@@ -501,13 +501,44 @@ sub variantCalls{
   # for the next SNP-calling instances.
   my $regionsFile="";
   if($$settings{'sample-sites'}){
+    logmsg "--sample-sites was specified: finding initial variant sites to make the downstream SNP calling faster. First, need to find most distant genome using kmers and jaccard distance";
+
+    # Find the most different set of reads
+    for(my $i=0;$i<@bam;$i++){
+      for(my $j=$i+1;$j<@bam;$j++){
+        my $tmpName="$$settings{tmpdir}/".join("_","genomeDist",$i,$j,".tmp");
+        $sge->pleaseExecute("$scriptsdir/genomeDist.pl -n 1 $bam[$i] $bam[$j] > $tmpName",{numcpus=>1});
+      }
+    }
+    $sge->wrapItUp();
+    
+    # Figure out the most distant using sums of points.
+    my %distance;
+    open(SORTALLGENOMEDIST,"sort -k3,3n -k1,1 -k2,2 $$settings{tmpdir}/genomeDist*.tmp | ") or die "ERROR: could not open  $$settings{tmpdir}/genomeDist*.tmp: $!";
+    while(<SORTALLGENOMEDIST>){
+      chomp;
+      my($bam1,$bam2,$d)=split /\t/;
+      $distance{$bam1}+=$d;
+      $distance{$bam2}+=$d;
+    }
+    close SORTALLGENOMEDIST;
+    
+    # The most distant genome is the one with the lowest jaccard distance overall.
     my $initBam=$bam[0];
-    $regionsFile="$$settings{tmpdir}/initialSnpSites.bed";
-    logmsg "--sample-sites was specified: finding initial variant sites to make the downstream SNP calling faster. Using $initBam";
+    my $minScore=$distance{$initBam};
+    for my $b(@bam){
+      if($distance{$b} < $minScore){
+        $minScore=$distance{$b};
+        $initBam=$b;
+      }
+    }
+    logmsg "The most distantly related by jaccard distance is $initBam.";
+    system("rm -vf $$settings{tmpdir}/genomeDist*.tmp");
 
     # This complicated command does multithreaded samtools mpileup
     # using xargs and one cpu per contig.
     # https://www.biostars.org/p/48781/#48815
+    $regionsFile="$$settings{tmpdir}/initialSnpSites.bed";
     if(!-e $regionsFile){
       system("rm -fv $regionsFile.*.tmp");
       my $command="samtools view -H $initBam | grep \"\@SQ\" | sed 's/^.*SN://g' | cut -f 1 | xargs -I {} -n 1 -P $$settings{numcpus} sh -c \"samtools mpileup -uf $ref -r '{}' $initBam | bcftools call -cv | grep -v '^#' | cut -f 1,2 > $regionsFile.'{}'.tmp \" ";
