@@ -106,7 +106,7 @@ install-varscan:
 clean-varscan:
 	rm -vf $(PREFIX)/lib/varscan.v2.3.7.jar
 
-install-phast:
+install-phast: check-blast
 	mkdir -p $(PREFIX)/lib/phast
 	wget http://phast.wishartlab.com/phage_finder/DB/prophage_virus.db -O $(PREFIX)/lib/phast/phast.faa
 	makeblastdb -in $(PREFIX)/lib/phast/phast.faa -dbtype prot
@@ -238,7 +238,7 @@ test-download-data:
 	@echo "Downloading test data sets"
 	set_downloadTestData.pl all
 
-check: check-sys check-Lyve-SET-PATH check-CGP-assembly check-Lyve-SET check-PERL check-smalt check-freebayes check-raxml check-freebayes check-phyml
+check: check-sys check-Lyve-SET-PATH check-CGP-assembly check-Lyve-SET check-PERL check-smalt check-freebayes check-raxml check-freebayes check-phyml check-blast
 	@echo --OK
 check-sys:
 	@F=$$(which cat) && echo "Found $$F"
@@ -270,6 +270,7 @@ check-PERL:
 	@perl -I $(PREFIX)/lib -MFile::Slurp -e 1
 	@echo "Looking for String::Escape"
 	@perl -I $(PREFIX)/lib -MString::Escape -e 1
-	@echo "Looking for Graph::Centrality::Pagerank"
-	@perl -I $(PREFIX)/lib -MGraph::Centrality::Pagerank -e 1
-
+check-blast:
+	which blastx
+	which blastp
+	which makeblastdb
