@@ -47,10 +47,10 @@ install: install-prerequisites
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-phispy install-samtools install-bcftools install-smalt install-snap install-raxml
+install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-phispy install-samtools install-bcftools install-smalt install-snap install-raxml install-perlModules
 	@echo DONE installing prerequisites
 
-clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-phispy clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml
+clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-phispy clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-perlModules
 	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
 
 install-mkdir:
@@ -195,6 +195,19 @@ install-edirect:
 
 clean-edirect:
 	rm -rvf $(PREFIX)/lib/edirect
+
+install-perlModules:
+	@echo "Installing Perl modules using CPAN"
+	perl -MCPAN -e 'install CPAN' # update CPAN just in case
+	perl -MCPAN -e 'force install Config::Simple'
+	perl -MCPAN -e 'force install File::Slurp'
+	perl -MCPAN -e 'force install Math::Round'
+	perl -MCPAN -e 'force install Number::Range'
+	perl -MCPAN -e 'force install Statistics::Descriptive'
+	perl -MCPAN -e 'force install Statistics::Normality'
+
+clean-perlModules:
+	@echo "Perl modules were installed using CPAN which is not a real package manager; not uninstalling."
 
 cuttingedge: install-mkdir cuttingedge-gitclone install-prerequisites
 	@echo "DONE installing the cutting edge version"
