@@ -98,9 +98,26 @@ sub backfillVcfValues{
   my $fail_lowRefFreq ="RF$$settings{altFreq}";
   my $fail_lowAltFreq ="AF$$settings{altFreq}";
   my $fail_indel      ="isIndel";
+
+  # How was the bam generated?
+  my $mapper="unknown";
+  my $CL="unknown";
+  open(SAMTOOLS,"samtools view -H '$bam' | ") or die "ERROR: could not open $bam with samtools: $!";
+  while(<SAMTOOLS>){
+    next if(!/^\@PG/);
+    chomp;
+    my @F=split /\t/;
+    for(@F){
+      my($key,$value)=split /:/;
+      $mapper=$value if($key eq "ID");
+      $CL=$value if($key eq "CL");
+    }
+  }
   
   # Add new headers
   $vcf->add_header_line({key=>'reference',value=>$$settings{reference}});
+  $vcf->add_header_line({key=>'mapper',value=>$mapper});
+  $vcf->add_header_line({key=>'mapperCL',value=>$CL});
   $vcf->add_header_line({key=>'FILTER', ID=>$fail_lowCoverage, Description=>"Depth is less than $$settings{coverage}, the user-set coverage threshold"});
   $vcf->add_header_line({key=>'FILTER', ID=>$fail_lowRefFreq, Description=>"Reference variant consensus is less than $$settings{altFreq}, the user-set threshold"});
   $vcf->add_header_line({key=>'FILTER', ID=>$fail_lowAltFreq, Description=>"Allele variant consensus is less than $$settings{altFreq}, the user-set threshold"});
