@@ -473,7 +473,8 @@ sub cleanReads{
       $sge->pleaseExecute("run_assembly_trimClean.pl -i $file -o $tmp --auto --nosingletons --numcpus $$settings{numcpus} 2>&1 && mv -v $file $backup && mv -v $tmp $file",{numcpus=>$$settings{numcpus},jobname=>"clean$b"});
     } elsif($$settings{read_cleaner} eq "bayeshammer"){
       logmsg "Did not find $backup. Cleaning with BayesHammer...";
-      ...;
+      die "Bayeshammer not implemented";
+      #...;
     } else {
       logmsg "ERROR: I do not understand the read cleaner $$settings{read_cleaner}";
       die;
@@ -507,7 +508,7 @@ sub variantCalls{
     for(my $i=0;$i<@bam;$i++){
       for(my $j=$i+1;$j<@bam;$j++){
         my $tmpName="$$settings{tmpdir}/".join("_","genomeDist",$i,$j,".tmp");
-        $sge->pleaseExecute("$scriptsdir/genomeDist.pl -n 1 $bam[$i] $bam[$j] > $tmpName",{numcpus=>1,jobname="genomeDist"});
+        $sge->pleaseExecute("$scriptsdir/genomeDist.pl -n 1 $bam[$i] $bam[$j] > $tmpName",{numcpus=>1,jobname=>"genomeDist"});
       }
     }
     $sge->wrapItUp();
