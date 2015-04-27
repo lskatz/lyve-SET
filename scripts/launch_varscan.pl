@@ -7,11 +7,14 @@ use warnings;
 use Data::Dumper;
 use Getopt::Long;
 use File::Basename qw/basename fileparse/;
+use File::Temp qw/tempdir/;
 use Bio::Perl;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib/vcftools_0.1.12b/perl";
 use Vcf;
+use lib "$FindBin::RealBin/../lib";
+use LyveSET qw/@fastaExt @fastqExt @bamExt/;
 
 my $samplename="Sample1"; # to be changed later
 $0=fileparse $0;
@@ -24,9 +27,10 @@ sub main{
   GetOptions($settings,qw(help reference=s tempdir=s altFreq=s coverage=i region=s)) or die $!;
 
   my $bam=$ARGV[0] or die "ERROR: need bam\n".usage();
-  $samplename=basename($bam,qw(.sorted.bam .bam));
   my $reference=$$settings{reference} or die "ERROR: need --reference\n".usage();
-  $$settings{tempdir}||="tmp";
+  my $refname=basename($reference,qw(.fasta .fa .fna .mfa));
+
+  $$settings{tempdir}||=tempdir("set_varscan.XXXXXX",TMPDIR=>1,CLEANUP=>1);
   $$settings{coverage}||=10;
   $$settings{altFreq}||=0.75;
   $$settings{region}||=0;
@@ -35,6 +39,16 @@ sub main{
   `varscan.sh >/dev/null`;
   die "ERROR: varscan.sh gave an error" if $?;
 
+  # Transform the sample name, e.g.,
+  # NC001416.fasta.wgsim.fastq.gz-reference.sorted.bam => NC001416
+  $samplename=basename($bam,@bamExt);
+  $samplename=~s/\-$refname$//;
+  $samplename=basename($samplename,@fastqExt,@fastaExt);
+  $samplename=basename($samplename,qw(.fasta.wgsim .wgsim),@fastaExt);
+
+  # To make varscan work, first do mpileup.
+  # Then, it reads from mpileup.
+  # Lyve-SET needs to alter some of the VCF in the third step, backfillVcfValues().
   my $pileup=mpileup($bam,$reference,$settings);
   my $vcf=varscan($pileup,$settings);
   backfillVcfValues($vcf,$bam,$settings);

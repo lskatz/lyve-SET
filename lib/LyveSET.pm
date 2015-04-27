@@ -6,9 +6,16 @@ use File::Basename qw/fileparse basename dirname/;
 use Term::ANSIColor;
 use Data::Dumper;
 
-our @EXPORT_OK = qw(logmsg);
+our @EXPORT_OK = qw(logmsg @fastqExt @fastaExt @bamExt);
 
 local $0=basename $0;
+
+######
+# CONSTANTS
+
+our @fastqExt=qw(.fastq.gz .fastq .fq .fq.gz);
+our @fastaExt=qw(.fasta .fna .faa .mfa .fa);
+our @bamExt=qw(.sorted.bam .bam);
 
 ###########################################
 ### COMMON SUBS (not object subroutines) ##
