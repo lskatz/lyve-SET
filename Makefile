@@ -198,16 +198,16 @@ clean-edirect:
 
 install-perlModules:
 	@echo "Installing Perl modules using CPAN"
-	perl -MCPAN -e 'install CPAN' # update CPAN just in case
-	perl -MCPAN -e 'force install Config::Simple'
-	perl -MCPAN -e 'force install File::Slurp'
-	perl -MCPAN -e 'force install Math::Round'
-	perl -MCPAN -e 'force install Number::Range'
-	perl -MCPAN -e 'force install Statistics::Descriptive'
-	perl -MCPAN -e 'force install Statistics::Normality'
+	# update CPAN just in case
+	-perl -MCPAN -e 'install CPAN' # update CPAN just in case
+	for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Descriptive Statistics::Normality; do\
+	  perl -MCPAN -e "install $$package" || perl -MCPAN -e "notest install $$package";\
+	  if [ $$? -gt 0 ]; then exit 1; fi;\
+	done;
+	@echo "Done with Perl modules"
 
 clean-perlModules:
-	@echo "Perl modules were installed using CPAN which is not a real package manager; not uninstalling."
+	@echo "Perl modules were installed using CPAN which doesn't have an uninstalling mechanism"
 
 cuttingedge: install-mkdir cuttingedge-gitclone install-prerequisites
 	@echo "DONE installing the cutting edge version"
