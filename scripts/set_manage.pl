@@ -15,6 +15,7 @@ use Bio::Perl;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
+use LyveSET qw/@fastqExt @fastaExt @bamExt/;
 $ENV{PATH}="$ENV{PATH}:$FindBin::RealBin/../lib/edirect";
 
 # The directories a project should have
@@ -134,7 +135,7 @@ sub addReads{
   } else {
     logmsg "NOTE: could not find file $reads";
     logmsg "I will see if it's on NCBI";
-    my $b=basename($reads,qw(.sra .fastq .fastq.gz));
+    my $b=basename($reads,qw(.sra),@fastqExt);
     $newPath="$project/reads/$b.fastq.gz";
     my $three=substr($b,0,3);
     my $six=substr($b,0,6);
@@ -169,7 +170,7 @@ sub addAssembly{
     logmsg "NOTE: I could not find file $asm";
     logmsg "I will see if it's on NCBI";
 
-    my $b=basename($asm,qw(.fasta .fna .fa));
+    my $b=basename($asm,@fastaExt);
     my $fasta=_downloadAssembly($b,$project,$settings);
     move($fasta,"$project/asm/$b.fasta");
     die "Could not move file: $!" if $?;
@@ -203,7 +204,7 @@ sub changeReference{
     copy($ref,$newPath) or die "ERROR: could not copy $ref to $newPath\n  $!";
     logmsg "cp $ref => $newPath";
   } else {
-    my $b=basename($ref,qw(.fasta .fna .fa));
+    my $b=basename($ref,@fastaExt);
     my $fasta=_downloadAssembly($b,$project,$settings);
     move($fasta,$newPath);
     die "Could not move file: $!" if $?;
@@ -219,7 +220,7 @@ sub changeReference{
 
 sub _downloadAssembly{
   my($ID,$project,$settings)=@_;
-  my $b=basename($ID,qw(.fasta .fna .fa));
+  my $b=basename($ID,@fastaExt);
   my $tmpFile="$project/$b.tmp.fasta";
   my $filteredFile="$project/$b.fasta";
   system("esearch -db nucleotide -query $b | efetch -format fasta > $tmpFile");

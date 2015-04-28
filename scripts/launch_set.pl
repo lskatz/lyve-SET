@@ -23,6 +23,8 @@ use Thread::Queue;
 use Schedule::SGELK;
 use Config::Simple;
 
+use LyveSET qw/@fastaExt @fastqExt @bamExt/;
+
 my ($name,$scriptsdir,$suffix)=fileparse($0);
 $scriptsdir=File::Spec->rel2abs($scriptsdir);
 
@@ -390,7 +392,7 @@ sub mapReads{
   my (@bam,@job);
   for my $fastq(@file){
     my $b=fileparse $fastq;
-    my $bamPrefix="$bamdir/$b-".basename($ref,qw(.fasta .fna .fa));
+    my $bamPrefix="$bamdir/$b-".basename($ref,@fastaExt);
     push(@bam,"$bamPrefix.sorted.bam");
 
     if(-e "$bamPrefix.sorted.bam"){
@@ -419,7 +421,7 @@ sub mapReads{
     logmsg "Finding regions to mask, and recording them in $maskDir/*";
 
     for my $bam(@bam){
-      my $b=basename($bam,qw(.sorted.bam));
+      my $b=basename($bam,@bamExt);
       my $bed="$maskDir/$b.cliffs.bed";
       next if(-e $bed);
       $sge->pleaseExecute("$scriptsdir/set_findCliffs.pl --numcpus $$settings{numcpus} $bam > $bed",{jobname=>"maskCliff$b",numcpus=>$$settings{numcpus}});
@@ -438,7 +440,7 @@ sub downsampleReads{
   for my $file(@$reads){
     # downsample into tmpdir
     # move the original reads to "$file.orig"
-    my $b=basename($file,qw(.cleaned.fastq.gz .downsampled.fastq.gz .fastq.gz));
+    my $b=basename($file,qw(.cleaned.fastq.gz .downsampled.fastq.gz),@fastqExt);
     my $d=dirname($file);
     my $backupDir="$d/notDownsampled";
     mkdir($backupDir);
@@ -458,7 +460,7 @@ sub cleanReads{
   for my $file(@$reads){
     # Clean into tmpdir
     # move the original reads to "$file.orig"
-    my $b=basename($file,qw(.cleaned.fastq.gz .downsampled.fastq.gz .fastq.gz));
+    my $b=basename($file,qw(.cleaned.fastq.gz .downsampled.fastq.gz), @fastqExt);
     my $d=dirname($file);
     my $backupDir="$d/notCleaned";
     mkdir($backupDir);

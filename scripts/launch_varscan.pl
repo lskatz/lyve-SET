@@ -28,7 +28,7 @@ sub main{
 
   my $bam=$ARGV[0] or die "ERROR: need bam\n".usage();
   my $reference=$$settings{reference} or die "ERROR: need --reference\n".usage();
-  my $refname=basename($reference,qw(.fasta .fa .fna .mfa));
+  my $refname=basename($reference,@fastaExt);
 
   $$settings{tempdir}||=tempdir("set_varscan.XXXXXX",TMPDIR=>1,CLEANUP=>1);
   $$settings{coverage}||=10;
