@@ -23,9 +23,9 @@ if [ "$IN" == "" ] || [ "$OUT" == "" ]; then
   exit 1;
 fi
 
-command="bcftools merge $IN -O z > $OUT.tmp && mv -v $OUT.tmp $OUT"
+command="bcftools merge $IN -O z --force-samples > $OUT.tmp && mv -v $OUT.tmp $OUT"
 eval $command
-if [ $? -gt 0 ]; then 
+if [ $? -gt 0 ]; then
   echo -e "ERROR with bcftools:\n  $command";
   rm -vf $OUT.tmp
   exit 1;
