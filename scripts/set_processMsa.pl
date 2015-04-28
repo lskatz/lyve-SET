@@ -12,6 +12,7 @@ use Data::Dumper;
 use Getopt::Long;
 use File::Basename;
 use File::Spec;
+use File::Temp qw/tempdir/;
 use Bio::Perl;
 use File::Copy qw/move copy/;
 use threads;
@@ -53,7 +54,7 @@ sub main{
     $$settings{fstPrefix}||="$dir/fst";
     $$settings{eigenPrefix}||="$dir/eigen";
   }
-  $$settings{tempdir}||="$$settings{msaDir}/tmp";
+  $$settings{tempdir}||=tempdir("set_processMSA.XXXXXX",TMPDIR=>1, CLEANUP=>1);
   mkdir $$settings{tempdir} if(!-d $$settings{tempdir});
 
   my $infile;
@@ -141,7 +142,7 @@ sub pairwiseDistance{
     logmsg "$outfile was found. I will not perform pairwise distances again without --force";
     return $outfile;
   }
-
+  
   # Before calculating pairwise distances, take a shortcut by
   # removing only invariant sites.
   logmsg "Removing invariant sites, as they do not contribute toward pairwise distances.";
