@@ -40,11 +40,12 @@ sub main{
   die "ERROR: varscan.sh gave an error" if $?;
 
   # Transform the sample name, e.g.,
-  # NC001416.fasta.wgsim.fastq.gz-reference.sorted.bam => NC001416
+  # NC001416.fasta.wgsim.fastq.gz-reference.sorted.bam => NC001416.fasta.wgsim
+  # sample1.fastq.gz-reference.sorted.bam => sample1
   $samplename=basename($bam,@bamExt);
   $samplename=~s/\-$refname$//;
   $samplename=basename($samplename,@fastqExt,@fastaExt);
-  $samplename=basename($samplename,qw(.fasta.wgsim .wgsim),@fastaExt);
+  $samplename=basename($samplename,@fastaExt);
 
   # To make varscan work, first do mpileup.
   # Then, it reads from mpileup.
