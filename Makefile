@@ -47,10 +47,10 @@ install: install-prerequisites
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-phispy install-samtools install-bcftools install-smalt install-snap install-raxml install-perlModules
+install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-phispy install-samtools install-bcftools install-smalt install-snap install-raxml install-perlModules install-config
 	@echo DONE installing prerequisites
 
-clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-phispy clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-perlModules
+clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-phispy clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-perlModules clean-config
 	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
 
 install-mkdir:
@@ -208,6 +208,12 @@ install-perlModules:
 
 clean-perlModules:
 	@echo "Perl modules were installed using CPAN which doesn't have an uninstalling mechanism"
+
+install-config:
+	cp -vn $(PREFIX)/config/original/*.conf $(PREFIX)/config/
+
+clean-config:
+	rm -v $(PREFIX)/config/*.conf
 
 cuttingedge: install-mkdir cuttingedge-gitclone install-prerequisites
 	@echo "DONE installing the cutting edge version"
