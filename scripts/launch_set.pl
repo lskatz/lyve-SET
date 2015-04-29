@@ -292,6 +292,8 @@ sub maskReference{
     }
     close BED;
   }
+  # TODO use Number::Range here.
+
   # Change the unique points to ranges
   my @masked; 
   my $maskedRegions="$$settings{refdir}/maskedRegions.bed";
