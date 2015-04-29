@@ -200,7 +200,7 @@ install-perlModules:
 	@echo "Installing Perl modules using CPAN"
 	# update CPAN just in case
 	-perl -MCPAN -e 'install CPAN' # update CPAN just in case
-	for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Descriptive Statistics::Normality; do\
+	for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Descriptive Statistics::Normality Graph::Centrality::Pagerank; do\
 	  perl -MCPAN -e "install $$package" || perl -MCPAN -e "notest install $$package";\
 	  if [ $$? -gt 0 ]; then exit 1; fi;\
 	done;
