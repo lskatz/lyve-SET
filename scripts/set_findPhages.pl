@@ -76,8 +76,8 @@ sub phast{
     
     # Add these coordinates to ranges
     $range{$contig}||=Number::Range->new;
-    my $lo=min($qstart,$qend);
-    my $hi=max($qstart,$qend);
+    my $lo=min($sstart,$send);
+    my $hi=max($sstart,$send);
     
     no warnings;
     $range{$contig}->addrange($lo..$hi);
