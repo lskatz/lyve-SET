@@ -508,7 +508,8 @@ sub variantCalls{
   if($$settings{'sample-sites'}){
     logmsg "--sample-sites was specified: finding initial variant sites to make the downstream SNP calling faster. First, need to find most distant genome using kmers and jaccard distance";
 
-    # Find the most different set of reads
+    # Find the most different set of reads.
+    # TODO: just find the max distance from the ref assembly.
     for(my $i=0;$i<@bam;$i++){
       for(my $j=$i+1;$j<@bam;$j++){
         my $tmpName="$$settings{tmpdir}/".join("_","genomeDist",$i,$j,".tmp");

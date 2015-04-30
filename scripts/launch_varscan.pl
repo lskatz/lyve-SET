@@ -238,6 +238,6 @@ sub usage{
   --tempdir  tmp/      A temporary directory to store files
   --coverage 10        Min coverage
   --altFreq  0.75      Min consensus agreement for a SNP
-  --region   file.bed  File of positions to read (default with no bed file: read all positions)
+  --region   file.bed  File of positions to include (default with no bed file: read all positions)
   "
 }
