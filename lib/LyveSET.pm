@@ -22,7 +22,14 @@ our @bamExt=qw(.sorted.bam .bam);
 ### COMMON SUBS/TOOLS (not object subroutines) ##
 #################################################
 # Redefine how the Lyve-SET scripts die
-$SIG{'__DIE__'} = sub { my $e = $_[0]; $e =~ s/(at [^\s]+? line \d+\.$)/\nStopped $1/; die("$0: ".(caller(1))[3].": ".$e); };
+$SIG{'__DIE__'} = sub {
+  local $0=basename($0);
+  my $e = $_[0] || ""; 
+  my $callerSub=(caller(1))[3] || (caller(0))[3] || "UnknownSub";
+
+  $e =~ s/(at [^\s]+? line \d+\.$)/\nStopped $1/; 
+  die("$0: $callerSub: $e"); 
+};
 # Centralized logmsg
 sub logmsg {print STDERR "$0: ".(caller(1))[3].": @_\n";}
 
