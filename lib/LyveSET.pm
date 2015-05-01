@@ -5,8 +5,9 @@ use Exporter qw(import);
 use File::Basename qw/fileparse basename dirname/;
 use Term::ANSIColor;
 use Data::Dumper;
+use Number::Range;
 
-our @EXPORT_OK = qw(logmsg @fastqExt @fastaExt @bamExt);
+our @EXPORT_OK = qw(logmsg rangeInversion rangeUnion @fastqExt @fastaExt @bamExt);
 
 local $0=basename $0;
 
@@ -17,13 +18,42 @@ our @fastqExt=qw(.fastq.gz .fastq .fq .fq.gz);
 our @fastaExt=qw(.fasta .fna .faa .mfa .fa);
 our @bamExt=qw(.sorted.bam .bam);
 
-###########################################
-### COMMON SUBS (not object subroutines) ##
-###########################################
+#################################################
+### COMMON SUBS/TOOLS (not object subroutines) ##
+#################################################
 # Redefine how the Lyve-SET scripts die
 $SIG{'__DIE__'} = sub { my $e = $_[0]; $e =~ s/(at [^\s]+? line \d+\.$)/\nStopped $1/; die("$0: ".(caller(1))[3].": ".$e); };
 # Centralized logmsg
 sub logmsg {print STDERR "$0: ".(caller(1))[3].": @_\n";}
+
+############
+# Ranges: based on Number::Range
+
+# Find the union of a set of numbers.
+sub rangeUnion{
+  my($range,$settings)=@_;
+
+  my $R=Number::Range->new;
+  for(@$range){
+    no warnings; # we don't need "X already in range" warnings
+    $R->addrange($_);
+  }
+
+  return $R->range;
+}
+
+# Find the numbers not listed in a given range
+sub rangeInversion($$$;$){
+  my($range,$min,$max,$settings)=@_;
+
+  my $R=Number::Range->new("$min..$max");
+  for(@$range){
+    no warnings; # we don't want "X not in range or already removed" warnings
+    $R->delrange($_);
+  }
+  
+  return $R->range;
+}
 
 ###########################################
 ### CLASS DEFINITION ######################
@@ -43,6 +73,7 @@ sub new{
   return $self;
 }
 
+### Progress bar stuff
 sub progressCharacterSet{
   my($self,$min,$max,$settings)=@_;
   if($max < $min){
