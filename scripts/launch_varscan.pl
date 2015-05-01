@@ -224,8 +224,20 @@ sub covDepth{
 # VCF line manipulations
 sub vcf_markAmbiguous{
   my($x,$reason,$settings)=@_;
-  $$x{ALT}[1]="N";
-  $$x{gtypes}{$samplename}{GT}="2/2";
+  my $ucRef=uc($$x{REF}); # uppercase reference, to make it easier for str comparison
+
+  # Figure out the alt allele (N) and the correct genotype integer
+  my $gtInt=1; # for the GT, e.g., 1/1 or 2/2
+  if($ucRef eq $$x{ALT}[0] || $$x{ALT}[0]=~/[Nn]/){
+    shift(@{ $$x{ALT} }); # unnecessary to mark the ref base in ALT
+    $gtInt=1;
+  } else {
+    $gtInt=2;
+  }
+  push(@{ $$x{ALT} }, "N");
+  $$x{gtypes}{$samplename}{GT}="$gtInt/$gtInt";
+
+  # empty the filter and then put on the fail reason
   @{$$x{FILTER}}=() if($$x{FILTER}[0] eq "PASS");
   push(@{$$x{FILTER}},$reason);
 }
