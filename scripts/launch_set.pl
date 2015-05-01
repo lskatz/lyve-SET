@@ -22,8 +22,9 @@ use threads;
 use Thread::Queue;
 use Schedule::SGELK;
 use Config::Simple;
+use Number::Range;
 
-use LyveSET qw/@fastaExt @fastqExt @bamExt/;
+use LyveSET qw/@fastaExt @fastqExt @bamExt rangeUnion rangeInversion/;
 
 my ($name,$scriptsdir,$suffix)=fileparse($0);
 $scriptsdir=File::Spec->rel2abs($scriptsdir);
@@ -280,64 +281,55 @@ sub maskReference{
   
   # Find out what the masked regions are in each bed file
   # and find a union of all masked regions, ie, a unique set of points.
-  my %points;
+  my %maskedRange  = ();
   for my $bed(glob("$maskDir/*.bed")){
     open(BED,$bed) or die "ERROR: could not open $bed for reading: $!";
     while(<BED>){
       chomp;
       my($contig,$start,$stop)=split /\t/;
-      for my $pos($start..$stop){
-        $points{$contig}{$pos}=1;
-      }
+      $maskedRange{$contig}||=Number::Range->new;
+
+      no warnings;
+      $maskedRange{$contig}->addrange("$start..$stop");
     }
     close BED;
   }
-  # TODO use Number::Range here.
 
-  # Change the unique points to ranges
+  # Write the masked ranges to a file
   my @masked; 
   my $maskedRegions="$$settings{refdir}/maskedRegions.bed";
   open(MASKEDBED,">$maskedRegions") or die "ERROR: could not open $maskedRegions: $!";
-  while(my($contig,$positions)=each(%points)){
-    # Change the list to a range
-    # http://www.perlmonks.org/?node_id=87538
-    my $strList=integersToRange(keys(%$positions));
-    while($strList=~/(\d+)\-(\d+)/g){
-      print MASKEDBED join("\t",$contig,$1,$2)."\n";
-      push(@masked,[$contig,$1,$2]);
+  while(my($contig,$RangeObj)=each(%maskedRange)){
+    for my $range(split(/,/,$RangeObj->range)){
+      my($min,$max)=split(/\.\./,$range);
+      print MASKEDBED join("\t",$contig,$min,$max)."\n";
     }
   }
   close MASKEDBED;
 
-  # invert the coordinates
-  my %unmaskedPoints;
+  # Invert the coordinates to make the unmasked coordinates
+  my %unmaskedRange=();
+  while(my($contig,$RangeObj)=each(%maskedRange)){
+    $unmaskedRange{$contig}||=Number::Range->new(1..$seqLength{$contig}-1);
+    no warnings; # avoid Number::Range warnings 'X not in range or already removed'
+    $unmaskedRange{$contig}->delrange($maskedRange{$contig}->range);
+  }
+
+  # Write inverted (unmasked) regions to a file
   my $unmaskedRegions="$$settings{refdir}/unmaskedRegions.bed";
   open(UNMASKEDBED,">$unmaskedRegions") or die "ERROR: could not open $unmaskedRegions: $!";
-  while(my($contig,$positions)=each(%points)){
-    # Find the inverse by finding which coordinates of the contig
-    # do not show up in the original masked datapoints.
-    my @inverse=sort{$a<=>$b} grep{!$$positions{$_}} (0..$seqLength{$contig}-1);
-    my %inverse;
-    @inverse{@inverse}=(1) x @inverse;
-    $unmaskedPoints{$contig}=\%inverse;
-    my $unmaskedPointsStr=integersToRange(keys(%{$unmaskedPoints{$contig}}));
-    while($unmaskedPointsStr=~/(\d+)\-(\d+)/g){
-      print UNMASKEDBED join("\t",$contig,$1,$2)."\n";
+  while(my($contig,$RangeObj)=each(%unmaskedRange)){
+    for my $range(split(/,/,$RangeObj->range)){
+      my($min,$max)=split(/\.\./,$range);
+      print UNMASKEDBED join("\t",$contig,$min,$max)."\n";
     }
   }
   close UNMASKEDBED;
 
   logmsg "Inverted masked regions from $maskedRegions and put them into $unmaskedRegions";
-  logmsg "I now know where 'good' regions are, as they are listed in $unmaskedRegions.";
+  logmsg "I now know where unmasked regions are, as they are listed in $unmaskedRegions.";
 
   return $unmaskedRegions;
-}
-
-sub integersToRange{
-  my @sorted=sort({$a<=>$b} @_);
-  my $str=join(",",@sorted); # comma-separated
-  $str=~s/(?<!\d)(\d+)(?:,((??{$++1}))){1,32766}(?!\d)/$1-$+/g; # range format
-  return $str;
 }
 
 sub indexReference{
