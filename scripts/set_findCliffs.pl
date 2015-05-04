@@ -12,10 +12,13 @@ use File::Temp qw/tempdir/;
 use threads;
 use Thread::Queue;
 use threads::shared;
+use POSIX qw/ceil/;
 
 use lib "$FindBin::RealBin/../lib";
 use Number::Range;
 use LyveSET qw/logmsg/;
+
+my $readBamStick :shared; # A thread must hold the stick before it can read the bam
 
 $0=basename($0);
 exit(main());
@@ -42,10 +45,16 @@ sub findCliffs{
   # This can be done while regions are being defined in the next loop.
   logmsg "Calculating depth of $bam in the background.";
   my $depthfile="$$settings{tempdir}/".basename($bam).".depth";
-  my $depthThread=threads->new(sub{
-    system("samtools depth $bam > $depthfile");
-    die "ERROR with samtools depth: $!" if $?;
-  });
+  system("samtools depth $bam > $depthfile");
+  die "ERROR with samtools depth: $!" if $?;
+  my %depth;
+  open(DEPTH,$depthfile) or die $!;
+  while(<DEPTH>){
+    chomp;
+    my($seqname,$pos,$d)=split /\t/;
+    $depth{$seqname}{$pos}=$d;
+  }
+  close DEPTH;
 
   # Generate the regions that will be looked at
   my $windowSize=250;
@@ -60,20 +69,28 @@ sub findCliffs{
       push(@region,[$bam,$seqname,$pos,$stop]);
     }
   }
-  logmsg "Done defining regions. Waiting for samtools depth to finish.";
+  # Split the windows into thread-sized chunks
+  my $numPerThread=ceil(@region/$$settings{numcpus});
+  my @regionSet;
+  my @depthSet;
+  for(my $i=0;$i<$$settings{numcpus};$i++){
+    # Split up the regions
+    $regionSet[$i]=[splice(@region,0,$numPerThread)];
 
-  # Gotta be done with the depth calculation at this point
-  $depthThread->join;
-  logmsg "Done with samtools depth";
+    # Also split up the depth hashes
+    for(@{$regionSet[$i]}){ # [bam,seqname,start,stop]
+      my(undef,$seqname,$start,$stop)=@$_;
+      $depthSet[$i]{$seqname}{$_}=$depth{$seqname}{$_}||0 for($start..$stop);
+    }
+  }
+  logmsg "Done defining regions.";
 
-  # Start off the threads and enqueue those defined regions
-  my $Q=Thread::Queue->new(@region);
+  # Make threads and distribute the regions array evenly to them all
   my @thr;
-  my $depth={};
-  share($depth);
-  $depth=readBamDepth($depthfile,$settings);
-  $thr[$_]=threads->new(\&findCliffsInRegionWorker,$depth,$Q,$settings) for(0..$$settings{numcpus}-1);
-  $Q->enqueue(undef) for(@thr);
+  for my $i(0..$$settings{numcpus}-1){
+    my %depthCopy=%{$depthSet[$i]};
+    $thr[$i]=threads->new(\&findCliffsInRegionWorker,$regionSet[$i],\%depthCopy,$settings);
+  }
 
   # Gather results from the threads by making
   # a set of ranges
@@ -89,7 +106,6 @@ sub findCliffs{
       }
     }
   }
-  undef($depth); # free up some memory
   # DONE gathering and combining ranges
 
   # Print the results in BED format
@@ -97,45 +113,34 @@ sub findCliffs{
     next if(!$region{$seqname});
     my $rangeStr=$region{$seqname}->range;
     while($rangeStr=~/(\d+)\.\.(\d+),?/g){
-      print join("\t",$seqname,$1,$2)."\n";
+      my($start,$stop)=($1,$2);
+      my $name=join(":","cliff",$seqname,"$start-$stop");
+      print join("\t",$seqname,$start,$stop,$name)."\n";
     }
   }
 }
 
 sub findCliffsInRegionWorker{
-  my($depth,$Q,$settings)=@_;
-  my $tid=threads->tid;
+  my($regionArr,$depth,$settings)=@_;
 
-  # Make a copy of depth so that this thread isn't in competition
-  # with the other threads.
-  my %depth=%$depth;
-  undef($depth); # free up memory
+  logmsg "Init";
 
   my @region; # array of hashes
   my $i=0;
-  DEQUEUE:
-  while(my $tmp=$Q->dequeue){
-    last DEQUEUE if(!defined($tmp));
+  for my $tmp(@$regionArr){
     my($bam,$seqname,$pos,$lastPos)=@$tmp;
-    my @r=findCliffsInRegion($bam,\%depth,$seqname,$pos,$lastPos,$settings);
+    my @r=findCliffsInRegion($bam,$depth,$seqname,$pos,$lastPos,$settings);
     push(@region,@r);
-    #logmsg "TID$tid: $seqname:$pos-$lastPos";
-    #logmsg $tid;
     $i++;
-    
-    #if($i % 1000 == 0){
-    #  #sleep 1; # give the other threads time to dequeue
-    #}
   }
-  logmsg "TID$tid: finished looking at $i regions";
+  logmsg "Finished looking at $i regions";
   return \@region;
 }
 
 sub readBamDepth{
-  my($depthfile,$settings)=@_;
-  # Figure out coverage information ONCE! (per thread)
-  logmsg "Reading depth from $depthfile";
-  open(DEPTH,$depthfile) or die "ERROR: could not open $depthfile:$!";
+  my($bam,$region,$settings)=@_;
+  lock $readBamStick;
+  open(DEPTH,"samtools depth -r '$region' $bam | ") or die "ERROR: could not open $bam:$!";
   my %depth;
   while(<DEPTH>){
     chomp;
@@ -143,7 +148,6 @@ sub readBamDepth{
     $depth{$seqname}{$pos}=$depth;
   }
   close DEPTH;
-  logmsg "Done reading depth from $depthfile";
 
   return \%depth;
 }
@@ -159,6 +163,7 @@ sub findCliffsInRegion{
   my $stepSize=int($windowSize/2);
 
   # Find the average of average depths
+  #my $allDepth=readBamDepth($bam,"$seqname:$pos-$lastPos",$settings);
   my %depth;
   for(my $start=$pos;$start<$lastPos;$start+=$stepSize){
     my $stop=$start+$windowSize-1;
