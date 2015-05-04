@@ -1,0 +1,2 @@
+The reference genome contains a plasmid; however Lyve-SET is set to download only one fasta file per genome.
+Therefore the reference file is correct but if you download only the one accession listed in NUCLEOTIDE, then the reference genome will be incomplete.
