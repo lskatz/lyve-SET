@@ -38,8 +38,9 @@ sub logmsg {
   my $parentSub=(caller(1))[3] || (caller(0))[3];
   $parentSub=~s/^main:://;
 
+  # Find the thread ID and stringify it
   my $tid=threads->tid;
-  my $tid=($tid) ? "(TID$tid)" : "";
+  $tid=($tid) ? "(TID$tid)" : "";
 
   my $msg="$0: $parentSub$tid: @_\n";
 
