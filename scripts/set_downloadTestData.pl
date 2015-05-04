@@ -75,6 +75,10 @@ sub downloadDataset{
   # get the reads
   mkdir("$testdir/reads");
   for(@readsRemote){
+    $_=~s/^\s+|\s+$//g; # trim
+    $_=~s/#.*//;        # ignore comments
+    next if(/^$/);      # if there's nothing left on this line anymore, then skip it
+
     my ($r,$realname)=split(/\t/,$_);
     $realname=$r if(!$realname);
     $_=~s/^\s+|\s+$//g for($r,$realname);
@@ -84,6 +88,10 @@ sub downloadDataset{
   # assemblies: the first assembly is the reference genome
   mkdir("$testdir/asm");
   for(@assemblyRemote){
+    $_=~s/^\s+|\s+$//g; # trim
+    $_=~s/#.*//;        # ignore comments
+    next if(/^$/);      # if there's nothing left on this line anymore, then skip it
+
     my ($r,$realname)=split(/\t/,$_);
     $realname=$r if(!$realname);
     $_=~s/^\s+|\s+$//g for($r,$realname);
