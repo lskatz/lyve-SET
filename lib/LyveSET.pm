@@ -6,6 +6,7 @@ use File::Basename qw/fileparse basename dirname/;
 use Term::ANSIColor;
 use Data::Dumper;
 use Number::Range;
+use threads;
 
 our @EXPORT_OK = qw(logmsg rangeInversion rangeUnion @fastqExt @fastaExt @bamExt);
 
@@ -31,7 +32,20 @@ $SIG{'__DIE__'} = sub {
   die("$0: $callerSub: $e"); 
 };
 # Centralized logmsg
-sub logmsg {print STDERR "$0: ".(caller(1))[3].": @_\n";}
+#sub logmsg {print STDERR "$0: ".(caller(1))[3].": @_\n";}
+sub logmsg {
+  local $0=basename $0;
+  my $parentSub=(caller(1))[3] || (caller(0))[3];
+  $parentSub=~s/^main:://;
+
+  my $tid=threads->tid;
+  my $tid=($tid) ? "(TID$tid)" : "";
+
+  my $msg="$0: $parentSub$tid: @_\n";
+
+  print STDERR $msg;
+}
+
 
 ############
 # Ranges: based on Number::Range
