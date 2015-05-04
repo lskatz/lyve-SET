@@ -416,7 +416,7 @@ sub mapReads{
 
     for my $bam(@bam){
       my $b=basename($bam,@bamExt);
-      my $bed="$bamDir/$b.bed";
+      my $bed="$bamdir/$b.bed";
       next if(-e $bed);
       $sge->pleaseExecute("$scriptsdir/set_findCliffs.pl --numcpus $$settings{numcpus} $bam > $bed",{jobname=>"maskCliff$b",numcpus=>$$settings{numcpus}});
     }
