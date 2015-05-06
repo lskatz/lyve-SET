@@ -26,6 +26,7 @@ sub main{
   $$settings{mask}||=();
 
   my($in)=@ARGV;
+  $in||=""; # avoid undefined warnings
 
   logmsg "Filtering for clustered SNPs or any other specified filters";
   filterSites($in,$settings);
