@@ -34,7 +34,11 @@ my $logmsgFh;
 sub logmsg {
   local $0=basename $0;
   my $FH = *STDOUT; 
-  my $msg="$0: ".(caller(1))[3].": @_\n";
+  my $caller=(caller(1))[3];
+  $caller=~s/^main:://;
+  $caller=~s/^__ANON__//;
+
+  my $msg="$0: $caller: @_\n";
 
   # print the message to the logfile if it's not the same as stdout
   #print join("\t","===",fileno($logmsgFh),fileno($FH))."\n";
@@ -54,7 +58,7 @@ exit(main());
 sub main{
   # start with the settings that are on by default, and which can be turned off by, e.g., --notrees
   my $settings={trees=>1,msa=>1, matrix=>1};
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! rename-taxa=s fast downsample sample-sites singleend presets=s read_cleaner=s)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s)) or die $!;
   # TODO put these global options into LyveSET.conf, now that it exists
   # Lyve-SET
   $$settings{allowedFlanking}||=0;
@@ -63,7 +67,6 @@ sub main{
   $$settings{min_coverage}||=10;
   $$settings{'mask-phages'}=1 if(!defined($$settings{'mask-phages'}));
   $$settings{'mask-cliffs'}=1 if(!defined($$settings{'mask-cliffs'}));
-  $$settings{'rename-taxa'}||="";
   $$settings{downsample}||=0;
   $$settings{'sample-sites'}||=0;
   $$settings{singleend}||=0;
@@ -165,11 +168,7 @@ sub main{
 
   if($$settings{trees}){
     logmsg "Launching set_processMsa.pl";
-    my $regexParam="";
-    if($$settings{'rename-taxa'}){
-      $regexParam="--rename-taxa ".$$settings{'rename-taxa'};
-    }
-    my $command="set_processMsa.pl --auto $regexParam --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus} 2>&1 | tee $$settings{logdir}/set_processMsa.log ";
+    my $command="set_processMsa.pl --auto --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus} 2>&1 | tee $$settings{logdir}/set_processMsa.log ";
     logmsg "Processing the MSA\n  $command";
     $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
     $sge->wrapItUp();
@@ -668,11 +667,23 @@ sub usage{
 
   # The help menu
   my $help="$0: Launches the Lyve-SET pipeline
+    Please visit http://github.com/lskatz/Lyve-SET for more information.
+
     Usage: $0 [project] [-ref reference.fasta]
     If project is not given, then it is assumed to be the current working directory.
     If reference is not given, then it is assumed to be proj/reference/reference.fasta
-    Where parameters with a / are directories
     -ref      proj/reference/reference.fasta   The reference genome assembly
+
+    SNP MATRIX OPTIONS
+    --allowedFlanking  $$settings{allowedFlanking} allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+    --min_alt_frac     $$settings{min_alt_frac}  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
+    --min_coverage     $$settings{min_coverage}  Minimum coverage needed before a SNP is called. Otherwise, 'N'
+    ";
+    return "$help\n  --help To view more help\n" if(!$$settings{help});
+
+    $help.="
+    Where parameters with a / are directories
+    LOCATIONS OF FILE DIRECTORIES
     -reads    $$settings{readsdir} where fastq and fastq.gz files are located
     -bam      $$settings{bamdir} where to put bams
     -vcf      $$settings{vcfdir} where to put vcfs
@@ -681,15 +692,6 @@ sub usage{
     --logdir  $$settings{logdir} Where to put log files. Qsub commands are also stored here.
     -asm      $$settings{asmdir} directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
 
-    SNP MATRIX OPTIONS
-    --allowedFlanking  $$settings{allowedFlanking} allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
-    --min_alt_frac     $$settings{min_alt_frac}  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
-    --min_coverage     $$settings{min_coverage}  Minimum coverage needed before a SNP is called. Otherwise, 'N'
-    --rename-taxa      ''  A perl regex to rename taxa in the MSA. See set_processMsa.pl for details and examples.  Use additional escapes for special characters, e.g. 's/\\\\..*//'
-    ";
-    return "$help\n  --help To view more help\n" if(!$$settings{help});
-
-    $help.="
     SKIP CERTAIN STEPS
     --nomask-phages                  Do not search for and mask phages in the reference genome
     --nomask-cliffs                  Do not search for and mask 'Cliffs' in pileups
