@@ -35,10 +35,13 @@ sub logmsg {
   local $0=basename $0;
   my $FH = *STDOUT; 
   my $caller=(caller(1))[3];
-  $caller=~s/^main:://;
-  $caller=~s/^__ANON__//;
+  $caller=(caller(2))[3] if($caller=~/__ANON__/); # Don't care about __ANON__ subroutines
+  $caller=~s/(main:*)+//;
+  #$caller=~s/^__ANON__//;  # Don't care about __ANON__ subroutines
+  $caller=~s/^\s+|\s+$//g; # trim
+  $caller="$caller:" if($caller ne "");
 
-  my $msg="$0: $caller: @_\n";
+  my $msg="$0: $caller @_\n";
 
   # print the message to the logfile if it's not the same as stdout
   #print join("\t","===",fileno($logmsgFh),fileno($FH))."\n";
@@ -47,7 +50,7 @@ sub logmsg {
   }
   print $FH $msg;
 }
-local $SIG{'__DIE__'} = sub { local $0=basename $0; my $e = $_[0]; $e =~ s/(at [^\s]+? line \d+\.$)/\nStopped $1/; my $msg="$0: ".(caller(1))[3].": ".$e; logmsg($msg);  die(); };
+local $SIG{'__DIE__'} = sub { local $0=basename $0; my $e = $_[0]; $e =~ s/(at [^\s]+? line \d+\.$)/\nStopped $1/; logmsg($e); die(); };
 END{
   close $logmsgFh if(defined($logmsgFh) && fileno($logmsgFh) > 0);
 }
@@ -666,7 +669,7 @@ sub usage{
   local $0=fileparse $0;
 
   # The help menu
-  my $help="$0: Launches the Lyve-SET pipeline
+  my $help="Launches the Lyve-SET pipeline
     Please visit http://github.com/lskatz/Lyve-SET for more information.
 
     Usage: $0 [project] [-ref reference.fasta]
