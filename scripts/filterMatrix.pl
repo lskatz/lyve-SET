@@ -67,8 +67,9 @@ sub filterSites{
 
     # get the fields from the matrix
     my($CONTIG,$POS,$REF,@GT)=split(/\t/,$bcfMatrixLine);
+    my $numAlts=@GT;
 
-    for(my $i=0;$i<@GT;$i++){
+    for(my $i=0;$i<$numAlts;$i++){
       $GT[$i]=diploidGtToHaploid($GT[$i],$REF,$settings);
     }
 
@@ -93,11 +94,20 @@ sub filterSites{
     # High-quality sites are far enough away from each other, as defined by the user
     $hqSite=0 if($POS - $currentPos < $$settings{allowed});
 
+    # Simply get rid of any site that consists of all Ns
+    my $is_allNs=1;
+    for(my $i=0;$i<$numAlts;$i++){
+      if($GT[$i]!~/N/i){
+        $is_allNs=0;
+      }
+    }
+    $hqSite=0 if($is_allNs);
+
     # The user can specify that high quality sites are those where every site is defined
     # (ie through --noambiguities)
     if(!$$settings{ambiguities}){
-      for my $nt(@GT){
-        if($nt!~/[ATCG]/i){
+      for(my $i=0;$i<$numAlts;$i++){
+        if($GT[$i]!~/[ATCG]/i){
           $hqSite=0;
           last;
         }
@@ -108,7 +118,7 @@ sub filterSites{
     if(!$$settings{invariant}){
       my $altRef=$GT[0];
       my $is_variant=0;
-      for(my $i=1;$i<@GT;$i++){
+      for(my $i=1;$i<$numAlts;$i++){
         if($GT[$i] ne $altRef){
           $is_variant=1;
         }
