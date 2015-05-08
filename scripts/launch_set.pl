@@ -1,5 +1,7 @@
 #!/usr/bin/env perl
 
+require 5.12.0;  # includes the "not implemented/yadda yadda operator (...)"
+
 # Update paths
 use FindBin qw/$RealBin/;
 use lib "$FindBin::RealBin/../lib";
