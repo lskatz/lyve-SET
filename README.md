@@ -90,20 +90,28 @@ Examples
 
 See: [examples.md](docs/EXAMPLES.md) for more details.
 
-The script `set_manage.pl` sets up the project directory and adds reads, and you should use the following syntax:
+The script `set_manage.pl` sets up the project directory and adds reads, and you should use the following syntax. Note that paired end reads should be in interleaved format. Scripts that interleave reads include `run_assembly_shuffleReads.pl` in the CG-Pipleline package (included with `make install`) and also `shuffleSequences_fastq.pl` in the Velvet package.
     
+    # Shuffle your reads if they are not already.
+    $ mkdir interleaved
+    $ for f in *_R1.fastq.gz; do
+    >   b=$(basename $i _R1.fastq.gz)  # getting the basename of the file
+    >   r=${b}_R2.fastq.gz             # Reverse reads filename
+    >   run_assembly_shuffleReads.pl $f $r | gzip -c > interleaved/$b.fastq.gz
+    > done;
+    # Create the project directory `setTest`
     $ set_manage.pl --create setTest
-    $ set_manage.pl setTest --add-reads file1.fastq.gz
-    $ set_manage.pl setTest --add-reads file2.fastq.gz
-    $ set_manage.pl setTest --add-reads file3.fastq.gz
-    $ set_manage.pl setTest --add-reads file4.fastq.gz
-    $ set_manage.pl setTest --add-reads file5.fastq.gz
+    # Add reads
+    $ for i in interleaved/*.fastq.gz; do
+    >   set_manage.pl setTest --add-reads $i
+    > done;
+    # Add assemblies (optional)
     $ set_manage.pl setTest --add-assembly file1.fasta
     $ set_manage.pl setTest --add-assembly file2.fasta
+    # Specify your reference genome
     $ set_manage.pl setTest --change-reference file3.fasta
 
-NOTE: paired end reads should be in interleaved format. Scripts that interleaved include run_assembly_shuffleReads.pl in the CG-Pipleline package and also shuffleSequences_fastq.pl in the Velvet package.
-
+    
 Run Lyve-SET with as few options as possible
 
     $ launch_set.pl setProj
