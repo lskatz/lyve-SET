@@ -32,7 +32,7 @@ fi
 #   b. Is there at least one sample with an unambiguous base call? --print.
 #   c. Are all bases ambiguous? -- skip
 command="bcftools merge $IN --force-samples | \
-perl -lane 'if(/^#/){print;} elsif(\$F[4] ne \"N\"){ print; } else { \$numF=@F; \$has_hq=0; for my \$info(@F[8..\$numF-1]){ \$gt=substr((split(/:/,\$info))[0],0,1); \$has_hq=1 if(\$gt=~/[ATCG0\.,]/i);} print if(\$has_hq); }' |\
+perl -lane 'if(/^#/){print;} elsif(\$F[4] ne \"N\"){ print; } else { \$numF=@F; \$has_hq=0; for my \$info(@F[9..\$numF-1]){ \$gt=substr((split(/:/,\$info))[0],0,1); \$has_hq=1 if(\$gt=~/[ATCG0\.,]/i);} print if(\$has_hq); }' |\
 bgzip -c > $OUT.tmp
 "
 eval $command
