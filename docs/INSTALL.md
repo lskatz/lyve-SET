@@ -5,7 +5,8 @@ Quickie Installation
 --------------------
 
 1. Run `make install` while you are in the Lyve-SET directory. This step probably takes 10-20 minutes.
-2. Update the path to include the scripts subdirectory. You can do this yourself if you are comfortable or run `make env` followed by `source ~/.bashrc`
+2. Update the path to include the scripts subdirectory. You can do this yourself if you are comfortable or run `make env`.
+3. Update your current session's path: `source ~/.bashrc`
 
 Requirements
 ------------
