@@ -23,11 +23,27 @@ if [ "$IN" == "" ] || [ "$OUT" == "" ]; then
   exit 1;
 fi
 
-command="bcftools merge $IN -O z --force-samples > $OUT.tmp && mv -v $OUT.tmp $OUT"
+# zcat out.pooled.vcf.gz|perl -lane 'if(/^#/){print;} elsif($F[4] ne "N"){ print; } else { $numF=@F; $has_hq=0; for my $info(@F[8..$numF-1]){ $gt=substr((split(/:/,$info))[0],0,1); $has_hq=1 if($gt=~/[ATCG0\.,]/i);} print if($has_hq); }' | grep -cv '#'
+
+# This command does the following:
+# 1. bcftools merge (merging VCF samples into one)
+# 2. Checks to see if the site is high-quality or not
+#   a. Is it a header or is there no ambiguous alt call? -- print.
+#   b. Is there at least one sample with an unambiguous base call? --print.
+#   c. Are all bases ambiguous? -- skip
+command="bcftools merge $IN --force-samples | \
+perl -lane 'if(/^#/){print;} elsif(\$F[4] ne \"N\"){ print; } else { \$numF=@F; \$has_hq=0; for my \$info(@F[8..\$numF-1]){ \$gt=substr((split(/:/,\$info))[0],0,1); \$has_hq=1 if(\$gt=~/[ATCG0\.,]/i);} print if(\$has_hq); }' |\
+bgzip -c > $OUT.tmp
+"
 eval $command
 if [ $? -gt 0 ]; then
   echo -e "ERROR with bcftools:\n  $command";
   rm -vf $OUT.tmp
+  exit 1;
+fi;
+mv -v $OUT.tmp $OUT
+if [ $? -gt 0 ]; then
+  echo "ERROR moving $OUT.tmp to $OUT";
   exit 1;
 fi;
 
