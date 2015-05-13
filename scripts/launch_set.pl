@@ -70,8 +70,8 @@ sub main{
   $$settings{keep}||=0;
   $$settings{min_alt_frac}||=0.75;
   $$settings{min_coverage}||=10;
-  $$settings{'mask-phages'}=1 if(!defined($$settings{'mask-phages'}));
-  $$settings{'mask-cliffs'}=1 if(!defined($$settings{'mask-cliffs'}));
+  $$settings{'mask-phages'}=0 if(!defined($$settings{'mask-phages'}));
+  $$settings{'mask-cliffs'}=0 if(!defined($$settings{'mask-cliffs'}));
   $$settings{downsample}||=0;
   $$settings{'sample-sites'}||=0;
   $$settings{singleend}||=0;
