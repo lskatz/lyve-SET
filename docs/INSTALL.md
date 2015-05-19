@@ -50,7 +50,16 @@ Installation
 Upgrading
 ---------
 ### By stable releases
-Unfortunately the best way to get the next stable release is to download the full version like usual, followed by `make` as described above.
+Unfortunately the best way to get the next stable release is to download the full version like usual, followed by `make install`.  If successful, then delete the directory containing the older version.
+
+    cd ~/tmp
+    wget http://latest/release.tar.gz
+    tar zxvf release.tar.gz
+    cd Lyve-SET
+    make install # takes 10-20 minutes to download packages on broadband; install
+    cd ~/bin
+    rm -r Lyve-SET && mv ~/tmp/Lyve-SET .
+
 ### By `git`
     git pull -u origin master
     make clean
