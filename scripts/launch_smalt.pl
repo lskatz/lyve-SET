@@ -116,7 +116,7 @@ sub mapReads{
   # cleanup
   system("mv -v $sorted $bam"); die if $?;
   system("mv -v $sorted.bai $bam.bai"); die if $?;
-  system("mv -v $sorted.depth.gz $bam.depth.gz"); die if $?;
+  unlink("$sorted.depth.gz");
   system("rm -v $tmpOut $tmpSamOut"); die if $?;
 
   return 1;
