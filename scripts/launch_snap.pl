@@ -182,8 +182,7 @@ sub mapReads{
   system("mv -v $sorted $bam"); die if $?;
   system("mv -v $sorted.bai $bam.bai"); die if $?;
   system("mv -v $sorted.depth $bam.depth"); die if $?;
-  system("gzip -9v $bam.depth"); die if $?; # save some space
-  #system("rm -v $tmpOut"); die if $?;
+  unlink("$bam.depth");
 
   return 1;
 }
