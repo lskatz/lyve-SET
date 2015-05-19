@@ -14,8 +14,8 @@ sub logmsg{print STDERR "@_\n";}
 exit(main());
 
 sub main{
-  my $settings={clean=>0};
-  GetOptions($settings,qw(help reference=s fastq=s bam=s tempdir=s clean! numcpus=i smaltxopts=s pairedend=i minPercentIdentity=i)) or die $!;
+  my $settings={};
+  GetOptions($settings,qw(help reference=s fastq=s bam=s tempdir=s numcpus=i smaltxopts=s pairedend=i minPercentIdentity=i)) or die $!;
   $$settings{numcpus}||=1;
   $$settings{tempdir}||="tmp";
   $$settings{pairedend}||=0;
@@ -40,29 +40,16 @@ sub main{
   my $reference=$$settings{reference};
   $$settings{refdir}||=dirname($reference);
 
-  logmsg "Cleaning was disabled. I will not clean the reads before mapping" if(!$$settings{clean});
-  $fastq=cleanReads($fastq,$settings) if($$settings{clean});
+  # Check if the reference genome was indexed.
+  # I think it has to die and not index the genome just in case other
+  # instances of this script are trying to do the same thing.
+  for my $indexFile("$reference.sma","$reference.smi"){
+    die "ERROR: Could not find $indexFile, which makes me think that the reference genome has not been indexed with `smalt index`." if(!-e $indexFile);
+  }
+
   mapReads($fastq,$bam,$reference,$settings);
 
   return 0;
-}
-
-sub cleanReads{
-  my($query,$settings)=@_;
-  logmsg "Trimming, removing duplicate reads, and cleaning";
-  my $b=fileparse $query;
-  my $prefix="$$settings{tempdir}/$b";
-  #system("run_assembly_trimLowQualEnds.pl -c 99999 $query > '$prefix.trimmed.fastq'"); 
-  die if $?;
-  #system("run_assembly_removeDuplicateReads.pl '$prefix.trimmed.fastq' > '$prefix.nodupes.fastq'");
-  system("run_assembly_removeDuplicateReads.pl '$query' > '$prefix.nodupes.fastq'");
-  die if $?;
-  system("run_assembly_trimClean.pl --numcpus $$settings{numcpus} -i '$prefix.nodupes.fastq' -o '$prefix.cleaned.fastq' --min_length 36");
-  die if $?;
-  system("rm -v '$prefix.nodupes.fastq' '$prefix.trimmed.fastq'");
-  #die if $?;
-
-  return "$prefix.cleaned.fastq";
 }
 
 sub mapReads{
