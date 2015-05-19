@@ -27,9 +27,24 @@ In the case where you have all pileups finished and want to call SNPs on a singl
 Other manual steps in Lyve-SET
 -------------------------------------------------
 
+### From a set of VCFs to finished results
+
     mergeVcf.sh -o msa/out.pooled.vcf.gz vcf/*.vcf.gz # get a pooled VCF
     cd msa
     pooledToMatrix.sh -o out.bcftoolsquery.tsv out.pooled.vcf.gz  # Create a readable matrix
     filterMatrix.pl --noambiguities --noinvariant  < out.bcftoolsquery.tsv > out.filteredbcftoolsquery.tsv # Filter out low-quality sites
     matrixToAlignment.pl < out.filteredbcftoolsquery.tsv > out.aln.fas  # Create an alignment in standard fasta format
     set_processMsa.pl --numcpus 12 --auto --force out.aln.fas # Run the next steps in this mini-pipeline
+
+### Manual steps in `set_processMsa.pl`
+
+Hopefully all these commands make sense but please tell me if I need to expound.
+
+    cd msa
+    removeUninformativeSites.pl --gaps-allowed --ambiguities-allowed out.aln.fas > /tmp/variantSites.fasta
+    pairwiseDistances.pl --numcpus 12 /tmp/variantSites.fasta | sort -k3,3n | tee pairwise.tsv | pairwiseTo2d.pl > pairwise.matrix.tsv && rm /tmp/variantSites.fasta
+    set_indexCase.pl pairwise.tsv | sort -k2,2nr > eigen.tsv # Figure out the most "connected" genome which is the most likely index case
+    launch_raxml.sh -n 12 informative.aln.fas informative # create a tree with the suffix 'informative'
+    applyFstToTree.pl --numcpus 12 -t RAxML_bipartitions.informative -p pairwise.tsv --outprefix fst --outputType averages > fst.avg.tsv  # look at the Fst for your tree (might result in an error for some trees, like polytomies)
+    applyFstToTree.pl --numcpus 12 -t RAxML_bipartitions.informative -p pairwise.tsv --outprefix fst --outputType samples > fst.samples.tsv  # instead of average Fst values per tree node, shows you each repetition
+    
