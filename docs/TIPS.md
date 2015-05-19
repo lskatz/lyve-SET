@@ -24,15 +24,12 @@ In the case where you have all pileups finished and want to call SNPs on a singl
     cd vcf; 
     ls *.vcf| xargs -I {} -P 24 -n 1 sh -c "vcf-sort < {} > {}.tmp && mv -v {}.tmp {} && bgzip {} && tabix {}.gz"
 
-One-liners for finding SNPs via the MSA directory
+Other manual steps in Lyve-SET
 -------------------------------------------------
 
-### Find actual SNPs of high quality (assuming only two genomes)
-
-Conditions: the first genome alt must not be equal to the second's.  Also, neither position can be "N"
-
-    cat out.bcftoolsquery.tsv | perl -lane 'BEGIN{$header=<>; chomp($header);} ($contig,$pos,$ref,@alt)=@F; chomp(@F,@alt); for($i=0;$i<@alt;$i++){$alt[$i]=substr($alt[$i],0,1); $alt[$i]=$ref if($alt[$i] eq ".");} print if($alt[0] ne $alt[1] && $alt[0] ne "N" && $alt[1] ne "N");'
-
-NOTE: I just put this command effectively into a Lyve-SET script like so:
-    
-    filterMatrix.pl --noambiguities --noinvariant  < out.bcftoolsquery.tsv
+    mergeVcf.sh -o msa/out.pooled.vcf.gz vcf/*.vcf.gz # get a pooled VCF
+    cd msa
+    pooledToMatrix.sh -o out.bcftoolsquery.tsv out.pooled.vcf.gz  # Create a readable matrix
+    filterMatrix.pl --noambiguities --noinvariant  < out.bcftoolsquery.tsv > out.filteredbcftoolsquery.tsv # Filter out low-quality sites
+    matrixToAlignment.pl < out.filteredbcftoolsquery.tsv > out.aln.fas  # Create an alignment in standard fasta format
+    set_processMsa.pl --numcpus 12 --auto --force out.aln.fas # Run the next steps in this mini-pipeline
