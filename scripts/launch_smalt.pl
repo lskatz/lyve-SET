@@ -54,8 +54,8 @@ sub main{
 
 sub mapReads{
   my($query,$bam,$ref,$settings)=@_;
-  if(-s "$bam.depth" || -s "$bam.depth.gz"){
-    logmsg "Found $bam depth\n  I will not re-map.";
+  if(-s "$bam"){
+    logmsg "Found $bam\n  I will not re-map.";
     return 1;
   }
 
