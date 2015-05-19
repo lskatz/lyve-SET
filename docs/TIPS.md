@@ -3,6 +3,12 @@ Tips and Tricks
 
 Here are just some tips and tricks that I've used or that others have contributed
 
+Masking a region in your reference genome
+-----------------------------------------
+Yes, there is actually a mechanism to manually mask troublesome regions in the reference genome!  Under `project/reference/maskedRegions`, create a file with an extension `.bed`.  This file has at least three columns: `contig`, `start`, `stop`.  BED is a standard file format and is better described here: https://genome.ucsc.edu/FAQ/FAQformat.html#format1 
+
+The Lyve-SET phage-finding tool that uses PHAST actually puts a `phages.bed` file into that directory.  In the course of the pipeline, Lyve-SET will use any BED files in that directory to 1) ignore any reads that are mapped entirely in those regions and 2) ignore any SNPs that are found in those regions.  In the future, Lyve-SET will also use individualized BED files in the bam directory to mask SNPs found on a per-genome basis.
+
 Using multiple processors on a single-node machine
 --------------------------------------------------
 
