@@ -47,3 +47,11 @@ Installation
 * `make clean-*` - Every `make install` command comes with a `make clean` command, e.g.:
   * `make clean-CGP`
 
+Upgrading
+---------
+### By stable releases
+Unfortunately the best way to get the next stable release is to download the full version like usual, followed by `make` as described above.
+### By `git`
+    git pull -u origin master
+    make clean
+    make install
