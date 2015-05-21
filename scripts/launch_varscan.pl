@@ -251,5 +251,6 @@ sub usage{
   --coverage 10        Min coverage
   --altFreq  0.75      Min consensus agreement for a SNP
   --region   file.bed  File of positions to include (default with no bed file: read all positions)
+  #--exclude  file.bed  File of positions to mask    (conflicts with --region; default: don't exclude)
   "
 }
