@@ -56,7 +56,7 @@ sub findCliffs{
   }
   close DEPTH;
 
-  # Generate the regions that will be looked at
+  # Generate the regions that will be looked at.
   my $windowSize=250;
   my $stepSize=int($windowSize/2);
   my $seqinfo=getSeqInfo($bam,$settings);
@@ -196,12 +196,13 @@ sub findCliffsInRegion{
   # anything I miss will be encompassed in the next cascading
   # window anyway.
   my @sortedStart=sort {$a<=>$b} keys(%depth);
-  shift(@sortedStart); pop(@sortedStart);
+  # Don't look at the perifery so that there is context to the cliffs.
+  @sortedStart=splice(@sortedStart,3,-3); # go 3 sub-windows into the larger window
   for(my $i=0;$i<@sortedStart;$i++){
     my $start=$sortedStart[$i];
     my $depth=$depth{$start};
     next if($depth > $lo); # don't call this a cliff it's not too low
-    push(@region,{depth=>$depth,CI=>[$lo,9999],region=>[$seqname,$start,$start+$windowSize]});
+    push(@region,{depth=>$depth,windowDepth=>$avg,windowStdev=>$stdev,CI=>[$lo,9999],region=>[$seqname,$start,$start+$windowSize]});
   }
   #logmsg "TID:".threads->tid." $seqname:$pos-$lastPos  Depth 95% CI interval: [$lo,$hi]";
   return \@region;
