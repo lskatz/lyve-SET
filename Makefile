@@ -161,10 +161,9 @@ clean-smalt:
 
 install-snap:
 	git clone https://github.com/amplab/snap.git $(PREFIX)/lib/snap
-	cd $(PREFIX)/lib/snap && make
-	cp -vn $(PREFIX)/lib/snap/snap   $(PREFIX)/scripts/
-	cd $(PREFIX)/lib/snap && make snapxl
-	cp -vn $(PREFIX)/lib/snap/snapxl $(PREFIX)/scripts/
+	cd $(PREFIX)/lib/snap && git checkout v0.15 && make
+	cp -vn $(PREFIX)/lib/snap/snap  $(PREFIX)/scripts/
+	ln -sv snap $(PREFIX)/scripts/snapxl # a band-aid until I remove snapxl from the code
 
 clean-snap:
 	rm -rvf $(PREFIX)/lib/snap $(PREFIX)/scripts/snap $(PREFIX)/scripts/snapxl
