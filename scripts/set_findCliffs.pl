@@ -5,7 +5,7 @@ use warnings;
 use Data::Dumper;
 use Getopt::Long;
 use FindBin;
-use List::Util qw/sum/;
+use List::Util qw/sum max min/;
 use Statistics::Descriptive;
 use File::Basename qw/fileparse basename dirname/;
 use File::Temp qw/tempdir/;
@@ -13,6 +13,7 @@ use threads;
 use Thread::Queue;
 use threads::shared;
 use POSIX qw/ceil/;
+use Statistics::LineFit;
 
 use lib "$FindBin::RealBin/../lib";
 use Number::Range;
@@ -43,7 +44,7 @@ sub findCliffs{
 
   # Find the depth of the whole bam file one time, to save cpu.
   # This can be done while regions are being defined in the next loop.
-  logmsg "Calculating depth of $bam in the background.";
+  logmsg "Calculating depth of $bam";
   my $depthfile="$$settings{tempdir}/".basename($bam).".depth";
   system("samtools depth $bam > $depthfile");
   die "ERROR with samtools depth: $!" if $?;
@@ -70,6 +71,7 @@ sub findCliffs{
     }
   }
   # Split the windows into thread-sized chunks
+  logmsg "Defining regions to give to the cliff-detector";
   my $numPerThread=ceil(@region/$$settings{numcpus});
   my @regionSet;
   my @depthSet;
@@ -83,7 +85,7 @@ sub findCliffs{
       $depthSet[$i]{$seqname}{$_}=$depth{$seqname}{$_}||0 for($start..$stop);
     }
   }
-  logmsg "Done defining regions.";
+  logmsg "Now investigating those regions for cliffs.";
 
   # Make threads and distribute the regions array evenly to them all
   my @thr;
@@ -94,30 +96,39 @@ sub findCliffs{
 
   # Gather results from the threads by making
   # a set of ranges
+  my @cliff;
   for my $t(@thr){
     logmsg "Combining ranges found in TID".$t->tid;
-    my $ranges=$t->join;
-    # Add whatever coordinates the analysis showed us
-    for my $setOfRanges(@$ranges){
-      next if(!@$setOfRanges);
-      for my $c(@$setOfRanges){
-        no warnings; # b/c $_->addrange will produce a warning if there are repeated coordinates
-        $region{$$c{region}[0]}->addrange($$c{region}[1]..$$c{region}[2]);
-      }
-    }
+    my $cliffs=$t->join;
+    push(@cliff,@$cliffs);
   }
-  # DONE gathering and combining ranges
 
-  # Print the results in BED format
-  for my $seqname(keys(%$seqinfo)){
-    next if(!$region{$seqname});
-    my $rangeStr=$region{$seqname}->range;
-    while($rangeStr=~/(\d+)\.\.(\d+),?/g){
-      my($start,$stop)=($1,$2);
-      my $name=join(":","cliff",$seqname,"$start-$stop");
-      print join("\t",$seqname,$start,$stop,$name)."\n";
+  # Combine ranges
+  my %cliffRange;
+  for my $cliff(@cliff){
+    my $name=$$cliff{region}[0];
+    $cliffRange{$name}||=Number::Range->new;
+    no warnings;
+    $cliffRange{$name}->addrange($$cliff{region}[1]..$$cliff{region}[2]);
+  }
+
+  # Print ranges
+  while(my($seqname,$cliff)=each(%cliffRange)){
+    my $range=$cliff->range();
+
+    # some internal sorting by start
+    my @pos;
+    while($range=~/(\d+)\.\.(\d+),?/g){
+      push(@pos,[$1,$2]);
+    }
+
+    for my $lohi(sort {$$a[0] <=> $$b[0]} @pos){
+      my($lo,$hi)=@$lohi;
+      my $name="$seqname:$lo";
+      print join("\t",$seqname,$lo,$hi,$name)."\n";
     }
   }
+
 }
 
 sub findCliffsInRegionWorker{
@@ -129,8 +140,8 @@ sub findCliffsInRegionWorker{
   my $i=0;
   for my $tmp(@$regionArr){
     my($bam,$seqname,$pos,$lastPos)=@$tmp;
-    my @r=findCliffsInRegion($bam,$depth,$seqname,$pos,$lastPos,$settings);
-    push(@region,@r);
+    my $r=findCliffsBySlope($bam,$depth,$seqname,$pos,$lastPos,$settings);
+    push(@region,@$r);
     $i++;
   }
   logmsg "Finished looking at $i regions";
@@ -152,60 +163,58 @@ sub readBamDepth{
   return \%depth;
 }
 
-sub findCliffsInRegion{
+sub findCliffsBySlope{
   my($bam,$allDepth,$seqname,$pos,$lastPos,$settings)=@_;
-  my %region; # $region{contig}=>[ 
-              #                    [start,stop],
-              #                    [start,stop],
-              #                  ]
-
+  
+  $$settings{slopeThreshold}||=3; # detect any region that has a slope bigger than this abs number
+  
   my $windowSize=15;
   my $stepSize=int($windowSize/2);
 
-  # Find the average of average depths
-  #my $allDepth=readBamDepth($bam,"$seqname:$pos-$lastPos",$settings);
-  my %depth;
-  for(my $start=$pos;$start<$lastPos;$start+=$stepSize){
+  # Figure out the slope every 15 bp in this region from $pos to $lastPos.
+  # If it goes beyond the threshold then it is a cliff.
+  my @cliff=();
+  while($pos<=$lastPos){
+
+    # Load up information for line-fitting (ie, trendline)
+    my (@depth,@pos); # y and x on the linefit graph
+    my $start=$pos;
     my $stop=$start+$windowSize-1;
-    $stop=$lastPos if($stop>$lastPos);
-    
-    # Calculate this window's depth
-    my $total;
-    for($start .. $stop){
-      $total+=$$allDepth{$seqname}{$_} || 0;
+    while($pos<=$stop){
+      
+      my $depth=$$allDepth{$seqname}{$pos} || 0;
+      push(@depth,$depth);
+      push(@pos,$pos);
+
+      $pos++;
     }
-    $depth{$start}=$total/($stop - $start + 1);
-    #my $windowDepth=depth($bam,"$seqname:$start-$stop",$settings);
-    #$depth{$start}=$windowDepth;
-  }
-  my $stat=Statistics::Descriptive::Full->new;
-  $stat->add_data(values(%depth));
-  my($avg,$stdev)=($stat->mean,$stat->standard_deviation);
 
-  # Is anything lower than a cutoff for what I'd expect?
-  # Cliffs don't happen all to often, so maybe it's in the bottom 1%
-  my $lo=$avg - 3*$stdev;
-  for($lo){
-    $_=0 if($_<0);
-    $_=sprintf("%0.2f",$_);
+    # Get the actual linefit statistics
+    my $linefit=Statistics::LineFit->new();
+    $linefit->setData(\@pos,\@depth) or die "Invalid depths to figure out the slope! \n @depth\n";
+
+    # Don't worry about this being a cliff if rSquared is not significant
+    next if(!defined($linefit->rSquared()) || $linefit->rSquared() < 0.5);
+
+    # Get the slope of the line
+    my($intercept,$slope)=$linefit->coefficients();
+
+    # Record this as a cliff if the slope is steep enough
+    next if(abs($slope) < $$settings{slopeThreshold});
+    push(@cliff,{
+      region=>[$seqname,$start,$stop],
+      intercept=>$intercept,
+      slope=>$slope,
+      hi=>max(@depth),
+      lo=>min(@depth),
+      name=>"$seqname:$start",
+      rSquared=>$linefit->rSquared(),
+    });
+
+
   }
 
-  # Figure out the cliffs using $lo as a cutoff
-  my @region;
-  # I don't want to look at the edges of the larger window, and
-  # anything I miss will be encompassed in the next cascading
-  # window anyway.
-  my @sortedStart=sort {$a<=>$b} keys(%depth);
-  # Don't look at the perifery so that there is context to the cliffs.
-  @sortedStart=splice(@sortedStart,3,-3); # go 3 sub-windows into the larger window
-  for(my $i=0;$i<@sortedStart;$i++){
-    my $start=$sortedStart[$i];
-    my $depth=$depth{$start};
-    next if($depth > $lo); # don't call this a cliff it's not too low
-    push(@region,{depth=>$depth,windowDepth=>$avg,windowStdev=>$stdev,CI=>[$lo,9999],region=>[$seqname,$start,$start+$windowSize]});
-  }
-  #logmsg "TID:".threads->tid." $seqname:$pos-$lastPos  Depth 95% CI interval: [$lo,$hi]";
-  return \@region;
+  return \@cliff;
 }
 
 # Finds sequence names (contigs) and their lengths
