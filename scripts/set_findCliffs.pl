@@ -8,113 +8,77 @@ use FindBin;
 use List::Util qw/sum max min/;
 use Statistics::Descriptive;
 use File::Basename qw/fileparse basename dirname/;
-use File::Temp qw/tempdir/;
+use File::Temp qw/tempdir tempfile/;
 use threads;
 use Thread::Queue;
-use threads::shared;
-use POSIX qw/ceil/;
+
 use Statistics::LineFit;
 
 use lib "$FindBin::RealBin/../lib";
 use Number::Range;
 use LyveSET qw/logmsg/;
 
-my $readBamStick :shared; # A thread must hold the stick before it can read the bam
-
-$0=basename($0);
 exit(main());
+
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help numcpus=i tempdir=s)) or die $!;
-  
+  GetOptions($settings,qw(help numcpus=i tempdir=s slopeThreshold=s rSquaredThreshold=s windowSize=i)) or die $!;
+
+  # Check on parameters
   my $bam=$ARGV[0] || "";
   die "ERROR: bam file not given!\n".usage() if(!$bam);
   die "ERROR: could not find $bam\n".usage() if(!-e $bam);
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("$0XXXXXX",TMPDIR=>1,CLEANUP=>1);
+  $$settings{slopeThreshold}||=3;      # detect any region that has a slope bigger than this abs number
+  $$settings{rSquaredThreshold}||=0.7; # level of significance in the trendline slope
+  $$settings{windowSize}||=10;
+
   logmsg "Temporary directory is $$settings{tempdir}";
-
-  my @region=findCliffs($bam,$settings);
-
-  return 0;
-}
-
-sub findCliffs{
-  my($bam,$settings)=@_;
-
-  # Find the depth of the whole bam file one time, to save cpu.
-  # This can be done while regions are being defined in the next loop.
-  logmsg "Calculating depth of $bam";
-  my $depthfile="$$settings{tempdir}/".basename($bam).".depth";
-  system("samtools depth $bam > $depthfile");
-  die "ERROR with samtools depth: $!" if $?;
-  my %depth;
-  open(DEPTH,$depthfile) or die $!;
-  while(<DEPTH>){
-    chomp;
-    my($seqname,$pos,$d)=split /\t/;
-    $depth{$seqname}{$pos}=$d;
-  }
-  close DEPTH;
-
-  # Generate the regions that will be looked at.
-  my $windowSize=250;
-  my $stepSize=int($windowSize/2);
-  my $seqinfo=getSeqInfo($bam,$settings);
-  my @region; # set of coordinates to analyze for depth
-  my %region; # hash of different range objects for cliffs
-  while(my($seqname,$length)=each(%$seqinfo)){
-    $region{$seqname}=Number::Range->new;
-    for(my $pos=1;$pos<=$length;$pos+=$stepSize){
-      my $stop=$pos+$windowSize-1;
-      push(@region,[$bam,$seqname,$pos,$stop]);
-    }
-  }
-  # Split the windows into thread-sized chunks
-  logmsg "Defining regions to give to the cliff-detector";
-  my $numPerThread=ceil(@region/$$settings{numcpus});
-  my @regionSet;
-  my @depthSet;
-  for(my $i=0;$i<$$settings{numcpus};$i++){
-    # Split up the regions
-    $regionSet[$i]=[splice(@region,0,$numPerThread)];
-
-    # Also split up the depth hashes
-    for(@{$regionSet[$i]}){ # [bam,seqname,start,stop]
-      my(undef,$seqname,$start,$stop)=@$_;
-      $depthSet[$i]{$seqname}{$_}=$depth{$seqname}{$_}||0 for($start..$stop);
-    }
-  }
-  logmsg "Now investigating those regions for cliffs.";
-
-  # Make threads and distribute the regions array evenly to them all
+  
+  # Kick off all the threads.
+  # Items being enqueued later go into this subroutine.
   my @thr;
-  for my $i(0..$$settings{numcpus}-1){
-    my %depthCopy=%{$depthSet[$i]};
-    $thr[$i]=threads->new(\&findCliffsInRegionWorker,$regionSet[$i],\%depthCopy,$settings);
+  my $Q=Thread::Queue->new;
+  $thr[$_]=threads->new(sub{
+    my($Q,$settings)=@_;
+    my @cliff;
+    while(defined(my $args=$Q->dequeue)){
+      my $cliff=findCliffsBySlope(@$args,$settings);
+      push(@cliff,@$cliff);
+    }
+    return \@cliff;
+  },$Q,$settings) for(0..$$settings{numcpus}-1);
+
+  # Find cliffs by enquing region information
+  logmsg "Finding cliffs whose slopes are at least $$settings{slopeThreshold} with an rSquared value of at least $$settings{rSquaredThreshold} in a sliding window size of $$settings{windowSize}.";
+  my $seqLength=bamSeqnames($bam,$settings);
+  while(my($seqname,$length)=each(%$seqLength)){
+    $Q->enqueue([$bam,$seqname,1,$length]);
   }
 
-  # Gather results from the threads by making
-  # a set of ranges
+  # Join all the threads.
+  $Q->enqueue(undef) for(@thr);
   my @cliff;
-  for my $t(@thr){
-    logmsg "Combining ranges found in TID".$t->tid;
-    my $cliffs=$t->join;
-    push(@cliff,@$cliffs);
+  for(@thr){
+    my $cliff=$_->join();
+    push(@cliff,@$cliff);
   }
 
-  # Combine ranges
+  # Make regions contiguous if they are touching
+  logmsg "Joining contiguous cliff regions";
   my %cliffRange;
   for my $cliff(@cliff){
-    my $name=$$cliff{region}[0];
+    my $name=$$cliff{seqname};
     $cliffRange{$name}||=Number::Range->new;
     no warnings;
-    $cliffRange{$name}->addrange($$cliff{region}[1]..$$cliff{region}[2]);
+    $cliffRange{$name}->addrange($$cliff{start}..$$cliff{stop});
   }
 
-  # Print ranges
-  while(my($seqname,$cliff)=each(%cliffRange)){
-    my $range=$cliff->range();
+  # Print regions where cliffs are.
+  # TODO: print slope and rSquared next to cliffs
+  for my $seqname(sort {$a cmp $b} keys(%cliffRange)){
+    my $range=$cliffRange{$seqname}->range();
 
     # some internal sorting by start
     my @pos;
@@ -129,64 +93,43 @@ sub findCliffs{
     }
   }
 
-}
-
-sub findCliffsInRegionWorker{
-  my($regionArr,$depth,$settings)=@_;
-
-  logmsg "Init";
-
-  my @region; # array of hashes
-  my $i=0;
-  for my $tmp(@$regionArr){
-    my($bam,$seqname,$pos,$lastPos)=@$tmp;
-    my $r=findCliffsBySlope($bam,$depth,$seqname,$pos,$lastPos,$settings);
-    push(@region,@$r);
-    $i++;
-  }
-  logmsg "Finished looking at $i regions";
-  return \@region;
-}
-
-sub readBamDepth{
-  my($bam,$region,$settings)=@_;
-  lock $readBamStick;
-  open(DEPTH,"samtools depth -r '$region' $bam | ") or die "ERROR: could not open $bam:$!";
-  my %depth;
-  while(<DEPTH>){
-    chomp;
-    my($seqname,$pos,$depth)=split /\t/;
-    $depth{$seqname}{$pos}=$depth;
-  }
-  close DEPTH;
-
-  return \%depth;
+  return 0;
 }
 
 sub findCliffsBySlope{
-  my($bam,$allDepth,$seqname,$pos,$lastPos,$settings)=@_;
-  
-  $$settings{slopeThreshold}||=3; # detect any region that has a slope bigger than this abs number
-  
-  my $windowSize=15;
-  my $stepSize=int($windowSize/2);
+  my($bam,$seqname,$pos,$lastPos,$settings)=@_;
 
-  # Figure out the slope every 15 bp in this region from $pos to $lastPos.
+  # Find the depth of the whole bam file one time, to save cpu.
+  logmsg "Calculating depth of $bam:$seqname";
+  my (undef,$depthfile)=tempfile("depthXXXXXX",SUFFIX=>".depth",DIR=>$$settings{tempdir});
+  system("samtools depth -r '$seqname' $bam > $depthfile");
+  die "ERROR with samtools depth: $!" if $?;
+  my %depth;
+  open(DEPTH,$depthfile) or die $!;
+  while(<DEPTH>){
+    chomp;
+    my($seqname,$pos,$d)=split /\t/;
+    print "$_\n" if(!$pos);
+    $depth{$pos}=$d;
+  }
+  close DEPTH;
+
+
+  my $windowSize=10;
+
+  # Figure out the slope for every 15 bp in a sliding window
   # If it goes beyond the threshold then it is a cliff.
   my @cliff=();
-  while($pos<=$lastPos){
+  for($pos=$pos;$pos<=$lastPos;$pos++){
 
     # Load up information for line-fitting (ie, trendline)
     my (@depth,@pos); # y and x on the linefit graph
     my $start=$pos;
     my $stop=$start+$windowSize-1;
-    while($pos<=$stop){
-      
-      my $depth=$$allDepth{$seqname}{$pos} || 0;
+    for(my $windowPos=$start;$windowPos<=$stop;$windowPos++){
+      my $depth=$depth{$windowPos}||0;
       push(@depth,$depth);
-      push(@pos,$pos);
-
-      $pos++;
+      push(@pos,$windowPos);
     }
 
     # Get the actual linefit statistics
@@ -194,15 +137,17 @@ sub findCliffsBySlope{
     $linefit->setData(\@pos,\@depth) or die "Invalid depths to figure out the slope! \n @depth\n";
 
     # Don't worry about this being a cliff if rSquared is not significant
-    next if(!defined($linefit->rSquared()) || $linefit->rSquared() < 0.5);
+    next if(!defined($linefit->rSquared()) || $linefit->rSquared() < $$settings{rSquaredThreshold});
 
     # Get the slope of the line
     my($intercept,$slope)=$linefit->coefficients();
 
-    # Record this as a cliff if the slope is steep enough
+    # Don't think about this as a cliff if the slope is shallow
     next if(abs($slope) < $$settings{slopeThreshold});
+
+    # Record this as a cliff if it passed all the criteria
     push(@cliff,{
-      region=>[$seqname,$start,$stop],
+      seqname=>$seqname, start=>$start, stop=>$stop,
       intercept=>$intercept,
       slope=>$slope,
       hi=>max(@depth),
@@ -211,50 +156,44 @@ sub findCliffsBySlope{
       rSquared=>$linefit->rSquared(),
     });
 
-
   }
+
 
   return \@cliff;
 }
 
-# Finds sequence names (contigs) and their lengths
-sub getSeqInfo{
+# Use samtools view -H to find the seqnames and their lengths
+sub bamSeqnames{
   my($bam,$settings)=@_;
-  my (%seqinfo);
-  open(BAMHEADER,"samtools view -H $bam | ") or die "ERROR: could not open $bam with samtools view -H: $!";
-  while(<BAMHEADER>){
-    chomp;
-    next if(!/\@SQ/);
-    my($SQ,@fields)=split(/\t/);
-    my %F;
-    for my $keyvalue(@fields){
-      my($key,$value)=split(/:/,$keyvalue);
-      $F{$key}=$value;
-    }
-    $seqinfo{$F{SN}}=$F{LN} if($F{SN} && $F{LN});
-  }
-  close BAMHEADER;
-  return \%seqinfo;
-}
-
-sub depth{
-  my($bam,$region,$settings)=@_;
-  open(DEPTH,"samtools depth -r '$region' $bam | ") or die "ERROR: could not open $bam with samtools depth: $!";
-  my @depth;
-  while(<DEPTH>){
-    chomp;
-    my($seqname,$pos,$depth)=split /\t/;
-    push(@depth,$depth);
-  }
-  close DEPTH;
   
-  return 0 if(!@depth);
-  return sum(@depth)/scalar(@depth);
+  my %seqLength;
+
+  open(BAMINFO,"samtools view -H '$bam' | ") or die "ERROR: could not use samtools view on $bam: $!";
+  while(<BAMINFO>){
+    chomp;
+    my($type,@theRest)=split(/\t/,$_);
+    next if($type ne '@SQ');
+    my $theRest=join("\t",@theRest);
+
+    my ($seqname,$length);
+    while($theRest=~/(\w+?):([^\t]+)/g){
+      $seqname=$2 if($1 eq "SN");
+      $length=$2 if($1 eq "LN");
+    }
+
+    $seqLength{$seqname}=$length;
+  }
+  close BAMINFO;
+  return \%seqLength;
 }
 
 sub usage{
   "Finds cliffs in the depth in a given sorted/indexed bam file.
   Usage: $0 file.bam
-  --numcpus 1
+  --numcpus              1
+  --tempdir              ''
+  --windowSize           10   How many positions are used when calculating a slope
+  --slopeThreshold       3    Ie, the depth changes X per every position in the window
+  --rSquaredThreshold    0.7  The level of significance in the slope trendline
   "
 }
