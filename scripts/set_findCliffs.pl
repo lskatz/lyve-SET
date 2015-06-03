@@ -30,7 +30,7 @@ sub main{
   die "ERROR: could not find $bam\n".usage() if(!-e $bam);
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("$0XXXXXX",TMPDIR=>1,CLEANUP=>1);
-  $$settings{slopeThreshold}||=3;      # detect any region that has a slope bigger than this abs number
+  $$settings{slopeThreshold}||=5;      # detect any region that has a slope bigger than this abs number
   $$settings{rSquaredThreshold}||=0.7; # level of significance in the trendline slope
   $$settings{windowSize}||=10;
 
