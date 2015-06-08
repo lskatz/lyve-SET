@@ -9,6 +9,7 @@ use Getopt::Long;
 use File::Basename qw/basename fileparse/;
 use File::Temp qw/tempdir/;
 use Bio::Perl;
+use Bio::FeatureIO;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib/vcftools_0.1.12b/perl";
@@ -24,16 +25,20 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help reference=s tempdir=s altFreq=s coverage=i region=s)) or die $!;
+  GetOptions($settings,qw(help reference=s tempdir=s altFreq=s coverage=i region=s exclude=s)) or die $!;
 
   my $bam=$ARGV[0] or die "ERROR: need bam\n".usage();
   my $reference=$$settings{reference} or die "ERROR: need --reference\n".usage();
   my $refname=basename($reference,@fastaExt);
 
-  $$settings{tempdir}||=tempdir("set_varscan.XXXXXX",TMPDIR=>1,CLEANUP=>1);
+  $$settings{tempdir} ||=tempdir("set_varscan.XXXXXX",TMPDIR=>1,CLEANUP=>1);
   $$settings{coverage}||=10;
-  $$settings{altFreq}||=0.75;
-  $$settings{region}||=0;
+  $$settings{altFreq} ||=0.75;
+  $$settings{region}  ||="";
+  $$settings{exclude} ||="";
+
+  # Not sure if I should include this error check or not
+  # die "ERROR: Cannot use --region and --exclude together\n".usage() if($$settings{exclude} && $$settings{region});
 
   # Check to see if varscan is installed correctly
   `varscan.sh >/dev/null`;
@@ -91,6 +96,9 @@ sub varscan{
 
 sub backfillVcfValues{
   my($vcfFile,$bam,$settings)=@_;
+
+  my $excludeSites=readBed($$settings{exclude},$settings) if($$settings{exclude});
+
   logmsg "Backfilling values in $vcfFile and printing to stdout";
   my $vcf=Vcf->new(file=>$vcfFile);
 
@@ -99,6 +107,7 @@ sub backfillVcfValues{
   my $fail_lowRefFreq ="RF$$settings{altFreq}";
   my $fail_lowAltFreq ="AF$$settings{altFreq}";
   my $fail_indel      ="isIndel";
+  my $fail_masked     ="masked";
 
   # How was the bam generated?
   my $mapper="unknown";
@@ -123,6 +132,7 @@ sub backfillVcfValues{
   $vcf->add_header_line({key=>'FILTER', ID=>$fail_lowRefFreq, Description=>"Reference variant consensus is less than $$settings{altFreq}, the user-set threshold"});
   $vcf->add_header_line({key=>'FILTER', ID=>$fail_lowAltFreq, Description=>"Allele variant consensus is less than $$settings{altFreq}, the user-set threshold"});
   $vcf->add_header_line({key=>'FILTER', ID=>$fail_indel, Description=>"Indels are not used for analysis in Lyve-SET"});
+  $vcf->add_header_line({key=>'FILTER', ID=>$fail_masked, Description=>"This site was masked using a bed file or other means"});
 
   # Genotype fields
   $vcf->add_header_line({key=>'FORMAT', ID=>'AF', Number=>'A', Type=>'Float', Description=>"Allele Frequency"});
@@ -189,6 +199,10 @@ sub backfillVcfValues{
     if(length($$x{ALT}[0]) > 1 || length($$x{REF}) > 1){
       vcf_markAmbiguous($x,$fail_indel,$settings);
     }
+    # Mask sites that are outright masked
+    if($$excludeSites{$$x{CHROM}}{$pos}){
+      vcf_markAmbiguous($x,$fail_masked,$settings);
+    }
 
     # Mask low frequency
     if($is_snp && $$x{gtypes}{$samplename}{AF} < $$settings{altFreq}){
@@ -242,6 +256,35 @@ sub vcf_markAmbiguous{
   push(@{$$x{FILTER}},$reason);
 }
 
+# Get a hash of seqname->{pos} from a bed file
+sub readBed{
+  my($bed,$settings)=@_;
+
+  my %bed;
+  my $bedin=Bio::FeatureIO->new(-format=>"bed",-file=>$bed);
+  while(my $feat=$bedin->next_feature){
+    my $seqname=$feat->seq_id;
+    my $start=$feat->start;
+    my $end=$feat->end;
+    for my $pos($start..$end){
+      $bed{$seqname}{$pos}=1;
+    }
+  }
+  $bedin->close;
+  return \%bed;
+  
+  #open(BED,$bed) or die "ERROR: could not read '$bed': $!";
+  #while(<BED>){
+  #  chomp;
+  #  my($seqname,$start,$stop,$name)=split /\t/;
+  #  # BED is zero-based, and the last position is not supposed to be included.
+  #  $start++; $stop++;
+  #  for my $pos($start..$stop-1){
+  #    $bed{$seqname}{$pos}=1;
+  #  }
+  #}
+  #return \%bed;
+}
 
 sub usage{
   local $0=fileparse $0;
@@ -251,6 +294,6 @@ sub usage{
   --coverage 10        Min coverage
   --altFreq  0.75      Min consensus agreement for a SNP
   --region   file.bed  File of positions to include (default with no bed file: read all positions)
-  #--exclude  file.bed  File of positions to mask    (conflicts with --region; default: don't exclude)
+  --exclude  file.bed  File of positions to mask    (conflicts with --region; default: don't exclude)
   "
 }
