@@ -11,6 +11,7 @@ use File::Basename qw/fileparse basename dirname/;
 use File::Temp qw/tempdir tempfile/;
 use threads;
 use Thread::Queue;
+use Bio::FeatureIO;
 
 use Statistics::LineFit;
 
@@ -77,6 +78,7 @@ sub main{
 
   # Print regions where cliffs are.
   # TODO: print slope and rSquared next to cliffs
+  my $bedOut=Bio::FeatureIO->new(-format=>"bed"); # STDOUT
   for my $seqname(sort {$a cmp $b} keys(%cliffRange)){
     my $range=$cliffRange{$seqname}->range();
 
@@ -86,12 +88,16 @@ sub main{
       push(@pos,[$1,$2]);
     }
 
+    # Print out these features in a standardized bed format
     for my $lohi(sort {$$a[0] <=> $$b[0]} @pos){
       my($lo,$hi)=@$lohi;
       my $name="$seqname:$lo";
-      print join("\t",$seqname,$lo,$hi,$name)."\n";
+      my $feat=Bio::SeqFeature::Annotated->new(-seq_id=>$seqname,-start=>$lo, -end=>$hi, -strand=>-1, -primary=>"Cliff", -Name=>$name, -source=>basename($0));
+      $feat->annotation->add_Annotation("Name",Bio::Annotation::SimpleValue->new(-tagname=>"name",-value=>$name));
+      $bedOut->write_feature($feat);
     }
   }
+  $bedOut->close;
 
   return 0;
 }
