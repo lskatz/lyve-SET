@@ -61,29 +61,10 @@ my $sge=Schedule::SGELK->new(-verbose=>1,-numnodes=>20,-numcpus=>1);
 exit(main());
 
 sub main{
-  # start with the settings that are on by default, and which can be turned off by, e.g., --notrees
-  my $settings={trees=>1,msa=>1, matrix=>1};
+  # Initialize settings by reading the global configuration
+  # file, LyveSET.conf
+  my $settings=readGlobalSettings(1);
   GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s)) or die $!;
-  # TODO put these global options into LyveSET.conf, now that it exists
-  # Lyve-SET
-  $$settings{allowedFlanking}||=0;
-  $$settings{keep}||=0;
-  $$settings{min_alt_frac}||=0.75;
-  $$settings{min_coverage}||=10;
-  $$settings{'mask-phages'}=0 if(!defined($$settings{'mask-phages'}));
-  $$settings{'mask-cliffs'}=0 if(!defined($$settings{'mask-cliffs'}));
-  $$settings{downsample}||=0;
-  $$settings{'sample-sites'}||=0;
-  $$settings{singleend}||=0;
-  # modules defaults
-  $$settings{read_cleaner}||="";
-  $$settings{mapper}||="smalt";
-  $$settings{snpcaller}||="varscan";
-  # queue stuff
-  $$settings{numcpus}||=1;
-  $$settings{numnodes}||=20;
-  $$settings{qsubxopts}||="";
-  $$settings{queue}||="all.q";
 
   # What options change when --fast is used?
   if($$settings{fast}){
@@ -148,7 +129,6 @@ sub main{
   #####################################
   # Go through the major steps of SET #
   # ###################################
-  $settings=readGlobalSettings(0,$settings);
   simulateReads($settings);
   maskReference($ref,$settings);
   indexReference($ref,$settings);
@@ -191,11 +171,12 @@ sub main{
 # value was there beforehand.
 sub readGlobalSettings{
   my($overwrite,$settings)=@_;
+  $settings={} if(!defined($settings));
   # make a copy of settings to avoid ridiculousness
   my %settingsCopy=%$settings;
 
   my $confPath="$FindBin::RealBin/../config/LyveSET.conf";
-  my $cfg=new Config::Simple($confPath) or die "ERROR: could not open $confPath";
+  my $cfg=new Config::Simple($confPath) or die "ERROR: could not open $confPath. You might need to run 'make' still.";
   # Find the configuration that was specified
   my $block=$cfg->block("global");
   die "ERROR: configuration [global] was not found in $confPath!" if(!keys(%$block));
@@ -529,7 +510,7 @@ sub variantCalls{
     my $initBam=$bam[0];
     my $minScore=$distance{$initBam};
     for my $b(@bam){
-      if($distance{$b} < $minScore){
+      if($distance{$b} > $minScore){
         $minScore=$distance{$b};
         $initBam=$b;
       }
@@ -541,6 +522,9 @@ sub variantCalls{
     # using xargs and one cpu per contig.
     # https://www.biostars.org/p/48781/#48815
     $regionsFile="$$settings{tmpdir}/initialSnpSites.bed";
+    if(-e $regionsFile && !-s $regionsFile){
+      unlink $_ for(glob("$regionsFile*"));
+    }
     if(!-e $regionsFile){
       system("rm -fv $regionsFile.*.tmp");
       my $command="samtools view -H $initBam | grep \"\@SQ\" | sed 's/^.*SN://g' | cut -f 1 | xargs -I {} -n 1 -P $$settings{numcpus} sh -c \"samtools mpileup -uf $ref -r '{}' $initBam | bcftools call -cv | grep -v '^#' | cut -f 1,2 > $regionsFile.'{}'.tmp \" ";
@@ -551,6 +535,11 @@ sub variantCalls{
       die if $?;
     }
   }
+  # # In at least one rare event, sampling sites introduced a zero-byte file
+  # # which made Lyve-SET crash.  Avoid, avoid, avoid!
+  # if(-e $regionsFile && !-s $regionsFile){
+  #   unlink $_ for(glob("$regionsFile*"));
+  # }
 
   # TODO make the variant callers output to bgzip and indexed files
   for my $bam(@bam){
