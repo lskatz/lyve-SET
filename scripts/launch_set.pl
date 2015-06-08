@@ -420,7 +420,7 @@ sub mapReads{
 
     for my $bam(@bam){
       my $b=basename($bam,@bamExt);
-      my $bed="$bamdir/$b.bed";
+      my $bed="$bam.cliffs.bed";
       next if(-e $bed);
       $sge->pleaseExecute("$scriptsdir/set_findCliffs.pl --numcpus $$settings{numcpus} $bam > $bed",{jobname=>"maskCliff$b",numcpus=>$$settings{numcpus}});
     }
@@ -565,6 +565,8 @@ sub variantCalls{
       $jobname="varscan$b";
       my $varscanxopts="";
       $varscanxopts.="--region $regionsFile " if($regionsFile);
+      $varscanxopts.="--exclude $bam.cliffs.bed " if(-e "$bam.cliffs.bed");
+      logmsg "$scriptsdir/launch_varscan.pl $bam --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $varscanxopts > $vcfdir/$b.vcf";
       $sge->pleaseExecute("$scriptsdir/launch_varscan.pl $bam --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $varscanxopts > $vcfdir/$b.vcf",{numcpus=>1,jobname=>$jobname,qsubxopts=>""});
       # sort VCF
       $sge->pleaseExecute("mv $vcfdir/$b.vcf $vcfdir/$b.vcf.tmp && vcf-sort < $vcfdir/$b.vcf.tmp > $vcfdir/$b.vcf && rm -v $vcfdir/$b.vcf.tmp",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
