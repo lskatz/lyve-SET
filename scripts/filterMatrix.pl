@@ -18,12 +18,13 @@ $0=fileparse $0;
 
 exit main();
 sub main{
-  my $settings={ambiguities=>1,invariant=>1};
-  GetOptions($settings,qw(help ambiguities! invariant! tempdir=s allowed=i mask=s@)) or die $!;
+  my $settings={ambiguities=>1,invariant=>1, 'invariant-loose'=>1};
+  GetOptions($settings,qw(help ambiguities! invariant! tempdir=s allowed=i mask=s@ invariant-loose!)) or die $!;
   die usage() if($$settings{help});
   $$settings{tempdir}||=tempdir("$0XXXXXX",TMPDIR=>1,CLEANUP=>1);
   $$settings{allowed}||=0;
-  $$settings{mask}||=();
+  $$settings{mask}||=[];
+  $$settings{invariant}=0 if(!$$settings{'invariant-loose'});
 
   my($in)=@ARGV;
   $in||=""; # avoid undefined warnings
@@ -95,10 +96,12 @@ sub filterSites{
     $hqSite=0 if($POS - $currentPos < $$settings{allowed});
 
     # Simply get rid of any site that consists of all Ns
+    # TODO make this optional somehow.
     my $is_allNs=1;
     for(my $i=0;$i<$numAlts;$i++){
       if($GT[$i]!~/N/i){
         $is_allNs=0;
+        last; # save a nanosecond
       }
     }
     $hqSite=0 if($is_allNs);
@@ -114,13 +117,33 @@ sub filterSites{
       }
     }
 
-    # Remove any invariant site, if the user wants
-    if(!$$settings{invariant}){
-      my $altRef=$GT[0];
+    # Remove any invariant site, if specified.
+    # invariant means "keep invariant sites"
+    # !invariant means "remove invariant sites"
+    # However, there is no point in looking for these
+    # sites if all alts are masked as Ns.
+    if(!$is_allNs && !$$settings{invariant}){
+
+      # Need a ref base that will be in the MSA that
+      # is not ambiguous for decent comparison.
+      # The bases in the MSA are only coming from alts.
+      my $altRefIndex=0;
+      my $altRef='N';
+      while($altRef=~/N/i){
+        $altRef=$GT[$altRefIndex];
+        die "Internal error: could not find unambiguous base at this site: $CONTIG:$POS" if($altRefIndex > 99999);
+        $altRefIndex++;
+      }
+      die "Internal error: alt reference not found at $CONTIG:$POS" if(!$altRef);
+
+      # Start off assuming that the site is not variant,
+      # until proven otherwise.
       my $is_variant=0;
       for(my $i=1;$i<$numAlts;$i++){
         if($GT[$i] ne $altRef){
+          next if(!$$settings{'invariant-loose'} &&  $GT[$i]=~/N/i);
           $is_variant=1;
+          last; # save a nanosecond of time here
         }
       }
       $hqSite=0 if(!$is_variant);
@@ -196,10 +219,11 @@ sub usage{
   Usage: 
     $0 bcftools.tsv > filtered.tsv
     $0 < bcftools.tsv > filtered.tsv # read stdin
-  --noambiguities     Remove any site with an ambiguity (i.e., complete deletion)
-  --noinvariant       Remove any site whose alts are all equal
-  --allowed 0         How close SNPs can be from each other before being thrown out
-  --tempdir tmp       temporary directory
-  --mask file.bed     BED-formatted file of regions to exclude. Multiple --mask flags are allowed for multiple bed files.
+  --noambiguities      Remove any site with an ambiguity (i.e., complete deletion)
+  --noinvariant        Remove any site whose alts are all equal.
+  --noinvariant-loose  Invokes --noinvariant, but does not consider ambiguities when deciding whether a site is variant
+  --allowed 0          How close SNPs can be from each other before being thrown out
+  --tempdir tmp        temporary directory
+  --mask file.bed      BED-formatted file of regions to exclude. Multiple --mask flags are allowed for multiple bed files.
   "
 }
