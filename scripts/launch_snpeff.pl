@@ -18,8 +18,6 @@ my ($name,$scriptsdir,$suffix)=fileparse($0);
 $scriptsdir=File::Spec->rel2abs($scriptsdir);my $programdir = ""; if ($scriptsdir =~ /(.*)\/scripts/) {$programdir = $1;}
 my $JAR = "$programdir/lib/snpEff.jar";  if (! -e $JAR) { die "ERROR: jar file does not exist at $JAR\nPlease edit $0 to reflect where the jar file is.\n";}
 
-#./run_snpeff.pl --force -i test -g H37Rv.gbk -chromosome "gi|448814763|ref|NC_000962.3|"
-
 exit(main());
 
 sub main{
