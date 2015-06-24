@@ -144,17 +144,17 @@ sub main{
     return 0;
   }
 
-  #if($$settings{msa}){
-  #  pooledToAlignment($pooled,$settings);
-  #} else {
-  #  logmsg "The alignment was not requested; wrapping up";
-  #  return 0;
-  #}
+  if($$settings{msa}){
+    pooledToAlignment($pooled,$settings);
+  } else {
+    logmsg "The alignment was not requested; wrapping up";
+    return 0;
+  }
 
-  if($$settings{msa} || $$settings{trees}){
-    logmsg "Launching set_processPooledVcf.pl";
-    my $command="set_processPooledVcf.pl $pooled --prefix $$settings{msadir}/out --numcpus $$settings{numpcus}";
-    logmsg "Processing the pooled VCF\n  $command";
+  if($$settings{trees}){
+    logmsg "Launching set_processMsa.pl";
+    my $command="set_processMsa.pl --auto --msaDir '$$settings{msadir}' --numcpus $$settings{numcpus} 2>&1 | tee $$settings{logdir}/set_processMsa.log ";
+    logmsg "Processing the MSA\n  $command";
     $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
     $sge->wrapItUp();
   } else {
