@@ -106,6 +106,19 @@ install-varscan:
 clean-varscan:
 	rm -vf $(PREFIX)/lib/varscan.v2.3.7.jar
 
+install-snpEff:
+	wget http://sourceforge.net/projects/snpeff/files/snpEff_latest_core.zip -O $(PREFIX)/lib/snpEff_latest_core.zip
+	cd $(PREFIX)/lib && unzip -o snpEff_latest_core.zip
+	mv $(PREFIX)/lib/snpEff/snpEff.jar $(PREFIX)/lib/.
+	mv $(PREFIX)/lib/snpEff/snpEff.config $(PREFIX)/config/original/snpEff.conf
+	cp $(PREFIX)/config/original/snpEff.conf $(PREFIX)/config/snpEff.conf
+	rm -rf $(PREFIX)/lib/snpEff_latest_core.zip
+	rm -rf $(PREFIX)/lib/snpEff
+
+clean-snpEff:
+	rm -rvf $(PREFIX)/lib/snpEff.jar
+	rm -rvf $(PREFIX)/config/original/snpEff.conf
+
 install-phast: check-blast
 	mkdir -p $(PREFIX)/lib/phast
 	wget http://phast.wishartlab.com/phage_finder/DB/prophage_virus.db -O $(PREFIX)/lib/phast/phast.faa
