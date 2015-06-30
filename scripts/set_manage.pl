@@ -8,14 +8,16 @@ use Data::Dumper;
 use Getopt::Long;
 use File::Spec;
 use Cwd qw/realpath/;
-use File::Basename qw/basename/;
+use File::Basename qw/basename fileparse/;
 use File::Copy qw/copy move/;
 use File::Slurp qw/read_file/;
+use File::Find;
+use File::Spec::Functions qw/abs2rel rel2abs/;
 use Bio::Perl;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
-use LyveSET qw/@fastqExt @fastaExt @bamExt/;
+use LyveSET qw/@fastqExt @fastaExt @bamExt @vcfExt/;
 $ENV{PATH}="$ENV{PATH}:$FindBin::RealBin/../lib/edirect";
 
 # The directories a project should have
@@ -31,7 +33,7 @@ exit main();
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help create test=s delete add-reads=s remove-reads=s add-assembly=s remove-assembly=s change-reference=s numnodes=i numcpus=i)) or die $!;
+  GetOptions($settings,qw(help create test=s compress delete add-reads=s remove-reads=s add-assembly=s remove-assembly=s change-reference=s numnodes=i numcpus=i)) or die $!;
   die usage() if($$settings{help});
   die "ERROR: need a SET project\n".usage() if(!@ARGV);
   my $project=shift(@ARGV);
@@ -49,6 +51,7 @@ sub main{
   $$settings{tempdir}||="$project/tmp";
 
   addSampleData($project,$settings) if($$settings{test});
+  compressProject($project,$settings) if($$settings{compress});
   addReads($project,$settings) if($$settings{'add-reads'});
   addAssembly($project,$settings) if($$settings{'add-assembly'});
   changeReference($project,$settings) if($$settings{'change-reference'});
@@ -106,6 +109,89 @@ sub addSampleData{
   changeReference($project,$settings);
 
   logmsg "Done! To test these data, please execute\n launch_set.pl $project";
+  return 1;
+}
+
+sub compressProject{
+  my($project,$settings)=@_;
+
+  # Mark how large the project is beforehand
+  my $beforeSize=0;
+  find(sub{$beforeSize+= -s $_ if(-f $_);}, $project);
+
+  # compress any fastq file that is not a symlink
+  find({no_chdir=>1, wanted=>sub{
+    return if(-d $_ || -l $_);
+    my($b,$d,$ext)=fileparse($_, @fastqExt);
+    # Slightly different commands depending on the extension
+    if($ext=~/gz$/){
+      # if it is compressed already
+      logmsg "Uncompressing and re-compressing $_";
+      system("gunzip -vc '$_' | gzip -vc9 > '$_.tmp' && mv '$_.tmp' '$_'");
+      die "ERROR: gzipping $_" if $?;
+    } else {
+      # if it is uncompressed
+      logmsg "Compressing $_";
+      system("gzip -vc9 '$_' > '$_.gz.tmp' && mv -v $_.gz.tmp $_.gz'");
+      die "ERROR: gzipping $_" if $?;
+    }
+  }}, "$project/reads");
+
+  # re-compress any bam that is not already maximally compressed
+  find({no_chdir=>1,wanted=>sub{
+    return if(-d $_ || -l $_);
+    my($b,$d,$ext)=fileparse($_, @bamExt);
+    
+    # Max compression only seems to be available in samtools sort
+    if($ext=~/bam$/){
+      logmsg "Compressing $_ with samtools sort";
+      my $command="samtools sort -@ $$settings{numcpus} -l 9 -O bam -T $$settings{tempdir}/$b.compression '$_' > '$_.tmp' && mv -v '$_.tmp' '$_'";
+      system($command);
+      die "ERROR: could not compress $_ with samtools sort\n $command" if $?;
+
+      # re-index, just in case
+      system("samtools index '$_'");
+      die "ERROR: could not re-index $_ with samtools index" if $?;
+    }
+  }}, "$project/bam");
+    
+
+  # re-compress any vcf that is not already maximally compressed
+  find({no_chdir=>1,wanted=>sub{
+    return if(-d $_ || -l $_);
+    my($b,$d,$ext)=fileparse($_, @vcfExt);
+    
+    if($ext=~/vcf.gz$/){
+      logmsg "Compressing $_ with bcftools view";
+      system("bcftools view -l 9 '$_' > '$_.tmp' && mv -v '$_.tmp' '$_'");
+      die "ERROR with bcftools view" if $?;
+      # re-index just in case
+      system("tabix -f '$_'");
+      die "ERROR with tabix" if $?;
+    } elsif($ext=~/vcf$/){
+      logmsg "Compressing $_ with bgzip and bcftools view";
+      system("bgzip '$_' && tabix -f $_.gz");
+      die "ERROR with bgzip" if $?;
+      system("bcftools view -l 9 '$_.gz' > '$_.gz.tmp' && mv -v '$_.gz.tmp' '$_.gz'");
+      die "ERROR with bcftools view" if $?;
+      system("tabix -f '$_.gz'");
+      die "ERROR with tabix" if $?;
+    }
+  }}, "$project/vcf","$project/msa");
+
+  # remove temp files
+  logmsg "Removing all temp files";
+  system("rm -rv $project/tmp/* $project/msa/tmp");
+
+  # Mark how large the project is after
+  my $afterSize=0;
+  find(sub{$afterSize+= -s $_ if(-f $_);}, $project);
+  
+  # Report how good compression was
+  my $differenceSize=($beforeSize-$afterSize);
+  my $ratio=sprintf("%0.2f",$afterSize/$beforeSize*100).'%';
+  logmsg "Compression took the size from $beforeSize to $afterSize for a reduction of $differenceSize, or $ratio";
+
   return 1;
 }
 
@@ -268,6 +354,7 @@ sub usage{
   --test DATASET                  Create a set project with test data (invokes --create). Options are:
                                     $testdata
   --delete                        Delete a set project
+  --compress                      Compress a set project
   --add-reads file.fastq.gz       Add reads to your project (using symlink)
   --add-reads SRR0123456          Add reads to your project (using NCBI/SRA/wget)
   --remove-reads file.fastq.gz    Remove reads from your project (using rm on reads, vcf, and bam directories)
