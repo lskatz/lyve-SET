@@ -18,6 +18,7 @@ local $0=basename $0;
 our @fastqExt=qw(.fastq.gz .fastq .fq .fq.gz);
 our @fastaExt=qw(.fasta .fna .faa .mfa .fa);
 our @bamExt=qw(.sorted.bam .bam);
+our @vcfExt=qw(.vcf.gz .vcf);
 
 #################################################
 ### COMMON SUBS/TOOLS (not object subroutines) ##
