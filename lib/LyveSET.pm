@@ -8,7 +8,7 @@ use Data::Dumper;
 use Number::Range;
 use threads;
 
-our @EXPORT_OK = qw(logmsg rangeInversion rangeUnion @fastqExt @fastaExt @bamExt);
+our @EXPORT_OK = qw(logmsg rangeInversion rangeUnion @fastqExt @fastaExt @bamExt @vcfExt);
 
 local $0=basename $0;
 
