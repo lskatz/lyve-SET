@@ -354,7 +354,7 @@ sub usage{
   --test DATASET                  Create a set project with test data (invokes --create). Options are:
                                     $testdata
   --delete                        Delete a set project
-  --compress                      Compress a set project
+  --compress                      Compress files in a project. The project will appear unchanged but the compression levels will be maximized.
   --add-reads file.fastq.gz       Add reads to your project (using symlink)
   --add-reads SRR0123456          Add reads to your project (using NCBI/SRA/wget)
   --remove-reads file.fastq.gz    Remove reads from your project (using rm on reads, vcf, and bam directories)
