@@ -130,8 +130,9 @@ sub downloadReads{
   logmsg "Converting sra file to fastq with fastq-dump";
   if(! -d $fastqDumpDir){
     my $deflineArg='@$sn[_$rn]/$ri';
-    system("fastq-dump -v -v -v -v -v --legacy-report --defline-seq '$deflineArg' --defline-qual '+' --split-files -O $fastqDumpDir.tmp $SRR && mv $fastqDumpDir.tmp $fastqDumpDir");
-    die "ERROR with fastq-dump" if $?;
+    my $command="fastq-dump -v -v -v -v -v --defline-seq '$deflineArg' --defline-qual '+' --split-files -O $fastqDumpDir.tmp $SRR && mv $fastqDumpDir.tmp $fastqDumpDir";
+    system($command);
+    die "ERROR with fastq-dump\n  $command" if $?;
   }
 
   # shuffle reads
