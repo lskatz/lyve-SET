@@ -153,7 +153,7 @@ sub main{
 
   if($$settings{msa} || $$settings{trees}){
     logmsg "Launching set_processPooledVcf.pl";
-    my $command="set_processPooledVcf.pl $pooled --prefix $$settings{msadir}/out --numcpus $$settings{numpcus}";
+    my $command="set_processPooledVcf.pl $pooled --prefix $$settings{msadir}/out --numcpus $$settings{numcpus}";
     logmsg "Processing the pooled VCF\n  $command";
     $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
     $sge->wrapItUp();
