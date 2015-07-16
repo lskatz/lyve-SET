@@ -14,8 +14,9 @@ exit main();
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help outdir=s));
+  GetOptions($settings,qw(help outdir=s format=s));
   die usage() if($$settings{help});
+  $$settings{format}||="tsv"; # by default, input format is tsv
 
   # Get the output directory and spreadsheet, and make sure they exist
   $$settings{outdir}||=die "ERROR: need outdir parameter\n".usage();
@@ -24,15 +25,15 @@ sub main{
   die "ERROR: cannot find $tsv" if(!-e $tsv);
 
   # Read the spreadsheet
-  my $info=readSpreadsheet($tsv,$settings);
+  my $infoTsv=readTsv($tsv,$settings);
 
   # download everything
-  downloadEverything($info,$settings);
+  downloadEverything($infoTsv,$settings);
 
   return 0;
 }
 
-sub readSpreadsheet{
+sub readTsv{
   my($tsv,$settings)=@_;
 
   # For the fastq-dump command
@@ -55,15 +56,20 @@ sub readSpreadsheet{
       @F{@header}=split(/\t/,$_);
 
       # SRA download command
-      $$d{$F{srarun_acc}}{download}="fastq-dump --defline-seq '$seqIdTemplate' --defline-qual '+' --split-files -O $tmpdir --gzip $F{srarun_acc} ";
-      $$d{$F{srarun_acc}}{name}=$F{strain};
-      $$d{$F{srarun_acc}}{type}="sra";
+      if($F{srarun_acc}){
+        $$d{$F{srarun_acc}}{download}="fastq-dump --defline-seq '$seqIdTemplate' --defline-qual '+' --split-files -O $tmpdir --gzip $F{srarun_acc} ";
+        $$d{$F{srarun_acc}}{name}=$F{strain} || die "ERROR: $F{srarun_acc} does not have a strain name!";
+        $$d{$F{srarun_acc}}{type}="sra";
+        $$d{$F{srarun_acc}}{tempdir}=$tmpdir;
+      }
 
       # GenBank download command
-      #(for i in `seq 1 7`; do id="JASV0100000$i"; efetch -db nucleotide -format fasta -id $id; done;) | grep . | sha256sum –
-      $$d{$F{genbankassembly}}{download}="efetch -format gbwithparts -db nuccore -id $F{genbankassembly} > $tmpdir/$F{genbankassembly}.gbk";
-      $$d{$F{genbankassembly}}{name}=$F{strain};
-      $$d{$F{genbankassembly}}{type}="genbank";
+      if($F{genbankassembly}){
+        $$d{$F{genbankassembly}}{download}="efetch -format gbwithparts -db nuccore -id $F{genbankassembly} > $tmpdir/$F{genbankassembly}.gbk";
+        $$d{$F{genbankassembly}}{name}=$F{strain} || die "ERROR: $F{genbankassembly} does not have a strain name!";
+        $$d{$F{genbankassembly}}{type}="genbank";
+        $$d{$F{genbankassembly}}{tempdir}=$tmpdir;
+      }
 
     } elsif(/^biosample_acc/){
       $have_reached_biosample=1;
@@ -79,41 +85,65 @@ sub readSpreadsheet{
 
   }
   close TSV;
+
+  #print Dumper $d;die;
   return $d;
 }
 
 sub downloadEverything{
   my($d,$settings)=@_;
 
+  # Read each entry one at a time.  Each entry is a hash
+  # consisting of: type, name, download, tempdir.
   while(my($key,$value)=each(%$d)){
-    next if(!defined($$value{download}));
+    # Only download entries which are hash values
+    next if(ref($value) ne "HASH" || !defined($$value{download}));
 
-    my($type,$name,$download)=($$value{type},$$value{name},$$value{download});
+    # Get some local variables to make it more readable downstream
+    my($type,$name,$download,$tempdir)=($$value{type},$$value{name},$$value{download},$$value{tempdir});
 
-    logmsg "Downloading $name/$type";
-    system($download);
-    die "ERROR downloading $name/$type" if $?;
+    # Run the download command found in the entry.
+    # The actual download command is found in the if statements
+    # in case we need to debug and focus on a specific statement.
+    logmsg "Downloading $name/$type to $tempdir";
 
-    # Download things appropriately and rename them.
+    # Rename/move the downloaded files appropriately.
     if($type eq 'sra'){
-      for my $file(glob("*.fastq.gz")){
+      # Perform the download
+      system($download);
+      die "ERROR downloading $name/$type" if $?;
+      # Move fastq.gz files to $strain.$SRR_1.fastq.gz.
+      for my $file(glob("$tempdir/*.fastq.gz")){
         my $b=basename($file);
-        system("mv $file $$settings{outdir}/$name.$b");
+        system("mv -v $file $$settings{outdir}/$name.$b");
         die "ERROR moving $file to $name.$b" if $?;
       }
     } elsif($type eq 'genbank'){
-      for my $file(glob("*.gbk")){
+      # Perform the download
+      system($download);
+      die "ERROR downloading $name/$type" if $?;
+      # Move gbk files to $strain.gbk.
+      # Only one gbk should be present. Others will be lost,
+      # if they exist.
+      for my $file(glob("$tempdir/*.gbk")){
         my $b=basename($file);
-        system("mv $file $$settings{outdir}/$name.gbk");
+        system("mv -v $file $$settings{outdir}/$name.gbk");
         die "ERROR moving $file to $name.gbk" if $?;
       }
+    } else {
+      die "INTERNAL ERROR: do not know how to deal with type $type";
     }
   }
+
+  # I can't think of any useful return value at this time.
+  return 1;
 }
 
 sub usage{
   "Reads a standard dataset spreadsheet and downloads its data
   Usage: $0 -o outdir spreadsheet.dataset.tsv
+  --format     tsv    The input format. Default: tsv. No other format
+                      is accepted at this time.
   "
 }
 
