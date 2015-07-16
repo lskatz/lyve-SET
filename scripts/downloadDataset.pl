@@ -37,7 +37,7 @@ sub readTsv{
   my($tsv,$settings)=@_;
 
   # For the fastq-dump command
-  my $seqIdTemplate='@$sn[_$rn]/$ri';
+  my $seqIdTemplate='@$ac_$sn[_$rn]/$ri';
   
   my $d={}; # download hash
   my $have_reached_biosample=0; # marked true when it starts reading entries
