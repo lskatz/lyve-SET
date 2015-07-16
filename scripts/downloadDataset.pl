@@ -17,6 +17,7 @@ sub main{
   GetOptions($settings,qw(help outdir=s format=s));
   die usage() if($$settings{help});
   $$settings{format}||="tsv"; # by default, input format is tsv
+  $$settings{seqIdTemplate}||='@$ac_$sn[_$rn]/$ri';
 
   # Get the output directory and spreadsheet, and make sure they exist
   $$settings{outdir}||=die "ERROR: need outdir parameter\n".usage();
@@ -37,7 +38,7 @@ sub readTsv{
   my($tsv,$settings)=@_;
 
   # For the fastq-dump command
-  my $seqIdTemplate='@$ac_$sn[_$rn]/$ri';
+  my $seqIdTemplate=$$settings{seqIdTemplate};
   
   my $d={}; # download hash
   my $have_reached_biosample=0; # marked true when it starts reading entries
@@ -45,7 +46,7 @@ sub readTsv{
   open(TSV,$tsv) or die "ERROR: could not open $tsv: $!";
   while(<TSV>){
     s/^\s+|\s+$//g; # trim whitespace
-    next if(/^$/);
+    next if(/^$/); # skip blank lines
 
     ## read the contents
     # Read biosample rows
@@ -61,6 +62,10 @@ sub readTsv{
         $$d{$F{srarun_acc}}{name}=$F{strain} || die "ERROR: $F{srarun_acc} does not have a strain name!";
         $$d{$F{srarun_acc}}{type}="sra";
         $$d{$F{srarun_acc}}{tempdir}=$tmpdir;
+        $$d{$F{srarun_acc}}{from}=["$tmpdir/$F{srarun_acc}_1.fastq.gz", "$tmpdir/$F{srarun_acc}_2.fastq.gz"];
+        $$d{$F{srarun_acc}}{to}=["$$settings{outdir}/$F{strain}_1.fastq.gz", "$$settings{outdir}/$F{strain}_2.fastq.gz"];
+
+        $$d{$F{srarun_acc}}{$_} = $F{$_} for(qw(sha256sumread1 sha256sumread1));
       }
 
       # GenBank download command
@@ -69,6 +74,10 @@ sub readTsv{
         $$d{$F{genbankassembly}}{name}=$F{strain} || die "ERROR: $F{genbankassembly} does not have a strain name!";
         $$d{$F{genbankassembly}}{type}="genbank";
         $$d{$F{genbankassembly}}{tempdir}=$tmpdir;
+        $$d{$F{genbankassembly}}{from}=["$tmpdir/$F{genbankassembly}.gbk"];
+        $$d{$F{genbankassembly}}{to}=["$$settings{outdir}/$F{strain}.gbk"];
+
+        $$d{$F{genbankassembly}}{$_} = $F{$_} for(qw(sha256sumassembly suggestedreference outbreak datasetname));
       }
 
     } elsif(/^biosample_acc/){
@@ -103,35 +112,28 @@ sub downloadEverything{
     my($type,$name,$download,$tempdir)=($$value{type},$$value{name},$$value{download},$$value{tempdir});
 
     # Run the download command found in the entry.
-    # The actual download command is found in the if statements
-    # in case we need to debug and focus on a specific statement.
     logmsg "Downloading $name/$type to $tempdir";
 
-    # Rename/move the downloaded files appropriately.
-    if($type eq 'sra'){
-      # Perform the download
-      system($download);
-      die "ERROR downloading $name/$type" if $?;
-      # Move fastq.gz files to $strain.$SRR_1.fastq.gz.
-      for my $file(glob("$tempdir/*.fastq.gz")){
-        my $b=basename($file);
-        system("mv -v $file $$settings{outdir}/$name.$b");
-        die "ERROR moving $file to $name.$b" if $?;
-      }
-    } elsif($type eq 'genbank'){
-      # Perform the download
-      system($download);
-      die "ERROR downloading $name/$type" if $?;
-      # Move gbk files to $strain.gbk.
-      # Only one gbk should be present. Others will be lost,
-      # if they exist.
-      for my $file(glob("$tempdir/*.gbk")){
-        my $b=basename($file);
-        system("mv -v $file $$settings{outdir}/$name.gbk");
-        die "ERROR moving $file to $name.gbk" if $?;
-      }
-    } else {
-      die "INTERNAL ERROR: do not know how to deal with type $type";
+    # Skip this download if the target files exist
+    my $numFiles=scalar(@{$$value{from}});
+    my $i_can_skip=1; # true until proven false
+    for(my $i=0;$i<$numFiles;$i++){
+      $i_can_skip=0 if(!-e $$value{to}[$i]);
+    }
+    if($i_can_skip){
+      logmsg "I found these files and so I can skip this download\n  ".join(" ",@{$$value{to}});
+      next;
+    }
+
+    # Perform the download
+    system($download);
+    die "ERROR downloading with command\n  $download" if $?;
+      
+    # Move the files according to how the download entry states.
+    for(my $i=0;$i<$numFiles;$i++){
+      my($from,$to)=($$value{from}[$i],$$value{to}[$i]);
+      system("mv -v $from $to");
+      die "ERROR moving $from to $to" if $?;
     }
   }
 
