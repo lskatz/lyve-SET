@@ -137,7 +137,13 @@ sub main{
   compareTaxa($ref,$settings); # SNP matrix, alignment, trees
 
   # Find the output files
-  symlink(rel2abs("$$settings{msadir}/out.RAxML_bipartitions"),"$project/".basename($project).".dnd") if(-e "$$settings{msadir}/out.RAxML_bipartitions");
+  my $absDir=rel2abs($$settings{msadir}); # save the abs. path
+  my $outPrefix="$project/".basename($project); # consistent output naming
+  symlink("$absDir/out.RAxML_bipartitions","$outPrefix.dnd") if(-e "$absDir/out.RAxML_bipartitions");
+  symlink("$absDir/out.filteredMatrix.tsv","$outPrefix.matrix.tsv") if(-e "$absDir/out.filteredMatrix.tsv");
+  symlink("$absDir/out.informative.fasta","$outPrefix.fasta") if(-e "$absDir/out.informative.fasta");
+  symlink("$$settings{msadir}/out.pairwise.tsv","$outPrefix.pairwise.tallskinny.tsv") if(-e "$absDir/out.pairwise.tsv");
+  symlink("$$settings{msadir}/out.pairwiseMatrix.tsv","$outPrefix.pairwise.matrix.tsv") if(-e "$absDir/out.pairwiseMatrix.tsv");
 
   return 0;
 }
