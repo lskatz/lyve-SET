@@ -14,7 +14,7 @@ exit main();
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help numcpus=i outdir=s regex=s));
+  GetOptions($settings,qw(help numcpus=i outdir=s regex=s)) or die $!;
   $$settings{numcpus}||=1;
   $$settings{outdir}||=basename($0).".out";
   $$settings{regex}||='/^(.*?)(_.*)$/';
