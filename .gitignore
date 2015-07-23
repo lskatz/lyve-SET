@@ -57,3 +57,5 @@ scripts/trunkreads
 scripts/vcf-sort
 scripts/vcfutils.pl
 scripts/wgsim
+config/LyveSET.conf
+config/presets.conf
