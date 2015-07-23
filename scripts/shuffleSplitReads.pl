@@ -5,20 +5,19 @@ use strict;
 use Data::Dumper;
 use Getopt::Long;
 use File::Basename qw/fileparse basename/;
-use File::Temp qw/tempdir/;
 use File::Copy qw/copy move/;
+use LyveSET qw/logmsg/;
+use threads;
+use Thread::Queue;
 
-sub logmsg{local $0=basename($0); print STDERR "@_\n";}
 exit main();
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help numcpus=i outdir=s regex=s uneven=s));
+  GetOptions($settings,qw(help numcpus=i outdir=s regex=s));
   $$settings{numcpus}||=1;
   $$settings{outdir}||=basename($0).".out";
   $$settings{regex}||='/^(.*?)(_.*)$/';
-  $$settings{uneven}||='die';
-  $$settings{uneven}=lc($$settings{uneven});
 
   my @splitFastq=@ARGV;
   die "ERROR: no fastq files were given!\n".usage() if(!@splitFastq);
@@ -57,58 +56,46 @@ sub readFastqs{
 
 sub shufflePairs{
   my($pairs,$settings)=@_;
-  my $outdir=$$settings{outdir};
-  
+
+  my $Q=Thread::Queue->new;
+
+  my @thr;
+  for(0..$$settings{numcpus}-1){
+    $thr[$_]=threads->new(\&shuffleWorker,$Q,$settings);
+  }
+
   # Shuffle all applicable reads
   while(my($basename,$reads)=each(%$pairs)){
-    my $outfile="$outdir/$basename.fastq.gz";
-    logmsg "Shuffling to $outfile";
-    next if(-e $outfile);
-    my $tmpfile=shuffle($$reads{1},$$reads{2},$settings);
-    system("gzip -v $tmpfile");
-    die "ERROR with gzip" if $?;
-    system("mv -v $tmpfile.gz $outfile");
-    die "ERROR with mv" if $?;
+    $Q->enqueue([$basename,$reads]);
   }
+
+  # Join the threads
+  $Q->enqueue(undef) for(@thr);
+  $_->join for(@thr);
 }
 
-sub shuffle{
-  my($r1,$r2,$settings)=@_;
-  my $tmpdir=tempdir("XXXXXX",TMPDIR=>1,CLEANUP=>1);
-  my $shuffled="$tmpdir/shuffled.fastq";
-  logmsg "Shuffling to $shuffled";
+sub shuffleWorker{
+  my($Q,$settings)=@_;
+  my $outdir=$$settings{outdir};
 
-  open(R1,"<",$r1) or die "ERROR: could not open $r1 for reading: $!";
-  open(R2,"<",$r2) or die "ERROR: could not open $r2 for reading: $!";
-  open(SHUFFLED,">",$shuffled) or die "ERROR: could not open $shuffled for writing: $!";
-  while(<R1>){
-    print SHUFFLED $_;           # id1
-    $_=<R1>; print SHUFFLED $_;  # seq1
-    $_=<R1>; print SHUFFLED $_;  # id1
-    $_=<R1>; print SHUFFLED $_;  # qual1
+  while(defined(my $tmp=$Q->dequeue)){
+    my($basename,$reads)=@$tmp;
 
-    my $id=<R2>;
-    if(!defined($id)){
-      my $msg="ERROR: there are not as many reads in $r2 as there are in $r1";
-      die $msg if($$settings{uneven} eq 'die');
-      logmsg $msg if($$settings{uneven} eq 'warn');
-    }
-             print SHUFFLED $id; # id2
-    $_=<R2>; print SHUFFLED $_;  # seq2
-    $_=<R2>; print SHUFFLED $_;  # id2
-    $_=<R2>; print SHUFFLED $_;  # qual2
+    logmsg "Looking for $basename";
+    my $outfile="$outdir/$basename.fastq.gz";
+    next if(-e $outfile);
+
+    system("run_assembly_shuffleReads.pl $$reads{1} $$reads{2} | gzip -c > $outfile.tmp");
+    die "ERROR with run_assembly_shuffleReads.pl" if $?;
+    system("mv -v $outfile.tmp $outfile");
   }
-
-  close R1; close R2; close SHUFFLED;
-  return $shuffled;
 }
 
 sub usage{
   local $0=fileparse $0;
-  "$0: shuffle a set of fastq files into a directory
+  "$0: shuffle a set of fastq files into a directory. Uses run_assembly_shuffleReads.pl.
   Usage: $0 *.fastq.gz -o outdir
   --outdir  output directory
   --regex   A regular expression with parentheses to capture the basename of both F/R files. Also must have parentheses to capture the second half of the filename.
-  --uneven  How to deal with uneven reads.  Options: die, warn
   "
 }
