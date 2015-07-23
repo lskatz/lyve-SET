@@ -19,7 +19,7 @@ use Bio::Perl;
 use Data::Dumper;
 use Getopt::Long;
 use File::Basename;
-use File::Spec;
+use File::Spec::Functions qw/rel2abs abs2rel/;
 use threads;
 use Thread::Queue;
 use Schedule::SGELK;
@@ -29,7 +29,7 @@ use Number::Range;
 use LyveSET qw/@fastaExt @fastqExt @bamExt rangeUnion rangeInversion/;
 
 my ($name,$scriptsdir,$suffix)=fileparse($0);
-$scriptsdir=File::Spec->rel2abs($scriptsdir);
+$scriptsdir=rel2abs($scriptsdir);
 
 # Logging
 my $logmsgFh;
@@ -108,7 +108,7 @@ sub main{
     $b=~s/dir$//;  # e.g., vcfdir => vcf
     $$settings{$param}||="$project/$b";
     die "ERROR: Could not find $param under $$settings{$param}/\n  mkdir $$settings{$param} to resolve this problem.\n".usage($settings) if(!-d $$settings{$param});
-    $$settings{$param}=File::Spec->rel2abs($$settings{$param});
+    $$settings{$param}=rel2abs($$settings{$param});
   }
 
   # SGE params
@@ -134,33 +134,10 @@ sub main{
   indexReference($ref,$settings);
   mapReads($ref,$$settings{readsdir},$$settings{bamdir},$settings);
   variantCalls($ref,$$settings{bamdir},$$settings{vcfdir},$settings);
+  compareTaxa($ref,$settings); # SNP matrix, alignment, trees
 
-  # TODO put all the tree-making stuff into its own subroutine too
-  my $pooled;
-  if($$settings{matrix}){
-    $pooled=variantsToMatrix($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
-  } else {
-    logmsg "The matrix was not requested; wrapping up";
-    return 0;
-  }
-
-  #if($$settings{msa}){
-  #  pooledToAlignment($pooled,$settings);
-  #} else {
-  #  logmsg "The alignment was not requested; wrapping up";
-  #  return 0;
-  #}
-
-  if($$settings{msa} || $$settings{trees}){
-    logmsg "Launching set_processPooledVcf.pl";
-    my $command="set_processPooledVcf.pl $pooled --prefix $$settings{msadir}/out --numcpus $$settings{numcpus}";
-    logmsg "Processing the pooled VCF\n  $command";
-    $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"set_processMsa.pl"});
-    $sge->wrapItUp();
-  } else {
-    logmsg "The phylogeny was not requested; wrapping up";
-    return 0;
-  }
+  # Find the output files
+  symlink(rel2abs("$$settings{msadir}/out.RAxML_bipartitions"),"$project/".basename($project).".dnd") if(-e "$$settings{msadir}/out.RAxML_bipartitions");
 
   return 0;
 }
@@ -597,6 +574,39 @@ sub indexAndCompressVcf{
   return $j;
 }
 
+# Make a matrix, trees, etc
+sub compareTaxa{
+  my($ref,$settings)=@_;
+  my $pooled;
+  if($$settings{matrix}){
+    $pooled=variantsToMatrix($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
+  } else {
+    logmsg "The matrix was not requested; wrapping up";
+    return 1;
+  }
+
+  #if($$settings{msa}){
+  #  pooledToAlignment($pooled,$settings);
+  #} else {
+  #  logmsg "The alignment was not requested; wrapping up";
+  #  return 0;
+  #}
+
+  if($$settings{msa} || $$settings{trees}){
+    logmsg "Launching set_processPooledVcf.pl";
+    my $command="set_processPooledVcf.pl $pooled --prefix $$settings{msadir}/out --numcpus $$settings{numcpus}";
+    logmsg "Processing the pooled VCF\n  $command";
+    $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"set_processPooledVcf.pl"});
+    $sge->wrapItUp();
+  } else {
+    logmsg "The phylogeny was not requested; wrapping up";
+    return 1;
+  }
+
+  return 1;
+}
+
+
 sub variantsToMatrix{
   my ($ref,$bamdir,$vcfdir,$msadir,$settings)=@_;
   logmsg "Creating a core hqSNP matrix";
@@ -656,7 +666,7 @@ sub usage{
   ## Format a few variables correctly
   # simplified pathnames for some options
   my @dir=qw(asmdir msadir readsdir bamdir vcfdir tmpdir logdir);
-  $$settings{$_}=File::Spec->abs2rel($_).'/' for(@dir);
+  $$settings{$_}=abs2rel($_).'/' for(@dir);
   # right padding for some options
   $$settings{$_}=reverse(sprintf("%15s","".reverse($$settings{$_}))) for(qw(mapper snpcaller allowedFlanking),@dir);
   local $0=fileparse $0;
