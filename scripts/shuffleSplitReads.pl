@@ -6,9 +6,12 @@ use Data::Dumper;
 use Getopt::Long;
 use File::Basename qw/fileparse basename/;
 use File::Copy qw/copy move/;
-use LyveSET qw/logmsg/;
 use threads;
 use Thread::Queue;
+
+use FindBin;
+use lib "$FindBin::RealBin/../lib";
+use LyveSET qw/logmsg/;
 
 exit main();
 
