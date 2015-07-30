@@ -42,7 +42,7 @@ sub main{
   my ($treeArr, $labelHash, $allLeafArr) = readSigClades($$settings{tree}, $settings);
 
   logmsg "Reading high bootstrap nodes and outputing statistics";
-  my $nodeStats = generateSigCladeStats($labelHash, $pairwise, $allLeafArr, $settings);
+  my ($pairwiseCladeStats, $singletonCladeStats, $singletonTaxaStats) = generateSigCladeStats($labelHash, $pairwise, $allLeafArr, $settings);
   
   outputTrees([$treeArr],$$settings{outprefix},$settings);
   #outputStatisticsThresholds($fstSample,$$settings{outprefix},$settings);
@@ -163,30 +163,62 @@ sub readSigClades{
 #	with other nodes, and between the node and everything else
 sub generateSigCladeStats{
 	my ($labelHashRef,$pairwiseRef,$allLeafArrRef, $settings)=@_;
-	my @betweenDistances;
-	my @withinDistances;
+	my @pairwiseDistances;
+	my @nodeSingletonDistances;
+	my @taxaSingletonDistances;
 	
-	logmsg "Returning clade stats";
+	logmsg "Returning significant clade stats";
 	foreach my $node1 (keys %$labelHashRef) {
-		# Between and within node distances
+		# 1. Between and within node distances
 		foreach my $node2 (keys %$labelHashRef) {
-			printf ("%s %s ", $node1, $node2);
-			distancesBetweenNodes( $$labelHashRef{$node1}, $$labelHashRef{$node2}, 
-							   $pairwiseRef, $settings );
+			my $distances = distancesBetweenNodes( $$labelHashRef{$node1}, 
+											$$labelHashRef{$node2}, 
+							   				$pairwiseRef, $settings );
+			push(@pairwiseDistances, sprintf("%s\t%s\t%d\t%d\t%d\t%d",
+										$node1, $node2, median(@$distances),
+										min(@$distances), max(@$distances),
+										medianAbsoluteDeviation($distances)));
 		}
 		
-		# Between node leaves and all other leaves
+		# 2. Between node leaves and all other leaves
 		my @nodeLeafCopy = @{$$labelHashRef{$node1}};
 		my @allLeafCopy = @$allLeafArrRef;
 		my %diff;
 		
+		# We set the keys of the diff hash to each label in allLeafCopy
+		# Then we delete out all the keys that match labels in nodeLeafCopy
+		# And what's left in diff is the difference between the two arrays
 		@diff{ @allLeafCopy } = undef;
 		delete @diff{ @nodeLeafCopy };
 		my @diffLeaf = keys %diff;
-		printf ("%s vs rest ", $node1);
-		distancesBetweenNodes( $$labelHashRef{$node1}, \@diffLeaf, 
-						   $pairwiseRef, $settings );
+		my $distances = distancesBetweenNodes( $$labelHashRef{$node1}, \@diffLeaf, 
+						   				$pairwiseRef, $settings );
+		push(@nodeSingletonDistances, sprintf("%s\t%s\t%d\t%d\t%d\t%d",
+										$node1, "Rest", median(@$distances),
+										min(@$distances), max(@$distances),
+										medianAbsoluteDeviation($distances)));				   				
 	}
+	
+	# 3. For each leaf, we also calculate distances to all other leafs
+	foreach my $taxa (@$allLeafArrRef){
+		my @taxaArr = ($taxa);
+		my @allLeafCopy = @$allLeafArrRef;
+		my %diff;
+		
+		# We set the keys of the diff hash to each label in allLeafCopy
+		# Then we delete out all the keys that match labels in nodeLeafCopy
+		# And what's left in diff is the difference between the two arrays
+		@diff{ @allLeafCopy } = undef;
+		delete @diff{ @taxaArr };
+		my @diffLeaf = keys %diff;
+		my $distances = distancesBetweenNodes( \@taxaArr, \@diffLeaf, 
+						   				$pairwiseRef, $settings );
+		push(@taxaSingletonDistances, sprintf("%s\t%s\t%d\t%d\t%d\t%d",
+										$taxa, "Rest", median(@$distances),
+										min(@$distances), max(@$distances),
+										medianAbsoluteDeviation($distances)));
+	}
+	return (\@pairwiseDistances, \@nodeSingletonDistances, \@taxaSingletonDistances);
 }
 
 # Distances from the pairwise distance list between any two leaf lists
@@ -200,12 +232,6 @@ sub distancesBetweenNodes{
 			push (@distanceArr, ${$pairwiseRef}{$name1}{$name2}) if $name1 ne $name2;
 		}
 	}
-
-	my $median = median(@distanceArr);
-	my $min = min(@distanceArr);
-	my $max = max(@distanceArr);
-	my $mad = medianAbsoluteDeviation(\@distanceArr);
-	printf ("%s [%s %s] %s\n", $median, $min, $max, $mad);
 	return \@distanceArr;
 }
 
@@ -263,130 +289,6 @@ sub outputStatisticsThresholds{
   close STATS;
   return 1;
 }
-
-# Return a group with the same number of elements as group1.
-# Will be randomized but will not have repeat elements nor will it intersect with group1.
-sub group2{
-  my($inGroup,$totalGroup,$settings)=@_;
-  my %inGroup;
-  $inGroup{$_}=1 for(@$inGroup); # use Algorithm::MedianSelect::XS qw(median);index
-  my @outGroup;
-  my $ingroupNum=@$inGroup;
-  my $indexFromTotal=@$totalGroup-1;
-  my $j=0;
-  for(my $i=0;$i<=$indexFromTotal;$i++){
-    my $randEl=$$totalGroup[rand($indexFromTotal)];
-    if(!$inGroup{$randEl}){
-      push(@outGroup,$randEl);
-      last if(++$j >= $ingroupNum);
-      $inGroup{$randEl}=1; # this will make it be random without replacement
-    } else {
-      #logmsg "WARNING ($i): $randEl is in inGroup:".Dumper $inGroup;
-    }
-  }
-  return \@outGroup;
-}
-
-# Find all phylogroups; bin them by the number of members.
-# Returns @arr=>(3=>[[g1,g2,g3],[g4,g5,g6]],...4=>[...
-#  Array=>[numInGroup=>[\@group1,\@group2...],numInGroup2=>[...
-sub defineGroup2s{
-  my($tree,$pairwise,$settings)=@_;
-  my %group;
-  my $in=Bio::TreeIO->new(-file=>$tree);
-  while(my $treeIn=$in->next_tree){
-    for my $node($treeIn->get_nodes){
-      next if($node->is_Leaf);
-
-      # get all descendents of the node and alpha-sort them
-      my @d;
-      for my $taxon($node->get_all_Descendents){
-        my $taxonId=$taxon->id;
-        next if(!$taxonId);
-        push(@d,$taxon) if(defined $$pairwise{$taxonId});
-      }
-      @d=sort{$a->id cmp $b->id} @d;
-      @d=map{$_->id} @d;
-      my $numDesc=@d;
-      next if(!$numDesc || $numDesc < 2 || !@d);
-
-      # Define the within distance in the last element
-      my $dist=averageGroupDistance(\@d,\@d,$pairwise,1,$settings);
-      push(@d,$dist);
-      push(@{$group{$numDesc}},\@d);
-    }
-  }
-  #print Dumper \%group;die;
-  $in->close;
-  return %group;
-}
-
-# find an average and standard deviation of an Fst of a group1
-sub fstDistribution{
-  my($group1,$allTaxa,$distance,$settings)=@_;
-  die "ERROR: reps can't be less than 1" if($$settings{reps}<1);
-  my $stat=Statistics::Descriptive::Full->new;
-  my $group1Str=join("",@$group1);
-
-  my @fst;
-
-  # return a bad fst if
-  #  1) there are only a few other groups
-  #  2) the number of taxa in group1 is too high.  >50 I guess?
-  return(0.01,0,\@fst) if(@$allTaxa < 2 || scalar(@$group1 > 50) );
-  my $within1=averageGroupDistance($group1,$group1,$distance,1,$settings);
-  for(my $i=0;$i<$$settings{reps};$i++){
-    my @group2=@{ $$allTaxa[rand(@$allTaxa - 1)] };
-    if($group1Str eq join("",@group2)){
-      $i--;
-      next;
-    }
-    my $within2=pop(@group2);
-    my $between=averageGroupDistance($group1,\@group2,$distance,0,$settings);
-    my $within=($within1+$within2)/2;
-    my $fst=($between - $within)/$between;
-    push(@fst,$fst);
-    print join("\t",sprintf("%0.4f",$fst),scalar(@$group1),scalar(@group2),join(",",@$group1),join(",",@group2))."\n" if($$settings{outputType} eq 'samples');
-  }
-  $stat->add_data(@fst);
-  return($stat->mean,$stat->standard_deviation,\@fst);
-}
-
-sub fst{
-  my($group1,$group2,$distance,$settings)=@_;
-  #warn Dumper [$group1,$group2];
-  my $within1=averageGroupDistance($group1,$group1,$distance,1,$settings);
-  my $within2=averageGroupDistance($group2,$group2,$distance,1,$settings);
-  # for some reason, this takes a very long time to run when multithreaded
-  my $between=averageGroupDistance($group1,$group2,$distance,0,$settings);
-
-  my $numGroup1=@$group1;
-  my $numGroup2=@$group2;
-  my $total=$numGroup1+$numGroup2;
-  my $within=($within1*$numGroup2/$total + $within2*$numGroup1/$total)/2;
-  return 0 if(!$between);
-  my $fst=($between-$within)/$between;
-  return $fst;
-}
-
-# specify the $is_same parameter to note that the two groups are really the same group.
-sub averageGroupDistance{
-  my($id1,$id2,$distance,$is_same,$settings)=@_;
-  my @distance;
-  my %seen;
-  for(my $i=0;$i<@$id1;$i++){
-    my $j=0;
-    $j=$i+1 if($is_same);
-    for(my $j=$j;$j<@$id2;$j++){
-      next if($$id1[$i] eq $$id2[$j]);
-      die "ERROR: $$id1[$i] - $$id2[$j] distance was not found" if(!defined($$distance{$$id1[$i]}{$$id2[$j]}));
-      push(@distance,$$distance{$$id1[$i]}{$$id2[$j]});
-    }
-  }
-  return 0 if(!@distance);
-  return sum(@distance)/@distance;
-}
-
 
 sub usage{
   my($settings)=@_;
