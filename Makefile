@@ -79,6 +79,8 @@ install-CGP:
 	ln -s $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_trimClean.pl $(PREFIX)/scripts/
 	ln -s $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_shuffleReads.pl $(PREFIX)/scripts/
 	ln -s $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_removeDuplicateReads.pl $(PREFIX)/scripts/
+	ln -s $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_readMetrics.pl $(PREFIX)/scripts/
+	ln -s $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_metrics.pl $(PREFIX)/scripts/
 
 clean-CGP:
 	rm -rvf $(PREFIX)/lib/cg-pipeline
