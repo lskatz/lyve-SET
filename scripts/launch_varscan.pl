@@ -37,8 +37,11 @@ sub main{
   $$settings{region}  ||="";
   $$settings{exclude} ||="";
 
+  ## Parameter error checking
   # Not sure if I should include this error check or not
   # die "ERROR: Cannot use --region and --exclude together\n".usage() if($$settings{exclude} && $$settings{region});
+  die "ERROR: altFreq must be between 0 and 1, inclusive" if($$settings{altFreq} < 0 || $$settings{altFreq} > 1);
+  die "ERROR: coverage must be >=0" if($$settings{coverage} < 0);
 
   # Check to see if varscan is installed correctly
   `varscan.sh >/dev/null`;
