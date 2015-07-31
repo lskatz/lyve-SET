@@ -212,13 +212,11 @@ clean-edirect:
 	rm -rvf $(PREFIX)/lib/edirect
 
 install-perlModules:
-	@echo "Installing Perl modules using CPAN"
-	# -perl -MCPAN -e 'install CPAN' # update CPAN just in case
-	for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Descriptive Statistics::Normality Graph::Centrality::Pagerank String::Escape Statistics::LineFit; do \
-	  cpanm -L $(PREFIX)/build $$package; \
+	@echo "Installing Perl modules using cpanminus"
+	for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Descriptive Graph::Centrality::Pagerank String::Escape Statistics::LineFit; do \
+	  perl scripts/cpanm -L $(PREFIX)/lib $$package; \
+		if [ $$? -gt 0 ]; then exit 1; fi; \
 	done;
-	mv -n $(PREFIX)/build/lib/perl5/* $(PREFIX)/lib/
-	rm -rf $(PREFIX)/build/lib
 	@echo "Done with Perl modules"
 
 clean-perlModules:
