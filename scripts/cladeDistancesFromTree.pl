@@ -9,11 +9,12 @@ use Getopt::Long;
 use File::Basename;
 use List::Util qw/min max sum/;
 use FindBin;
-use Statistics::Descriptive;
 use Math::Round qw/nearest/;
-use Statistics::Basic qw(:all);
 
-use lib "$FindBin::Bin/../lib";
+use lib "$FindBin::RealBin/../lib";
+use lib "$FindBin::RealBin/../lib/lib/perl5";
+use Statistics::Descriptive;
+use Statistics::Basic qw(median);
 
 $0=fileparse $0;
 sub logmsg{print STDERR (caller(1))[3].": @_\n";}
@@ -290,7 +291,7 @@ sub outputStatistics{
 	print STATS join("\n",@$pairwiseCladeStats)."\n";
 	print STATS join("\n",@$singletonCladeStats)."\n";
 	print STATS join("\n",@$singletonTaxaStats)."\n";
-	print STATS join("\n",@$treeStats);
+	print STATS join("\n",@$treeStats)."\n";
   	close STATS;
   }else{
   	my $outpairwise="$prefix.pairwise.stats.tsv";
@@ -315,7 +316,7 @@ sub outputStatistics{
   	
   	open(STATS4,">",$outTree) or die "ERROR: could not write to file $outTree:$!";
   	print STATS4 join("\t",qw(Node1 Node2 median min max MAD))."\n";
-	print STATS4 join("\n",@$treeStats);
+	print STATS4 join("\n",@$treeStats) ."\n";
   	close STATS4;
   }
   return 1;
