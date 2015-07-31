@@ -72,6 +72,10 @@ sub main{
     die "ERROR: could not move $$settings{tempdir}/$_.suffix: $!" if $?;
   }
 
+  # Get combined distance statistics on the tree
+  system("cladeDistancesFromTree.pl -t $$settings{prefix}.RAxML_bipartitions -p $$settings{outprefix}.pairwise.tsv --outprefix $$settings{outprefix}");
+  die "ERROR with cladeDistancesFromTree.pl" if $?;
+
   return 0;
 }
 sub usage{
