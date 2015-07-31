@@ -20,11 +20,10 @@ sub logmsg{print STDERR (caller(1))[3].": @_\n";}
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(tree=s pairwise=s outprefix=s help numcpus=i reps=i outputType=s)) or die $!;
+  GetOptions($settings,qw(tree=s pairwise=s outprefix=s help outputType=s bootstrap=i)) or die $!;
   die usage($settings) if($$settings{help});
-  $$settings{numcpus}||=1;
-  $$settings{reps}||=100;
-  $$settings{outputType}||="samples";
+  $$settings{outputType}||="merged";
+  $$settings{bootstrap}||=70;
   
   # required parameters
   for(qw(tree pairwise outprefix)){
@@ -39,13 +38,13 @@ sub main{
   my $pairwise=readPairwise($$settings{pairwise},$settings);
   
   logmsg "Reading the tree and assigning names to high bootstrap nodes";
-  my ($treeArr, $labelHash, $allLeafArr) = readSigClades($$settings{tree}, $settings);
+  my ($treeArr, $labelHash, $allLeafArr) = readSigClades($$settings{tree},$$settings{bootstrap},$settings);
 
   logmsg "Reading high bootstrap nodes and outputing statistics";
-  my ($pairwiseCladeStats, $singletonCladeStats, $singletonTaxaStats) = generateSigCladeStats($labelHash, $pairwise, $allLeafArr, $settings);
+  my ($pairwiseCladeStats, $singletonCladeStats, $singletonTaxaStats, $treeStats) = generateSigCladeStats($labelHash, $pairwise, $allLeafArr, $settings);
   
   outputTrees([$treeArr],$$settings{outprefix},$settings);
-  #outputStatisticsThresholds($fstSample,$$settings{outprefix},$settings);
+  outputStatistics($pairwiseCladeStats,$singletonCladeStats,$singletonTaxaStats,$treeStats,$$settings{outprefix},$settings);
 
   return 0;
 }
@@ -91,7 +90,7 @@ sub countAncNodes{
 # Returns : 	Newick tree relabeled with unique node labels
 #			Hash keyed to unique node labels pointing to lists of descendent leaves for each label
 sub readSigClades{
-  my($infile,$settings)=@_;
+  my($infile,$bootstrapthreshold,$settings)=@_;
   my @bootTree;
   my $i=0;
   my %labels = ();	# Descendent taxa leaf name lists keyed to each significant node's label
@@ -124,7 +123,7 @@ sub readSigClades{
       my $bootstrap=$node->bootstrap || $node->id;
          $bootstrap=0 if(!$bootstrap);
       # If the bootstrap is low then skip
-      if($bootstrap < 70){
+      if($bootstrap < $bootstrapthreshold){
         logmsg "Skipping node '$bootstrap' due to the low bootstrap values";
         $node->bootstrap(1); # give it a really low fst
         $node->id(1);        # give it a really low fst
@@ -133,6 +132,7 @@ sub readSigClades{
 
 	 # Relabel significant tree nodes with node name and bootstrap value
 	 #my $labelName = sprintf "%s %s", $labelLetter, $bootstrap;
+
 	 my $labelName = $labelLetter;
       $node->bootstrap($labelName);
       $node->id($labelName);
@@ -163,6 +163,7 @@ sub readSigClades{
 #	with other nodes, and between the node and everything else
 sub generateSigCladeStats{
 	my ($labelHashRef,$pairwiseRef,$allLeafArrRef, $settings)=@_;
+	my @treeSummary;
 	my @pairwiseDistances;
 	my @nodeSingletonDistances;
 	my @taxaSingletonDistances;
@@ -218,7 +219,15 @@ sub generateSigCladeStats{
 										min(@$distances), max(@$distances),
 										medianAbsoluteDeviation($distances)));
 	}
-	return (\@pairwiseDistances, \@nodeSingletonDistances, \@taxaSingletonDistances);
+	
+	# 4.	Calculate overall distances across the entire tree
+	my $treeDistances = distancesBetweenNodes( $allLeafArrRef, $allLeafArrRef, 
+						   				$pairwiseRef, $settings );
+	push(@treeSummary, sprintf("%s\t%s\t%d\t%d\t%d\t%d",
+						"Tree", "Tree", median(@$treeDistances),
+						min(@$treeDistances), max(@$treeDistances),
+						medianAbsoluteDeviation($treeDistances)));
+	return (\@pairwiseDistances, \@nodeSingletonDistances, \@taxaSingletonDistances,\@treeSummary);
 }
 
 # Distances from the pairwise distance list between any two leaf lists
@@ -270,43 +279,70 @@ sub outputTrees{
   return 1;
 }
 
-sub outputStatisticsThresholds{
-  my($fstSample,$prefix,$settings)=@_;
-  my $stat=Statistics::Descriptive::Full->new;
-
-  my $out="$prefix.stats.tsv";
-  my ($min,$max)=(min(keys(%$fstSample)),max(keys(%$fstSample)));
-  open(STATS,">",$out) or die "ERROR: could not write to file $out:$!";
-  print STATS join("\t",qw(numInGroup threshold average standardDeviation))."\n";
-  for(my $i=$min;$i<=$max;$i++){
-    next if(!$$fstSample{$i} || @{$$fstSample{$i}} < 2);
-    $stat->add_data(@{$$fstSample{$i}});
-    my ($avg,$stdev)=(sprintf("%0.4f",$stat->mean),sprintf("%0.4f",$stat->standard_deviation));
-    my $threshold=sprintf("%0.4f",$stat->percentile(95));
-    my $threshold2=sprintf("%0.4f",$stat->percentile(75));
-    print STATS join("\t",$i,"$threshold/$threshold2",$avg,$stdev)."\n";
+sub outputStatistics{
+  my($pairwiseCladeStats,$singletonCladeStats,$singletonTaxaStats,$treeStats,$prefix,$settings)=@_;
+  
+  if($$settings{outputType} eq "merged"){
+  	my $out="$prefix.merged.stats.tsv";
+  
+  	open(STATS,">",$out) or die "ERROR: could not write to file $out:$!";
+  	print STATS join("\t",qw(Node1 Node2 median min max MAD))."\n";
+	print STATS join("\n",@$pairwiseCladeStats)."\n";
+	print STATS join("\n",@$singletonCladeStats)."\n";
+	print STATS join("\n",@$singletonTaxaStats)."\n";
+	print STATS join("\n",@$treeStats);
+  	close STATS;
+  }else{
+  	my $outpairwise="$prefix.pairwise.stats.tsv";
+  	my $outsingClade="$prefix.singletonClades.stats.tsv";
+  	my $outsingTaxa="$prefix.singletonTaxa.stats.tsv";
+   	my $outTree="$prefix.tree.stats.tsv";
+  
+  	open(STATS1,">",$outpairwise) or die "ERROR: could not write to file $outpairwise:$!";
+  	print STATS1 join("\t",qw(Node1 Node2 median min max MAD))."\n";
+	print STATS1 join("\n",@$pairwiseCladeStats)."\n";
+	close STATS1;
+	
+	open(STATS2,">",$outsingClade) or die "ERROR: could not write to file $outsingClade:$!";
+  	print STATS2 join("\t",qw(Node1 Node2 median min max MAD))."\n";
+	print STATS2 join("\n",@$singletonCladeStats)."\n";
+	close STATS2;
+	
+	open(STATS3,">",$outsingTaxa) or die "ERROR: could not write to file $outsingTaxa:$!";
+  	print STATS3 join("\t",qw(Node1 Node2 median min max MAD))."\n";
+	print STATS3 join("\n",@$singletonTaxaStats);
+  	close STATS3;
+  	
+  	open(STATS4,">",$outTree) or die "ERROR: could not write to file $outTree:$!";
+  	print STATS4 join("\t",qw(Node1 Node2 median min max MAD))."\n";
+	print STATS4 join("\n",@$treeStats);
+  	close STATS4;
   }
-  close STATS;
   return 1;
 }
 
 sub usage{
   my($settings)=@_;
-  my $help="Applies the fixation index (Fst) to a tree using pairwise distances.
-  Usage: $0 -t in.dnd -p pairwise.tsv --outprefix out --outputType averages > fstaverages.tsv
-  Outputs groups with fst > 0.7
+  my $help="Labels nodes with significant bootstrap values and returns useful pairwise distance statistics for those nodes and the tree.
+  Usage: $0 -t in.dnd -p pairwise.tsv --outprefix out
+  Outputs Newick tree and tab delimited files with pairwise distance statistics
   -t in.dnd The tree file, which will be parsed by BioPerl. Format determined by extension.
   -p pairwise.tsv The pairwise distances file. NOTE: you can get pairwise distances from pairwiseDistances.pl
   --outprefix prefix The output prefix. Prefix can have a directory name encoded in it also, e.g. 'tmp/prefix'
-    Output files are: prefix.fst.dnd, prefix.pvalue.dnd
+    Output files are: prefix.fst.dnd, prefix.merged.stats.tsv 
+    ( using the split option will output: prefix.pairwise.stats.tsv, prefix.singletonClades.stats.tsv, prefix.
+    singletonTaxa.stats.tsv, and prefix.tree.stats.tsv )
   -h for additional help";
   return $help if(!$$settings{help}); # return shorthand help
   $help.="
   OPTIONAL
-  --outputType samples The type of stdout you want.  samples==every random sample; averages==average per node; >/dev/null for no output
-  --numcpus 1 The number of cpus to use (not currently multithreaded anyway)
-  --reps 100 The number of repetitions for each node to calculate an average Fst
-  Example: $0 applyFstToTree.pl -p pairwise.tsv -t 4b.dnd --outprefix out --outputType samples > fstsampling.tsv
+  --outputType merged (default) The type of distance stats output you want. 'merged' for one big file (prefix.merged.stats.tsv)
+  	And 'split' for separate files for pairwise by node (prefix.pairwise.stats.tsv), individual nodes vs other leaves 
+  	(prefix.singletonClades.stats.tsv), individual taxa vs other leaves (singletonTaxa.stats.tsv), and overall stats for the
+  	entire tree (prefix.tree.stats.tsv)
+  --bootstrap 70 (default) The percent threshold for significant bootstrap values. Only nodes with bootstrap values higher than this
+  	number will be included in pairwise by node and individual node statistic calculations.
+  Example: $0 applyFstToTree.pl -p pairwise.tsv -t 4b.dnd --outprefix out --outputType split --bootstrap 80
   ";
   return $help;
 }
