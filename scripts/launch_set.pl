@@ -272,6 +272,7 @@ sub maskReference{
   while(my($contig,$RangeObj)=each(%maskedRange)){
     for my $range(split(/,/,$RangeObj->range)){
       my($min,$max)=split(/\.\./,$range);
+      logmsg "Masking ".join("\t",$contig,$min,$max);
       print MASKEDBED join("\t",$contig,$min,$max)."\n";
     }
   }
@@ -282,6 +283,7 @@ sub maskReference{
   while(my($contig,$RangeObj)=each(%maskedRange)){
     $unmaskedRange{$contig}||=Number::Range->new(1..$seqLength{$contig}-1);
     no warnings; # avoid Number::Range warnings 'X not in range or already removed'
+    logmsg "Deleting $contig ".$maskedRange{$contig}->range;
     $unmaskedRange{$contig}->delrange($maskedRange{$contig}->range);
   }
 
@@ -291,6 +293,7 @@ sub maskReference{
   while(my($contig,$RangeObj)=each(%unmaskedRange)){
     for my $range(split(/,/,$RangeObj->range)){
       my($min,$max)=split(/\.\./,$range);
+      logmsg "Unmasked: ".join("\t",$contig,$min,$max);
       print UNMASKEDBED join("\t",$contig,$min,$max)."\n";
     }
   }
