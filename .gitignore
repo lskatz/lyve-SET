@@ -15,6 +15,7 @@ lib/snap/
 lib/standard-RAxML-8.1.16/
 lib/varscan.v2.3.7.jar
 lib/vcftools_0.1.12b/
+lib/lib
 scripts/basqcol
 scripts/bcftools
 scripts/bgzip
