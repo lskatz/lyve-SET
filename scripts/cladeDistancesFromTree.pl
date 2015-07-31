@@ -266,7 +266,7 @@ sub medianAbsoluteDeviation{
 sub outputTrees{
   my($treeArr,$prefix,$settings)=@_;
   my $numTrees=@{$$treeArr[0]};
-  my $fstOut=new Bio::TreeIO(-file=>">$prefix.fst.dnd");
+  my $fstOut=new Bio::TreeIO(-file=>">$prefix.labelednodes.dnd");
   #my $pOut=  new Bio::TreeIO(-file=>">$prefix.pvalue.dnd");
   for(my $i=0;$i<$numTrees;$i++){
     my $fstTree=$$treeArr[0][$i];
@@ -330,7 +330,7 @@ sub usage{
   -t in.dnd The tree file, which will be parsed by BioPerl. Format determined by extension.
   -p pairwise.tsv The pairwise distances file. NOTE: you can get pairwise distances from pairwiseDistances.pl
   --outprefix prefix The output prefix. Prefix can have a directory name encoded in it also, e.g. 'tmp/prefix'
-    Output files are: prefix.fst.dnd, prefix.merged.stats.tsv 
+    Output files are: prefix.labelednodes.dnd, prefix.merged.stats.tsv 
     ( using the split option will output: prefix.pairwise.stats.tsv, prefix.singletonClades.stats.tsv, prefix.
     singletonTaxa.stats.tsv, and prefix.tree.stats.tsv )
   -h for additional help";
