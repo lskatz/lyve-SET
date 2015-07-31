@@ -91,20 +91,28 @@ sub numberOfSitesMasked{
   # threshold percentage of genomes.
   my $numMaskedSites=0;
   my $numHasAnyMasking=0;
+  my $numTotallyMasked=0;
   for (@maskedSitesCounter){
     $_||=0;
     if($_ >= $numSeqsMeansMasked){
       $numMaskedSites++;
     } 
-    if ($_ > 0){
+    if($_ > 0){
       $numHasAnyMasking++;
     }
+    if($_ == $numSeqs){
+      $numTotallyMasked++;
+    }
   }
+
+  # Make a report
   my $percentMasked=int($numMaskedSites/$length * 100);
   logmsg "The MSA is $percentMasked% masked, defined by sites that are masked with a frequency > $$settings{frequencyMaskedDefinesMaskedSite}";
   my $percentAtAllMasked=int($numHasAnyMasking/$length * 100);
   logmsg "$percentAtAllMasked% of the sites in the MSA have at least one masked nucleotide";
-  
+  my $percentTotallyMasked=int($numTotallyMasked/$length * 100);
+  logmsg "$percentTotallyMasked% of the sites in the MSA are totally masked and are unnecessary for the analysis";
+
   return;
 }
 
