@@ -13,17 +13,11 @@ use POSIX qw/ceil/;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
-#use Statistics::Normality qw/shapiro_wilk_test dagostino_k_square_test/;
+use LyveSET qw/logmsg/;
+use lib "$FindBin::RealBin/../lib/lib/perl5";
 use Statistics::Descriptive;
 
 local $0=basename $0;
-sub logmsg {
-  my $FH = *STDOUT;
-  my $sub=(caller(1))[3];
-  $sub=~s/main:://;
-  print $FH "$0:$sub: @_\n";
-}
-
 exit main();
 
 sub main{

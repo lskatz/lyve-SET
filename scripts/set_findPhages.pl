@@ -15,6 +15,7 @@ use Bio::Perl;
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
 use LyveSET qw/logmsg/;
+use lib "$FindBin::RealBin/../lib/lib/perl5";
 use Number::Range;
 
 local $0=fileparse $0;

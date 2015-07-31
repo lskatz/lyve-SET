@@ -6,18 +6,18 @@ use Data::Dumper;
 use Getopt::Long;
 use FindBin;
 use List::Util qw/sum max min/;
-use Statistics::Descriptive;
 use File::Basename qw/fileparse basename dirname/;
 use File::Temp qw/tempdir tempfile/;
 use threads;
 use Thread::Queue;
 use Bio::FeatureIO;
 
-use Statistics::LineFit;
-
 use lib "$FindBin::RealBin/../lib";
-use Number::Range;
 use LyveSET qw/logmsg/;
+use lib "$FindBin::RealBin/../lib/lib/perl5";
+use Number::Range;
+use Statistics::LineFit;
+use Statistics::Descriptive;
 
 exit(main());
 

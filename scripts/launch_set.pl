@@ -13,6 +13,8 @@ use lib "$FindBin::RealBin/../lib";
 # Aw, screw it.  Force the path on the user.
 $ENV{PATH}="$RealBin:$ENV{PATH}";
 
+use lib "$FindBin::RealBin/../lib/lib/perl5";
+
 use strict;
 use warnings;
 use Bio::Perl;
