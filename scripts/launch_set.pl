@@ -543,8 +543,9 @@ sub variantCalls{
       my $varscanxopts="";
       $varscanxopts.="--region $regionsFile " if($regionsFile);
       $varscanxopts.="--exclude $bam.cliffs.bed " if(-e "$bam.cliffs.bed");
-      logmsg "$scriptsdir/launch_varscan.pl $bam --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $varscanxopts > $vcfdir/$b.vcf";
-      $sge->pleaseExecute("$scriptsdir/launch_varscan.pl $bam --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $varscanxopts > $vcfdir/$b.vcf",{numcpus=>1,jobname=>$jobname,qsubxopts=>""});
+      my $varscanCommand="$scriptsdir/launch_varscan.pl $bam --numcpus $$settings{numcpus} --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $varscanxopts > $vcfdir/$b.vcf";
+      logmsg $varscanCommand;
+      $sge->pleaseExecute($varscanCommand,{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
       # sort VCF
       $sge->pleaseExecute("mv $vcfdir/$b.vcf $vcfdir/$b.vcf.tmp && vcf-sort < $vcfdir/$b.vcf.tmp > $vcfdir/$b.vcf && rm -v $vcfdir/$b.vcf.tmp",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
       $jobname="sort$b"; # the thing that bgzip waits on to finish

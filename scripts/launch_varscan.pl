@@ -71,7 +71,8 @@ sub main{
 
 sub mpileup{
   my($bam,$reference,$settings)=@_;
-  my $pileup="$$settings{tempdir}/".fileparse($bam).".mpileup";
+  my $b=fileparse($bam);
+  my $pileup="$$settings{tempdir}/$b.mpileup";
   return $pileup if(-e $pileup && -s $pileup > 0);
   logmsg "Creating a pileup $pileup";
 
@@ -97,7 +98,7 @@ sub mpileup{
 
   # Multithread a pileup so that each region gets piped into a file.
   # Then, these individual files can be combined at a later step.
-  my $command="echo \"$regions\" | xargs -P $$settings{numcpus} -n 1 -I {} sh -c 'echo \"MPileup on {}\"; rm -fv $$settings{tempdir}/$pileup.*.mpileup; samtools mpileup -f $reference $xopts --region \"{}\" $bam > $$settings{tempdir}/$pileup.\$\$.mpileup' ";
+  my $command="echo \"$regions\" | xargs -P $$settings{numcpus} -n 1 -I {} sh -c 'echo \"MPileup on {}\"; rm -fv $$settings{tempdir}/$b.*.mpileup; samtools mpileup -f $reference $xopts --region \"{}\" $bam > $$settings{tempdir}/$b.\$\$.mpileup' ";
   logmsg "Running mpileup:\n  $command";
   system($command);
   die "ERROR with xargs and samtools mpileup" if $?;
@@ -105,7 +106,7 @@ sub mpileup{
   # Concatenate the output into a single file.
   # Individual regions are already sorted, thanks to the way mpileup works.
   logmsg "Sorting mpileup results into a combined file";
-  system("cat $$settings{tempdir}/$pileup.*.mpileup > $$settings{tempdir}/$pileup && rm -f $$settings{tempdir}/$pileup.*.mpileup");
+  system("cat $$settings{tempdir}/$b.*.mpileup > $pileup && rm -f $$settings{tempdir}/$b.*.mpileup");
   die "ERROR with sorting mpileup results and then deleting the intermediate files" if $?;
 
   return $pileup;
