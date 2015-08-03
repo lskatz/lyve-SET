@@ -140,7 +140,7 @@ sub main{
 
   # Find the output files
   my $absDir=rel2abs($$settings{msadir}); # save the abs. path
-  my $outPrefix="$project/".basename($project); # consistent output naming
+  my $outPrefix="$project/out"; # consistent output naming
   symlink("$absDir/out.RAxML_bipartitions","$outPrefix.dnd") if(-e "$absDir/out.RAxML_bipartitions");
   symlink("$absDir/out.filteredMatrix.tsv","$outPrefix.matrix.tsv") if(-e "$absDir/out.filteredMatrix.tsv");
   symlink("$absDir/out.informative.fasta","$outPrefix.fasta") if(-e "$absDir/out.informative.fasta");
