@@ -5,8 +5,11 @@ use Exporter qw(import);
 use File::Basename qw/fileparse basename dirname/;
 use Term::ANSIColor;
 use Data::Dumper;
-use Number::Range;
 use threads;
+
+use FinBin;
+use lib "$FindBin::Bin/../lib/lib/perl5";
+use Number::Range;
 
 our @EXPORT_OK = qw(logmsg rangeInversion rangeUnion @fastqExt @fastaExt @bamExt @vcfExt);
 
