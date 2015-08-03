@@ -7,7 +7,7 @@ use Term::ANSIColor;
 use Data::Dumper;
 use threads;
 
-use FinBin;
+use FindBin;
 use lib "$FindBin::Bin/../lib/lib/perl5";
 use Number::Range;
 
