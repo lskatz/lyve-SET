@@ -23,6 +23,14 @@ if [ "$IN" == "" ] || [ "$OUT" == "" ]; then
   exit 1;
 fi
 
+# Figure out regions names using the VCF index files
+REGION=$(echo "$IN" | xargs -n 1 tabix -l | sort | uniq);
+#echo "$REGION";
+#exit 1;
+
+# TODO: multithread, one thread per region
+
+
 # zcat out.pooled.vcf.gz|perl -lane 'if(/^#/){print;} elsif($F[4] ne "N"){ print; } else { $numF=@F; $has_hq=0; for my $info(@F[8..$numF-1]){ $gt=substr((split(/:/,$info))[0],0,1); $has_hq=1 if($gt=~/[ATCG0\.,]/i);} print if($has_hq); }' | grep -cv '#'
 
 # This command does the following:
