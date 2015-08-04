@@ -219,6 +219,9 @@ sub simulateReads{
 sub maskReference{
   my($ref,$settings)=@_;
 
+  my $unmaskedRegions="$$settings{refdir}/unmaskedRegions.bed";
+  return $unmaskedRegions if(-e $unmaskedRegions);
+
   # Make the directory where these masking coordinates go
   my $maskDir="$$settings{refdir}/maskedRegions";
   mkdir($maskDir) if(!-d $maskDir);
@@ -288,8 +291,8 @@ sub maskReference{
   }
 
   # Write inverted (unmasked) regions to a file
-  my $unmaskedRegions="$$settings{refdir}/unmaskedRegions.bed";
-  open(UNMASKEDBED,">$unmaskedRegions") or die "ERROR: could not open $unmaskedRegions: $!";
+  my $unmaskedRegionsTmp="$unmaskedRegions.tmp";
+  open(UNMASKEDBED,">$unmaskedRegionsTmp") or die "ERROR: could not open $unmaskedRegionsTmp: $!";
   while(my($contig,$RangeObj)=each(%unmaskedRange)){
     for my $range(split(/,/,$RangeObj->range)){
       my($min,$max)=split(/\.\./,$range);
@@ -298,6 +301,7 @@ sub maskReference{
     }
   }
   close UNMASKEDBED;
+  system("mv -v $unmaskedRegions.tmp $unmaskedRegions");
 
   logmsg "Inverted masked regions from $maskedRegions and put them into $unmaskedRegions";
   logmsg "I now know where unmasked regions are, as they are listed in $unmaskedRegions.";
