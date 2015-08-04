@@ -9,20 +9,15 @@ use Data::Dumper;
 use Bio::Perl;
 use Bio::AlignIO;
 use File::Basename qw/basename/;
+use POSIX qw/ceil/;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
-use Statistics::Normality qw/shapiro_wilk_test dagostino_k_square_test/;
+use LyveSET qw/logmsg/;
+use lib "$FindBin::RealBin/../lib/lib/perl5";
 use Statistics::Descriptive;
 
 local $0=basename $0;
-sub logmsg {
-  my $FH = *STDOUT;
-  my $sub=(caller(1))[3];
-  $sub=~s/main:://;
-  print $FH "$0:$sub: @_\n";
-}
-
 exit main();
 
 sub main{
@@ -44,6 +39,7 @@ sub main{
   my $msaObj=Bio::AlignIO->new(-file=>$msa)->next_aln;
 
   findAmbiguities($msaObj,$settings);
+  numberOfSitesMasked($msaObj,$settings);
 
   return 0;
 }
@@ -62,6 +58,55 @@ sub findAmbiguities{
       logmsg "WARNING: ".$seq->id." has $percentAmbiguous% ambiguous nucleotides";
     }
   }
+  return;
+}
+
+sub numberOfSitesMasked{
+  my($msaObj,$settings)=@_;
+  # TODO make this a parameter with a better name
+  $$settings{frequencyMaskedDefinesMaskedSite}||=0.5;
+  my $numSeqs=$msaObj->num_sequences;
+  my $numSeqsMeansMasked=ceil($numSeqs * $$settings{frequencyMaskedDefinesMaskedSite});
+
+  # Count how many genomes per site are masked
+  my $length=$msaObj->length;
+  my @maskedSitesCounter;
+  for my $seq($msaObj->each_seq){
+    # Remember the DNA sequence to speed things up
+    my $sequence=$seq->seq;
+    for(my $i=0;$i<$length;$i++){
+      if(substr($sequence,$i,1) =~/[^atcg]/i){
+        $maskedSitesCounter[$i]++;
+      }
+    }
+  }
+
+  # Find the number of sites that are masked above a 
+  # threshold percentage of genomes.
+  my $numMaskedSites=0;
+  my $numHasAnyMasking=0;
+  my $numTotallyMasked=0;
+  for (@maskedSitesCounter){
+    $_||=0;
+    if($_ >= $numSeqsMeansMasked){
+      $numMaskedSites++;
+    } 
+    if($_ > 0){
+      $numHasAnyMasking++;
+    }
+    if($_ == $numSeqs){
+      $numTotallyMasked++;
+    }
+  }
+
+  # Make a report
+  my $percentMasked=int($numMaskedSites/$length * 100);
+  logmsg "The MSA is $percentMasked% masked, defined by sites that are masked with a frequency > $$settings{frequencyMaskedDefinesMaskedSite}";
+  my $percentAtAllMasked=int($numHasAnyMasking/$length * 100);
+  logmsg "$percentAtAllMasked% of the sites in the MSA have at least one masked nucleotide";
+  my $percentTotallyMasked=int($numTotallyMasked/$length * 100);
+  logmsg "$percentTotallyMasked% of the sites in the MSA are totally masked and are unnecessary for the analysis";
+
   return;
 }
 

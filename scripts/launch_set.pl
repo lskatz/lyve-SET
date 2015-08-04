@@ -13,6 +13,8 @@ use lib "$FindBin::RealBin/../lib";
 # Aw, screw it.  Force the path on the user.
 $ENV{PATH}="$RealBin:$ENV{PATH}";
 
+use lib "$FindBin::RealBin/../lib/lib/perl5";
+
 use strict;
 use warnings;
 use Bio::Perl;
@@ -138,7 +140,7 @@ sub main{
 
   # Find the output files
   my $absDir=rel2abs($$settings{msadir}); # save the abs. path
-  my $outPrefix="$project/".basename($project); # consistent output naming
+  my $outPrefix="$project/out"; # consistent output naming
   symlink("$absDir/out.RAxML_bipartitions","$outPrefix.dnd") if(-e "$absDir/out.RAxML_bipartitions");
   symlink("$absDir/out.filteredMatrix.tsv","$outPrefix.matrix.tsv") if(-e "$absDir/out.filteredMatrix.tsv");
   symlink("$absDir/out.informative.fasta","$outPrefix.fasta") if(-e "$absDir/out.informative.fasta");
@@ -270,6 +272,7 @@ sub maskReference{
   while(my($contig,$RangeObj)=each(%maskedRange)){
     for my $range(split(/,/,$RangeObj->range)){
       my($min,$max)=split(/\.\./,$range);
+      logmsg "Masking ".join("\t",$contig,$min,$max);
       print MASKEDBED join("\t",$contig,$min,$max)."\n";
     }
   }
@@ -280,6 +283,7 @@ sub maskReference{
   while(my($contig,$RangeObj)=each(%maskedRange)){
     $unmaskedRange{$contig}||=Number::Range->new(1..$seqLength{$contig}-1);
     no warnings; # avoid Number::Range warnings 'X not in range or already removed'
+    logmsg "Deleting $contig ".$maskedRange{$contig}->range;
     $unmaskedRange{$contig}->delrange($maskedRange{$contig}->range);
   }
 
@@ -289,6 +293,7 @@ sub maskReference{
   while(my($contig,$RangeObj)=each(%unmaskedRange)){
     for my $range(split(/,/,$RangeObj->range)){
       my($min,$max)=split(/\.\./,$range);
+      logmsg "Unmasked: ".join("\t",$contig,$min,$max);
       print UNMASKEDBED join("\t",$contig,$min,$max)."\n";
     }
   }
@@ -538,8 +543,9 @@ sub variantCalls{
       my $varscanxopts="";
       $varscanxopts.="--region $regionsFile " if($regionsFile);
       $varscanxopts.="--exclude $bam.cliffs.bed " if(-e "$bam.cliffs.bed");
-      logmsg "$scriptsdir/launch_varscan.pl $bam --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $varscanxopts > $vcfdir/$b.vcf";
-      $sge->pleaseExecute("$scriptsdir/launch_varscan.pl $bam --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $varscanxopts > $vcfdir/$b.vcf",{numcpus=>1,jobname=>$jobname,qsubxopts=>""});
+      my $varscanCommand="$scriptsdir/launch_varscan.pl $bam --numcpus $$settings{numcpus} --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $varscanxopts > $vcfdir/$b.vcf";
+      logmsg $varscanCommand;
+      $sge->pleaseExecute($varscanCommand,{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
       # sort VCF
       $sge->pleaseExecute("mv $vcfdir/$b.vcf $vcfdir/$b.vcf.tmp && vcf-sort < $vcfdir/$b.vcf.tmp > $vcfdir/$b.vcf && rm -v $vcfdir/$b.vcf.tmp",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
       $jobname="sort$b"; # the thing that bgzip waits on to finish

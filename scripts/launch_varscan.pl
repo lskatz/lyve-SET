@@ -25,7 +25,7 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help reference=s tempdir=s altFreq=s coverage=i region=s exclude=s)) or die $!;
+  GetOptions($settings,qw(help reference=s tempdir=s altFreq=s coverage=i region=s exclude=s numcpus=i)) or die $!;
 
   my $bam=$ARGV[0] or die "ERROR: need bam\n".usage();
   my $reference=$$settings{reference} or die "ERROR: need --reference\n".usage();
@@ -36,9 +36,13 @@ sub main{
   $$settings{altFreq} ||=0.75;
   $$settings{region}  ||="";
   $$settings{exclude} ||="";
+  $$settings{numcpus} ||=1;
 
+  ## Parameter error checking
   # Not sure if I should include this error check or not
   # die "ERROR: Cannot use --region and --exclude together\n".usage() if($$settings{exclude} && $$settings{region});
+  die "ERROR: altFreq must be between 0 and 1, inclusive" if($$settings{altFreq} < 0 || $$settings{altFreq} > 1);
+  die "ERROR: coverage must be >=0" if($$settings{coverage} < 0);
 
   # Check to see if varscan is installed correctly
   `varscan.sh >/dev/null`;
@@ -67,17 +71,44 @@ sub main{
 
 sub mpileup{
   my($bam,$reference,$settings)=@_;
-  my $pileup="$$settings{tempdir}/".fileparse($bam).".mpileup";
+  my $b=fileparse($bam);
+  my $pileup="$$settings{tempdir}/$b.mpileup";
   return $pileup if(-e $pileup && -s $pileup > 0);
   logmsg "Creating a pileup $pileup";
-  
+
+  # Figure out any defined seqnames
+  my @seqname;
+  open(SAMTOOLS,"samtools view -H '$bam' | ") or die "ERROR: could not open $bam with samtools: $!";
+  while(<SAMTOOLS>){
+    next if(!/^\@SQ/);
+    chomp;
+    my @F=split /\t/;
+    for(@F){
+      my($key,$value)=split /:/;
+      push(@seqname,$value) if($key eq 'SN');
+    }
+  }
+  close SAMTOOLS;
+  my $regions=join("\n",@seqname)."\n";
+
+  # Figure out mpileup options
   my $xopts="";
   $xopts.="-Q 0 -B "; # assume that all reads have been properly filtered at this point and that mappings are good
   $xopts.="--positions $$settings{region} " if($$settings{region});
-  my $command="samtools mpileup -f '$reference' $xopts '$bam' 1>$pileup";
+
+  # Multithread a pileup so that each region gets piped into a file.
+  # Then, these individual files can be combined at a later step.
+  my $command="echo \"$regions\" | xargs -P $$settings{numcpus} -n 1 -I {} sh -c 'echo \"MPileup on {}\" >&2; rm -fv $$settings{tempdir}/$b.*.mpileup; samtools mpileup -f $reference $xopts --region \"{}\" $bam > $$settings{tempdir}/$b.\$\$.mpileup' ";
   logmsg "Running mpileup:\n  $command";
   system($command);
-  die "ERROR: problem with mpileup" if $?;
+  die "ERROR with xargs and samtools mpileup" if $?;
+
+  # Concatenate the output into a single file.
+  # Individual regions are already sorted, thanks to the way mpileup works.
+  logmsg "Sorting mpileup results into a combined file";
+  system("cat $$settings{tempdir}/$b.*.mpileup > $pileup && rm -f $$settings{tempdir}/$b.*.mpileup");
+  die "ERROR with sorting mpileup results and then deleting the intermediate files" if $?;
+
   return $pileup;
 }
 
@@ -272,24 +303,13 @@ sub readBed{
   }
   $bedin->close;
   return \%bed;
-  
-  #open(BED,$bed) or die "ERROR: could not read '$bed': $!";
-  #while(<BED>){
-  #  chomp;
-  #  my($seqname,$start,$stop,$name)=split /\t/;
-  #  # BED is zero-based, and the last position is not supposed to be included.
-  #  $start++; $stop++;
-  #  for my $pos($start..$stop-1){
-  #    $bed{$seqname}{$pos}=1;
-  #  }
-  #}
-  #return \%bed;
 }
 
 sub usage{
   local $0=fileparse $0;
   "$0: find SNPs using varscan
   Usage: $0 file.bam --reference ref.fasta > file.vcf
+  --numcpus  1         How many cpus to use
   --tempdir  tmp/      A temporary directory to store files
   --coverage 10        Min coverage
   --altFreq  0.75      Min consensus agreement for a SNP

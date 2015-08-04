@@ -4,11 +4,14 @@
 use strict;
 use warnings;
 use Data::Dumper;
-use Graph::Centrality::Pagerank;
 use Getopt::Long;
+use File::Basename qw/basename/;
+
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
-use File::Basename qw/basename/;
+use LyveSET qw/logmsg/;
+use lib "$FindBin::RealBin/../lib/lib/perl5";
+use Graph::Centrality::Pagerank;
 
 sub logmsg {local $0=basename $0;my $FH = *STDERR; print $FH "$0: ".(caller(1))[3].": @_\n";}
 exit main();

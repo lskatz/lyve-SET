@@ -10,14 +10,16 @@ use File::Spec;
 use Cwd qw/realpath/;
 use File::Basename qw/basename fileparse/;
 use File::Copy qw/copy move/;
-use File::Slurp qw/read_file/;
 use File::Find;
 use File::Spec::Functions qw/abs2rel rel2abs/;
 use Bio::Perl;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
-use LyveSET qw/@fastqExt @fastaExt @bamExt @vcfExt/;
+use LyveSET qw/@fastqExt @fastaExt @bamExt @vcfExt logmsg/;
+use lib "$FindBin::RealBin/../lib/lib/perl5";
+use File::Slurp qw/read_file/;
+
 $ENV{PATH}="$ENV{PATH}:$FindBin::RealBin/../lib/edirect";
 
 # The directories a project should have
@@ -28,7 +30,6 @@ my $testDir="$FindBin::RealBin/../testdata";
 my @test=_uniq(map({basename($_) if(-d $_)} glob("$testDir/*")));
 my $testdata=join(", ",@test);
 
-sub logmsg{local $0=basename $0; print STDERR "$0: @_\n";}
 exit main();
 
 sub main{

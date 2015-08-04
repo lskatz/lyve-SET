@@ -9,11 +9,12 @@ use Getopt::Long;
 use File::Basename;
 use List::Util qw/min max sum/;
 use FindBin;
-use Statistics::Descriptive;
 use Math::Round qw/nearest/;
-use Statistics::Basic qw(:all);
 
-use lib "$FindBin::Bin/../lib";
+use lib "$FindBin::RealBin/../lib";
+use lib "$FindBin::RealBin/../lib/lib/perl5";
+use Statistics::Descriptive;
+use Statistics::Basic qw(median);
 
 $0=fileparse $0;
 sub logmsg{print STDERR (caller(1))[3].": @_\n";}
@@ -265,7 +266,7 @@ sub medianAbsoluteDeviation{
 sub outputTrees{
   my($treeArr,$prefix,$settings)=@_;
   my $numTrees=@{$$treeArr[0]};
-  my $fstOut=new Bio::TreeIO(-file=>">$prefix.fst.dnd");
+  my $fstOut=new Bio::TreeIO(-file=>">$prefix.labelednodes.dnd");
   #my $pOut=  new Bio::TreeIO(-file=>">$prefix.pvalue.dnd");
   for(my $i=0;$i<$numTrees;$i++){
     my $fstTree=$$treeArr[0][$i];
@@ -290,7 +291,7 @@ sub outputStatistics{
 	print STATS join("\n",@$pairwiseCladeStats)."\n";
 	print STATS join("\n",@$singletonCladeStats)."\n";
 	print STATS join("\n",@$singletonTaxaStats)."\n";
-	print STATS join("\n",@$treeStats);
+	print STATS join("\n",@$treeStats)."\n";
   	close STATS;
   }else{
   	my $outpairwise="$prefix.pairwise.stats.tsv";
@@ -315,7 +316,7 @@ sub outputStatistics{
   	
   	open(STATS4,">",$outTree) or die "ERROR: could not write to file $outTree:$!";
   	print STATS4 join("\t",qw(Node1 Node2 median min max MAD))."\n";
-	print STATS4 join("\n",@$treeStats);
+	print STATS4 join("\n",@$treeStats) ."\n";
   	close STATS4;
   }
   return 1;
@@ -329,7 +330,7 @@ sub usage{
   -t in.dnd The tree file, which will be parsed by BioPerl. Format determined by extension.
   -p pairwise.tsv The pairwise distances file. NOTE: you can get pairwise distances from pairwiseDistances.pl
   --outprefix prefix The output prefix. Prefix can have a directory name encoded in it also, e.g. 'tmp/prefix'
-    Output files are: prefix.fst.dnd, prefix.merged.stats.tsv 
+    Output files are: prefix.labelednodes.dnd, prefix.merged.stats.tsv 
     ( using the split option will output: prefix.pairwise.stats.tsv, prefix.singletonClades.stats.tsv, prefix.
     singletonTaxa.stats.tsv, and prefix.tree.stats.tsv )
   -h for additional help";

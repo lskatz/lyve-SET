@@ -3,9 +3,6 @@
 # find Fst; make a tree; calculate the eigenvector
 # Author: Lee Katz <lkatz@cdc.gov>
 
-use FindBin;
-use lib "$FindBin::RealBin/../lib";
-
 use strict;
 use warnings;
 use Data::Dumper;
@@ -18,9 +15,10 @@ use File::Copy qw/move copy/;
 use threads;
 use Thread::Queue;
 
+use FindBin;
+use lib "$FindBin::RealBin/../lib";
 use LyveSET qw/logmsg/;
 
-#sub system{system(@_); die "ERROR with system call: $_[0]\n" if $?;}
 exit main();
 
 sub main{
@@ -37,6 +35,7 @@ sub main{
 
   my $snpMatrix="$$settings{prefix}.snpmatrix.tsv";
   my $filteredMatrix="$$settings{prefix}.filteredMatrix.tsv";
+  logmsg "Creating a SNP matrix from $VCF";
   system("pooledToMatrix.sh -o $$settings{prefix}.snpmatrix.tsv $VCF");
   die "ERROR with pooledToMatrix" if $?;
 
@@ -71,6 +70,10 @@ sub main{
     system("mv -v $$settings{tempdir}/$_.suffix $$settings{prefix}.$_");
     die "ERROR: could not move $$settings{tempdir}/$_.suffix: $!" if $?;
   }
+
+  # Get combined distance statistics on the tree
+  system("cladeDistancesFromTree.pl -t $$settings{prefix}.RAxML_bipartitions -p $$settings{prefix}.pairwise.tsv --outprefix $$settings{prefix}");
+  die "ERROR with cladeDistancesFromTree.pl" if $?;
 
   return 0;
 }
