@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# Applies the fixation index to a tree
+# Labels nodes with significant bootstrap values and returns useful pairwise distance statistics
 
 use strict;
 use warnings;
