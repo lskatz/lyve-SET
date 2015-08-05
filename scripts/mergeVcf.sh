@@ -3,10 +3,14 @@
 
 script=$(basename $0);
 
-while getopts "o:" o; do
+NUMCPUS=1; # default number of cpus
+while getopts "o:n:" o; do
   case "${o}" in
     o)
       OUT="$OPTARG"
+      ;;
+    n)
+      NUMCPUS="$OPTARG"
       ;;
     *)
       echo "ERROR: I do not understand option $OPTARG"
@@ -23,12 +27,71 @@ if [ "$IN" == "" ] || [ "$OUT" == "" ]; then
   exit 1;
 fi
 
-# Figure out regions names using the VCF index files
-REGION=$(echo "$IN" | xargs -n 1 tabix -l | sort | uniq);
-#echo "$REGION";
-#exit 1;
+# Figure out regions names using the VCF index files.
+# Do not multithread xargs here because of race conditions and stdout.
+REGION=$(echo "$IN" | xargs -P 1 -n 1 tabix -l | sort | uniq);
 
-# TODO: multithread, one thread per region
+# Multithread, one thread per region
+TMPDIR=$(mktemp -d /tmp/mergeVcf.XXXXXX);
+echo "$script: temporary directory is $TMPDIR";
+echo "$script: Running bcftools merge";
+export IN;
+echo "$REGION" | xargs -P $NUMCPUS -n 1 -I {} bash -c 'bcftools merge --regions "{}" $IN --force-samples -o '$TMPDIR'/merged.$$.vcf;'
+if [ $? -gt 0 ]; then
+  echo "$script: ERROR with bcftools merge"
+  rm -rvf $TMPDIR;
+  exit 1;
+fi
+
+echo "$script: Concatenating vcf output"
+bcftools concat $TMPDIR/merged.*.vcf > $TMPDIR/concat.vcf
+if [ $? -gt 0 ]; then
+  echo "$script: ERROR with bcftools concat"
+  rm -rvf $TMPDIR;
+  exit 1;
+fi
+
+echo "$script: parsing $TMPDIR/concat.vcf for high-quality positions"
+perl -lane '
+    if(/^#/){
+      print;
+    }elsif($F[4] ne "N"){ 
+      print; 
+    }else { 
+      $numF=@F; 
+      $has_hq=0; 
+      for my $info(@F[9..$numF-1]){ 
+        $gt=substr((split(/:/,$info))[0],0,1); 
+        $has_hq=1 if($gt=~/[ATCG0\.,]/i);
+      } 
+      print if($has_hq); 
+    }
+' < $TMPDIR/concat.vcf > $TMPDIR/hqPos.vcf
+if [ $? -gt 0 ]; then
+  echo "$script: ERROR with perl parsing"
+  rm -rvf $TMPDIR;
+  exit 1;
+fi
+
+bgzip $TMPDIR/hqPos.vcf
+if [ $? -gt 0 ]; then
+  echo "$script: ERROR with bgzip"
+  rm -rvf $TMPDIR;
+  exit 1;
+fi
+tabix $TMPDIR/hqPos.vcf.gz
+if [ $? -gt 0 ]; then
+  echo "$script: ERROR with tabix"
+  rm -rvf $TMPDIR;
+  exit 1;
+fi
+
+mv -v $TMPDIR/hqPos.vcf.gz $OUT
+mv -v $TMPDIR/hqPos.vcf.gz.tbi $OUT.tbi
+
+rm -rvf $TMPDIR;
+
+exit 0;
 
 
 # zcat out.pooled.vcf.gz|perl -lane 'if(/^#/){print;} elsif($F[4] ne "N"){ print; } else { $numF=@F; $has_hq=0; for my $info(@F[8..$numF-1]){ $gt=substr((split(/:/,$info))[0],0,1); $has_hq=1 if($gt=~/[ATCG0\.,]/i);} print if($has_hq); }' | grep -cv '#'
@@ -39,11 +102,11 @@ REGION=$(echo "$IN" | xargs -n 1 tabix -l | sort | uniq);
 #   a. Is it a header or is there no ambiguous alt call? -- print.
 #   b. Is there at least one sample with an unambiguous base call? --print.
 #   c. Are all bases ambiguous? -- skip
-command="bcftools merge $IN --force-samples | \
-perl -lane 'if(/^#/){print;} elsif(\$F[4] ne \"N\"){ print; } else { \$numF=@F; \$has_hq=0; for my \$info(@F[9..\$numF-1]){ \$gt=substr((split(/:/,\$info))[0],0,1); \$has_hq=1 if(\$gt=~/[ATCG0\.,]/i);} print if(\$has_hq); }' |\
-bgzip -c > $OUT.tmp
-"
-eval $command
+#command="bcftools merge $IN --force-samples | \
+#perl -lane 'if(/^#/){print;} elsif(\$F[4] ne \"N\"){ print; } else { \$numF=@F; \$has_hq=0; for my \$info(@F[9..\$numF-1]){ \$gt=substr((split(/:/,\$info))[0],0,1); \$has_hq=1 if(\$gt=~/[ATCG0\.,]/i);} print if(\$has_hq); }' |\
+#bgzip -c > $OUT.tmp
+#"
+#eval $command
 if [ $? -gt 0 ]; then
   echo -e "ERROR with bcftools:\n  $command";
   rm -vf $OUT.tmp
