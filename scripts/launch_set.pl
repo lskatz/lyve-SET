@@ -59,6 +59,7 @@ END{
   close $logmsgFh if(defined($logmsgFh) && fileno($logmsgFh) > 0);
 }
 
+my $invocation="$0 ".join(" ",@ARGV);
 my $sge=Schedule::SGELK->new(-verbose=>1,-numnodes=>20,-numcpus=>1);
 exit(main());
 
@@ -114,7 +115,8 @@ sub main{
   }
 
   # SGE params
-  $$settings{workingdir}=$$settings{logdir};
+  mkdir "$$settings{logdir}/SGELK" if(!-d "$$settings{logdir}/SGELK");
+  $$settings{workingdir}="$$settings{logdir}/SGELK";
   for (qw(workingdir numnodes numcpus keep qsubxopts queue)){
     $sge->set($_,$$settings{$_}) if($$settings{$_});
   }
@@ -122,6 +124,7 @@ sub main{
   # open the log file now that we know the logdir is there
   open($logmsgFh,">$$settings{logdir}/launch_set.log") or die "ERROR: could not open log file $$settings{logdir}/launch_set.log";
   logmsg "======\nOpened logfile at $$settings{logdir}/launch_set.log\n=====";
+  logmsg "Called Lyve-SET as follows:\n\n  $invocation\n";
 
   # Check the reference parameter
   die "ERROR: reference file was not given\n".usage($settings) if(!defined($$settings{ref}));
@@ -715,8 +718,8 @@ sub usage{
     -asm      $$settings{asmdir} directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
 
     SKIP CERTAIN STEPS
-    --nomask-phages                  Do not search for and mask phages in the reference genome
-    --nomask-cliffs                  Do not search for and mask 'Cliffs' in pileups
+    --mask-phages                    Search for and mask phages in the reference genome
+    --mask-cliffs                    Search for and mask 'Cliffs' in pileups
     --nomatrix                       Do not create an hqSNP matrix
     --nomsa                          Do not make a multiple sequence alignment
     --notrees                        Do not make phylogenies
