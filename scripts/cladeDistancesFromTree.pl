@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# Applies the fixation index to a tree
+# Labels nodes with significant bootstrap values and returns useful pairwise distance statistics
 
 use strict;
 use warnings;
@@ -15,9 +15,9 @@ use lib "$FindBin::RealBin/../lib";
 use lib "$FindBin::RealBin/../lib/lib/perl5";
 use Statistics::Descriptive;
 use Statistics::Basic qw(median);
+use LyveSET qw(logmsg);
 
 $0=fileparse $0;
-sub logmsg{print STDERR (caller(1))[3].": @_\n";}
 exit main();
 sub main{
   my $settings={};
@@ -46,6 +46,7 @@ sub main{
   
   outputTrees([$treeArr],$$settings{outprefix},$settings);
   outputStatistics($pairwiseCladeStats,$singletonCladeStats,$singletonTaxaStats,$treeStats,$$settings{outprefix},$settings);
+  outputLabels($labelHash,$$settings{outprefix},$settings);
 
   return 0;
 }
@@ -92,10 +93,11 @@ sub countAncNodes{
 #			Hash keyed to unique node labels pointing to lists of descendent leaves for each label
 sub readSigClades{
   my($infile,$bootstrapthreshold,$settings)=@_;
-  my @bootTree;
+  my @bootTree;	# Tree with significant nodes labeled with letters
   my $i=0;
   my %labels = ();	# Descendent taxa leaf name lists keyed to each significant node's label
   my @allLeaves;	# List of all leaf ids in tree
+  my @labelList;	# Each leaf and its leaf names
 
   logmsg "Counting nodes in the tree before analyzing...";
   my $numAncestorNodes=countAncNodes($infile,$settings);
@@ -132,12 +134,10 @@ sub readSigClades{
       }
 
 	 # Relabel significant tree nodes with node name and bootstrap value
-	 #my $labelName = sprintf "%s %s", $labelLetter, $bootstrap;
-
 	 my $labelName = $labelLetter;
       $node->bootstrap($labelName);
       $node->id($labelName);
-
+      
       # Insert descendent node list into label hash
       $labels{ $labelLetter } = \@d;
 	 
@@ -284,7 +284,7 @@ sub outputStatistics{
   my($pairwiseCladeStats,$singletonCladeStats,$singletonTaxaStats,$treeStats,$prefix,$settings)=@_;
   
   if($$settings{outputType} eq "merged"){
-  	my $out="$prefix.merged.stats.tsv";
+  	my $out="$prefix.merged.cladestats.tsv";
   
   	open(STATS,">",$out) or die "ERROR: could not write to file $out:$!";
   	print STATS join("\t",qw(Node1 Node2 median min max MAD))."\n";
@@ -294,10 +294,10 @@ sub outputStatistics{
 	print STATS join("\n",@$treeStats)."\n";
   	close STATS;
   }else{
-  	my $outpairwise="$prefix.pairwise.stats.tsv";
-  	my $outsingClade="$prefix.singletonClades.stats.tsv";
-  	my $outsingTaxa="$prefix.singletonTaxa.stats.tsv";
-   	my $outTree="$prefix.tree.stats.tsv";
+  	my $outpairwise="$prefix.pairwise.cladestats.tsv";
+  	my $outsingClade="$prefix.singletonClades.cladestats.tsv";
+  	my $outsingTaxa="$prefix.singletonTaxa.cladestats.tsv";
+   	my $outTree="$prefix.tree.cladestats.tsv";
   
   	open(STATS1,">",$outpairwise) or die "ERROR: could not write to file $outpairwise:$!";
   	print STATS1 join("\t",qw(Node1 Node2 median min max MAD))."\n";
@@ -322,28 +322,56 @@ sub outputStatistics{
   return 1;
 }
 
+sub outputLabels{
+  	my($labelHashRef,$prefix,$settings)=@_;
+  
+  	my $out="$prefix.labels.tsv";
+  	open(LABELS,">",$out) or die "ERROR: could not write to file $out:$!";
+  	print LABELS join("\t",qw(Label Leaves))."\n";
+  	while ( my ( $key, $value ) = each %$labelHashRef ){
+  		printf LABELS "%s: %s\n", $key, join(", ", @$value);
+  	}
+  	close LABELS;
+  	return 1;
+}
+
 sub usage{
   my($settings)=@_;
-  my $help="Labels nodes with significant bootstrap values and returns useful pairwise distance statistics for those nodes and the tree.
+  my $help="Labels nodes with significant bootstrap values and returns useful
+   pairwise distance statistics for those nodes and the tree.
+  
   Usage: $0 -t in.dnd -p pairwise.tsv --outprefix out
-  Outputs Newick tree and tab delimited files with pairwise distance statistics
-  -t in.dnd The tree file, which will be parsed by BioPerl. Format determined by extension.
-  -p pairwise.tsv The pairwise distances file. NOTE: you can get pairwise distances from pairwiseDistances.pl
-  --outprefix prefix The output prefix. Prefix can have a directory name encoded in it also, e.g. 'tmp/prefix'
-    Output files are: prefix.labelednodes.dnd, prefix.merged.stats.tsv 
-    ( using the split option will output: prefix.pairwise.stats.tsv, prefix.singletonClades.stats.tsv, prefix.
-    singletonTaxa.stats.tsv, and prefix.tree.stats.tsv )
+  
+  Outputs Newick tree, list of labels and leaves, and tab delimited files
+	with pairwise distance statistics
+  
+  -t in.dnd The tree file, which will be parsed by BioPerl. 
+  	Format determined by extension.
+  -p pairwise.tsv The pairwise distances file. NOTE: you can get pairwise 
+  	distances from pairwiseDistances.pl
+  --outprefix prefix The output prefix. Prefix can have a directory name 
+  	encoded in it also, e.g. 'tmp/prefix'.
+    	Output files are: prefix.labelednodes.dnd, prefix.merged.stats.tsv,
+    	and prefix.labels.tsv 
+    	(using the split option will output: prefix.pairwise.stats.tsv, 
+    	prefix.singletonClades.stats.tsv, prefix.singletonTaxa.stats.tsv, 
+    	and prefix.tree.stats.tsv )
   -h for additional help";
   return $help if(!$$settings{help}); # return shorthand help
   $help.="
   OPTIONAL
-  --outputType merged (default) The type of distance stats output you want. 'merged' for one big file (prefix.merged.stats.tsv)
-  	And 'split' for separate files for pairwise by node (prefix.pairwise.stats.tsv), individual nodes vs other leaves 
-  	(prefix.singletonClades.stats.tsv), individual taxa vs other leaves (singletonTaxa.stats.tsv), and overall stats for the
-  	entire tree (prefix.tree.stats.tsv)
-  --bootstrap 70 (default) The percent threshold for significant bootstrap values. Only nodes with bootstrap values higher than this
-  	number will be included in pairwise by node and individual node statistic calculations.
-  Example: $0 applyFstToTree.pl -p pairwise.tsv -t 4b.dnd --outprefix out --outputType split --bootstrap 80
+  --outputType merged (default) The type of distance stats output you want. 
+  	'merged' for one big file (prefix.merged.stats.tsv)
+  	'split' for separate files for pairwise by node (prefix.pairwise.stats.tsv), 
+  	individual nodes vs other leaves (prefix.singletonClades.stats.tsv), 
+  	individual taxa vs other leaves (singletonTaxa.stats.tsv), and overall 
+  	stats for the entire tree (prefix.tree.stats.tsv)
+  --bootstrap 70 (default) The percent threshold for significant bootstrap 
+  	values. Only nodes with bootstrap values higher than this number will 
+  	be included in pairwise by node and individual node statistic calculations.
+  
+  Example: 
+  $0 applyFstToTree.pl -p pairwise.tsv -t 4b.dnd --outprefix out --outputType split --bootstrap 80
   ";
   return $help;
 }
