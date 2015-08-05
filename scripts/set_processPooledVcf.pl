@@ -111,7 +111,7 @@ sub rerootLongestBranch{
 sub usage{
   local $0=basename $0;
   "Process a pooled VCF and get useful information
-  Usage: $0 file.fasta
+  Usage: $0 file.vcf.gz
   --prefix  ./out     Output file prefix. Default: current working directory
   --numcpus 1         Number of threads to use
   "
