@@ -47,10 +47,10 @@ install: install-prerequisites
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-samtools install-bcftools install-smalt install-snap install-raxml install-perlModules install-config
+install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-samtools install-bcftools install-smalt install-snap install-raxml install-perlModules install-config install-snpEff
 	@echo DONE installing prerequisites
 
-clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-perlModules clean-config
+clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-perlModules clean-config clean-snpEff
 	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
 
 install-mkdir:
@@ -113,13 +113,11 @@ install-snpEff:
 	cd $(PREFIX)/lib && unzip -o snpEff_latest_core.zip
 	mv $(PREFIX)/lib/snpEff/snpEff.jar $(PREFIX)/lib/.
 	mv $(PREFIX)/lib/snpEff/snpEff.config $(PREFIX)/config/original/snpEff.conf
-	cp $(PREFIX)/config/original/snpEff.conf $(PREFIX)/config/snpEff.conf
 	rm -rf $(PREFIX)/lib/snpEff_latest_core.zip
 	rm -rf $(PREFIX)/lib/snpEff
 
 clean-snpEff:
 	rm -rvf $(PREFIX)/lib/snpEff.jar
-	rm -rvf $(PREFIX)/config/original/snpEff.conf
 
 install-phast: check-blast
 	mkdir -p $(PREFIX)/lib/phast
