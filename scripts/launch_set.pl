@@ -126,6 +126,10 @@ sub main{
   logmsg "======\nOpened logfile at $$settings{logdir}/launch_set.log\n=====";
   logmsg "Called Lyve-SET as follows:\n\n  $invocation\n";
 
+  my $settingsString="";
+  $settingsString.=join("\t=\t",$_,$$settings{$_})."\n" for (sort {$a cmp $b} keys(%$settings));
+  logmsg "Raw settings are as follows\n$settingsString";
+
   # Check the reference parameter
   die "ERROR: reference file was not given\n".usage($settings) if(!defined($$settings{ref}));
   die "ERROR: Could not find the reference file at $$settings{ref}\n".usage($settings) if(!-f $$settings{ref});
