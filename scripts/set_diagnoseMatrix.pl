@@ -24,5 +24,10 @@ sub main{
 }
 
 sub reportMaskedGenomes{
-  
+  my($matrix,$settings)=@_;
+  open(MATRIX,$matrix) or die "ERROR: could not open $matrix for reading: $!";
+  while(<MATRIX>){
+    
+
+  close MATRIX;
 }
