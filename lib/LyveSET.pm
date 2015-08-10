@@ -14,7 +14,10 @@ use Number::Range;
 BEGIN{
   #print $INC{"Number/Range.pm"}."\n\n";;
 }
-our @EXPORT_OK = qw(logmsg rangeInversion rangeUnion @fastqExt @fastaExt @bamExt @vcfExt);
+our @EXPORT_OK = qw(
+           logmsg rangeInversion rangeUnion 
+           @fastqExt @fastaExt @bamExt @vcfExt @richseqExt
+         );
 
 local $0=basename $0;
 
@@ -25,6 +28,7 @@ our @fastqExt=qw(.fastq.gz .fastq .fq .fq.gz);
 our @fastaExt=qw(.fasta .fna .faa .mfa .fas .fa);
 our @bamExt=qw(.sorted.bam .bam);
 our @vcfExt=qw(.vcf.gz .vcf);
+our @richseqExt=qw(.gbk .gb .embl);
 
 #################################################
 ### COMMON SUBS/TOOLS (not object subroutines) ##
