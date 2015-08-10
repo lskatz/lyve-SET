@@ -28,7 +28,7 @@ use Schedule::SGELK;
 use Config::Simple;
 use Number::Range;
 
-use LyveSET qw/@fastaExt @fastqExt @bamExt rangeUnion rangeInversion/;
+use LyveSET qw/@fastaExt @richseqExt @fastqExt @bamExt @vcfExt rangeUnion rangeInversion/;
 
 my ($name,$scriptsdir,$suffix)=fileparse($0);
 $scriptsdir=rel2abs($scriptsdir);
@@ -54,7 +54,7 @@ sub logmsg {
   }
   print $FH $msg;
 }
-local $SIG{'__DIE__'} = sub { local $0=basename $0; my $e = $_[0]; $e =~ s/(at [^\s]+? line \d+\.$)/\nStopped $1/; logmsg($e); die(); };
+#local $SIG{'__DIE__'} = sub { local $0=basename $0; my $e = $_[0]; $e =~ s/(at [^\s]+? line \d+\.$)/\nStopped $1/; logmsg($e); die(); };
 END{
   close $logmsgFh if(defined($logmsgFh) && fileno($logmsgFh) > 0);
 }
@@ -101,9 +101,34 @@ sub main{
   logmsg "Project was defined as $project";
   # Checks to make sure that this is a project
   #system("set_manage.pl '$project'"); die if $?;
+
   # Set the defaults if they aren't set already
-  $$settings{ref}||="$project/reference/reference.fasta";
+  #$$settings{ref}||="$project/reference/reference.fasta";
+  if($$settings{ref}){
+    $$settings{ref}=$$settings{ref}; # if set, then leave it alone.
+  } elsif(-e "$project/reference/reference.gbk"){
+    $$settings{ref}="$project/reference/reference.gbk.fasta"; # this file might not exist yet and will be created soon
+  } elsif(-e "$project/reference/reference.fasta"){
+    $$settings{ref}="$project/reference/reference.fasta";
+  } else {
+    die "ERROR: reference file was not given\n".usage($settings);
+  }
+  #
+  # If a richseq (gbk/embl) were given as the reference, convert it to fasta and update the variable to the fasta
+  $$settings{richseq}||=""; # the genbank or embl file
+  my($refname,$refdir,$refext)=fileparse($$settings{ref},@richseqExt);
+  if($refext=~/gbk$|gb$|embl$/){
+    $$settings{richseq}=$$settings{ref};
+    $$settings{ref}=$$settings{richseq}.".fasta";
+    die "ERROR: $$settings{richseq} does not exist" if(!-e $$settings{richseq});
+    richseqToFasta($$settings{richseq},$$settings{ref},$settings);
+  }
+
+  # Ok, it's a defined string, but does the file exist?
+  die "ERROR: Could not find the reference file at $$settings{ref}\n".usage($settings) if(!-e $$settings{ref});
+  my $ref=$$settings{ref}; # $ref is called so many times, it might as well be its own variable
   $$settings{refdir}||=dirname($$settings{ref});
+
   # Check SET directories' existence and set their defaults
   die "ERROR: could not find dir $project" if(!-e $project);
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir logdir)){
@@ -130,10 +155,6 @@ sub main{
   $settingsString.=join("\t=\t",$_,$$settings{$_})."\n" for (sort {$a cmp $b} keys(%$settings));
   logmsg "Raw settings are as follows\n$settingsString";
 
-  # Check the reference parameter
-  die "ERROR: reference file was not given\n".usage($settings) if(!defined($$settings{ref}));
-  die "ERROR: Could not find the reference file at $$settings{ref}\n".usage($settings) if(!-f $$settings{ref});
-  my $ref=$$settings{ref};
 
   #####################################
   # Go through the major steps of SET #
@@ -143,6 +164,7 @@ sub main{
   indexReference($ref,$settings);
   mapReads($ref,$$settings{readsdir},$$settings{bamdir},$settings);
   variantCalls($ref,$$settings{bamdir},$$settings{vcfdir},$settings);
+  annotateVariants($$settings{richseq},$$settings{vcfdir},$settings);
   compareTaxa($ref,$settings); # SNP matrix, alignment, trees
 
   # Find the output files
@@ -182,6 +204,19 @@ sub readGlobalSettings{
   }
 
   return \%settingsCopy;
+}
+
+sub richseqToFasta{
+  my($infile,$outfile,$settings)=@_;
+  logmsg "Converting $infile to $outfile";
+  my $seqin=Bio::SeqIO->new(-file=>"$infile");
+  my $seqout=Bio::SeqIO->new(-file=>">$outfile");
+  while(my $seq=$seqin->next_seq){
+    $seq->desc(" ");
+    $seqout->write_seq($seq);
+  }
+  $seqin->close;
+  $seqout->close;
 }
 
 sub simulateReads{
@@ -579,6 +614,18 @@ sub variantCalls{
   return 1;
 }
 
+sub annotateVariants{
+  my($richseq,$vcfdir,$settings)=@_;
+  return if(!$richseq);
+
+  for my $vcf(glob("$vcfdir/*.vcf.gz")){
+    my $b=basename($vcf,@vcfExt);
+    $sge->pleaseExecute("launch_snpeff.pl --genbank $richseq --outdir $vcfdir.annotated --numcpus 1 $vcf",{numcpus=>1,jobname=>"snpeff$b"});
+  }
+  # No need to wrapItUp() since nothing depends on these annotations
+}
+
+
 # returns the last SGE job information in a hash ref
 sub indexAndCompressVcf{
   my($vcf,$holdjid,$settings)=@_;
@@ -698,10 +745,15 @@ sub usage{
   my $help="Launches the Lyve-SET pipeline
     Please visit http://github.com/lskatz/Lyve-SET for more information.
 
-    Usage: $0 [project] [-ref reference.fasta]
+    Usage: $0 [project] [-ref reference.fasta|reference.gbk]
     If project is not given, then it is assumed to be the current working directory.
     If reference is not given, then it is assumed to be proj/reference/reference.fasta
-    -ref      proj/reference/reference.fasta   The reference genome assembly
+    -ref      proj/reference/reference.fasta   The reference genome assembly. If it is 
+                                               a genbank or embl file, then it will be 
+                                               converted to reference.gbk.fasta and will
+                                               be used for SNP annotation. If a fasta
+                                               is given, then no SNP annotation will
+                                               happen.
 
     SNP MATRIX OPTIONS
     --allowedFlanking  $$settings{allowedFlanking} allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
