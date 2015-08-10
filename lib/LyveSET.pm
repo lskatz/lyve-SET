@@ -12,7 +12,7 @@ use lib dirname($INC{"LyveSET.pm"})."/lib/perl5";
 use Number::Range;
 
 BEGIN{
-  print $INC{"Number/Range.pm"}."\n\n";;
+  #print $INC{"Number/Range.pm"}."\n\n";;
 }
 our @EXPORT_OK = qw(logmsg rangeInversion rangeUnion @fastqExt @fastaExt @bamExt @vcfExt);
 
