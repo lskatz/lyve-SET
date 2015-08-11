@@ -8,21 +8,66 @@ use File::Basename qw/fileparse basename/;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
-use LyveSET qw/logmsg/;
+use LyveSET qw/logmsg @fastaExt/;
 
 exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help reference=s));
+  die usage($settings) if(!@ARGV);
+  GetOptions($settings,qw(help reference=s project=s));
   $$settings{maskedThresholdPercent}=10;
+  $$settings{project}||="";
+  $$settings{reference}||="";
+  $$settings{matrix}||=$ARGV[0];
 
-  die usage() if($$settings{help} || !@ARGV);
+  die usage($settings) if($$settings{help});
 
-  my $refInfo=readAssembly($settings);
-  for my $matrix(@ARGV){
-    reportMaskedGenomes($matrix,$refInfo,$settings);
+  # check that this is a Lyve-SET project if one is given
+  if($$settings{project}){
+    # See if this project exists and is legit
+    system("set_manage.pl $$settings{project}");
+    die "ERROR: $$settings{project} is not a Lyve-SET project!" if $?;
+
+    # Now find the reference genome
+    # Make an array of possible reference genomes
+    my @fasta=("$$settings{project}/reference/reference.fasta");
+    for my $ext(@fastaExt){
+      push(@fasta,(glob("$$settings{project}/reference/*.$ext")));
+    }
+    # Find the first one that exists and has a nonzero filesize
+    for my $fasta(@fasta){
+      if(-e $fasta && -s $fasta > 0){
+        $$settings{reference} ||= $fasta;
+        logmsg "Found $$settings{reference} reference genome";
+        last;
+      }
+    }
+
+    # Find the SNP matrix
+    my $msadir="$$settings{project}/msa";
+    my @tsv=("$msadir/out.snpmatrix.tsv","$msadir/out.bcftoolsquery.tsv","$msadir/out.filteredMatrix.tsv");
+    for my $tsv(@tsv){
+      if(-e $tsv && -s $tsv > 0){
+        $$settings{matrix}||=$tsv;
+        logmsg "Found $$settings{matrix} SNP matrix";
+        last;
+      }
+    }
+    
   }
+  # END if project is given
+
+  # If no project is given, then assign based on what the user specified
+  else {
+    ($$settings{matrix})=@ARGV;
+  }
+
+  # Now do some diagnostics
+  my $refInfo=readAssembly($settings);
+  reportMaskedGenomes($$settings{matrix},$refInfo,$settings);
+
+  return 0;
 }
 
 sub readAssembly{
@@ -119,10 +164,17 @@ sub reportMaskedGenomes{
 }
 
 sub usage{
+  my($settings)=@_;
   local $0=basename $0;
-  "Diagnoses a SNP matrix file
-  Usage: $0 snpmatrix.tsv
-  NOTE: snpmatrix.tsv must have as the first three columns: CHROM, POS, REF and must have subsequent columns pertaining to each sample
-  -r reference.fasta (optional)
-  "
+  my $help = "Diagnoses a SNP matrix file
+  USAGE: $0 -p set-project
+  note: set-project must be a Lyve-SET project folder
+  -h for more help
+  ";
+  return $help if(!$$settings{help});
+  $help.="
+  Alternate USAGE: $0 snpmatrix.tsv [-r reference.fasta]
+  note: snpmatrix.tsv must have as the first three columns: CHROM, POS, REF and must have subsequent columns pertaining to each sample
+  ";
+  return $help;
 }
