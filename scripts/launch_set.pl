@@ -706,7 +706,7 @@ sub variantsToMatrix{
   #  $$settings{allowedFlanking}=$allowedFlanking*3;
   #}
 
-  $sge->pleaseExecute("mergeVcf.sh -o $pooled $inVcf",{jobname=>"poolVcfs",numcpus=>1});
+  $sge->pleaseExecute("mergeVcf.sh -n $$settings{numcpus} -t $$settings{tmpdir} -o $pooled $inVcf",{jobname=>"poolVcfs",numcpus=>$$settings{numcpus}});
   $sge->wrapItUp();
 
   return $pooled;
