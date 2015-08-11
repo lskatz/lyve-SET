@@ -20,19 +20,28 @@ sub main{
 
   my $refInfo=readAssembly($settings);
   for my $matrix(@ARGV){
-    reportMaskedGenomes($matrix,$settings);
+    reportMaskedGenomes($matrix,$refInfo,$settings);
   }
 }
 
 sub readAssembly{
   my($settings)=@_;
-  my $ref=$$settings{reference} || return {};
+  my $asmLength={};
+  my $ref=$$settings{reference} || return $asmLength;
 
   # run assembly metrics on min=150, 250, and 1000 to reflect different meanings
+  for my $min(qw(150 250 1000)){
+    # run_assembly_metrics.pl -m 150 ../reference/reference.fasta -s genomeLength  --number
+    $$asmLength{$min} = `run_assembly_metrics.pl -m $min -s genomeLength --number $ref`;
+    die "ERROR: could not find the assembly length in $ref" if $?;
+    chomp($$asmLength{$min});
+    
+  }
+  return $asmLength;
 }
 
 sub reportMaskedGenomes{
-  my($matrix,$settings)=@_;
+  my($matrix,$refInfo,$settings)=@_;
   open(MATRIX,$matrix) or die "ERROR: could not open $matrix for reading: $!";
   my $header=<MATRIX>;
   $header=~s/^#//g;                # remove leading pound sign
@@ -95,6 +104,16 @@ sub reportMaskedGenomes{
   logmsg "Sites masked at all: $percentMasked%";
   logmsg "Sites where 50% of the site is masked: $percentMasked50%";
   logmsg "Sites where 100% of the site is masked: $percentMasked100%";
+
+  # What percent of the genome is represented in the matrix?
+  my @minLength=sort {$a <=> $b} keys(%$refInfo);
+  for my $minLength(@minLength){
+  #while(my($minLength,$asmLength)=each(%$refInfo)){
+    my $asmLength=$$refInfo{$minLength};
+    my $minLengthStr=sprintf("%0.2f%s",int($minLength*100)/100000,"k");
+    my $percentHq=int($numSites/$asmLength*10000)/100;
+    logmsg "With $minLengthStr min length contigs, $percentHq% is represented in the matrix";
+  }
 }
 
 sub usage{
