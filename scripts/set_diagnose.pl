@@ -15,11 +15,11 @@ exit(main());
 sub main{
   my $settings={};
   die usage($settings) if(!@ARGV);
-  GetOptions($settings,qw(help reference=s project=s));
+  GetOptions($settings,qw(help reference=s project=s matrix=s));
   $$settings{maskedThresholdPercent}=10;
   $$settings{project}||="";
   $$settings{reference}||="";
-  $$settings{matrix}||=$ARGV[0];
+  $$settings{matrix}||="";
 
   die usage($settings) if($$settings{help});
 
@@ -110,6 +110,7 @@ sub reportMaskedGenomes{
 
     # split that index into site info and sample info
     for(qw(CHROM POS REF)){
+      die "ERROR: field $_ was not found in $matrix" if(!$site{$_});
       $site{$_}=$sample{$_};
       delete($sample{$_});
     }
@@ -173,7 +174,7 @@ sub usage{
   ";
   return $help if(!$$settings{help});
   $help.="
-  Alternate USAGE: $0 snpmatrix.tsv [-r reference.fasta]
+  Alternate USAGE: $0 --matrix snpmatrix.tsv [-r reference.fasta]
   note: snpmatrix.tsv must have as the first three columns: CHROM, POS, REF and must have subsequent columns pertaining to each sample
   ";
   return $help;
