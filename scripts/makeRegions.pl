@@ -56,7 +56,7 @@ sub printChunks{
     for(my $start=1;$start<$length;$start+=$chunksize){
       my $end = $start + $chunksize - 1;
       $end=$length if($end > $length);
-      print join("\t",$seqname,$start,$end)."\n";
+      print "$seqname:$start-$end\n";
     }
   }
 
@@ -64,7 +64,7 @@ sub printChunks{
 
 sub usage{
   "Creates a list of regions of a bam file, suitable for samtools and bcftools
-  Usage: $0 file.sorted.bam > regions.bed
+  Usage: $0 file.sorted.bam > regions.txt
   --chunksize  10000  The size of each region
   "
 }
