@@ -18,27 +18,10 @@ PREFIXNOTE="Must be an absolute path directory. Default: $(PWD)"
 
 ###################################
 
-default: help
+default: install 
 
 help:
-	@echo 0. COMMON VARIABLES
-	@echo $(T) PREFIX=$(PREFIX) $(PREFIXNOTE)
-	@echo $(T) NUMCPUS=$(NUMCPUS)
-	@echo $(T) PROJECT=$(PROJECT)
-	@echo
-	@echo 1. INSTALL CHOICES
-	@echo $(T) all - Perform install, env, and clean. All parameters are valid to use here.
-	@echo $(T) install - copy all files over to an installation directory. Installs most prerequisites.
-	@echo $(T) cuttingedge - download and install the most up to date code. Does not include 'make env' or any prerequisites. Can be used instead of 'make install'
-	@echo
-	@echo 2. ENVIRONMENT CHECK
-	@echo $(T) env - put all environmental variables into a profile file
-	@echo $(T2) PROFILE=$(PROFILE)
-	@echo $(T) check - check to see if all prerequisites are installed
-	@echo $(T) test - create a test project using the test data found in the installation directory
-	@echo
-	@echo 3. OTHER
-	@echo $(T) clean - delete the temporary files. Does not remove the result of 'make env.'
+	@echo "Please see README.md for additional help"
 
 all: install env clean
 
@@ -227,34 +210,13 @@ install-config:
 clean-config:
 	rm -v $(PREFIX)/config/*.conf
 
-cuttingedge: install-mkdir cuttingedge-gitclone install-prerequisites
-	@echo "DONE installing the cutting edge version"
-
-cuttingedge-gitclone:
-	git clone --recursive https://github.com/lskatz/lyve-SET.git $(PREFIX)/build/Lyve-SET
-	rm -r $(PREFIX)/build/Lyve-SET/build # avoid directory-not-empty error
-	mv -vf $(PREFIX)/build/Lyve-SET/* $(PREFIX)/
-
-
 env:
 	echo "#Lyve-SET" >> $(PROFILE)
 	echo "export PATH=\$$PATH:$(PREFIX)/scripts" >> $(PROFILE)
 	echo "export PERL5LIB=\$$PERL5LIB:$(PREFIX)/lib" >> $(PROFILE)
 
 test:
-	@echo "Test data set given by CFSAN's snp-pipeline package found at https://github.com/CFSAN-Biostatistics/snp-pipeline"
-	set_manage.pl --create $(PROJECT)
-	set_manage.pl $(PROJECT) --add-reads $(PREFIX)/testdata/reads/sample1.fastq.gz
-	set_manage.pl $(PROJECT) --add-reads $(PREFIX)/testdata/reads/sample2.fastq.gz
-	set_manage.pl $(PROJECT) --add-reads $(PREFIX)/testdata/reads/sample3.fastq.gz
-	set_manage.pl $(PROJECT) --add-reads $(PREFIX)/testdata/reads/sample4.fastq.gz
-	set_manage.pl $(PROJECT) --change-reference $(PREFIX)/testdata/reference/lambda_virus.fasta
-	set_manage.pl $(PROJECT) --add-assembly $(PREFIX)/testdata/reference/lambda_virus.fasta
-	launch_set.pl $(PROJECT) --numcpus $(NUMCPUS)
-
-test-download-data:
-	@echo "Downloading test data sets"
-	set_downloadTestData.pl all
+	set_test.pl lambda lambda --numcpus $(NUMCPUS) 
 
 check: check-sys check-Lyve-SET-PATH check-CGP-assembly check-Lyve-SET check-PERL check-smalt check-freebayes check-raxml check-freebayes check-phyml check-blast
 	@echo --OK
