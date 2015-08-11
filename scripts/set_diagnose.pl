@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 use Getopt::Long;
+use File::Basename qw/fileparse basename/;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
@@ -67,7 +68,7 @@ sub reportMaskedGenomes{
       $site{$_}=$sample{$_};
       delete($sample{$_});
     }
-    my $REF=$site{REF};
+    my $REF=$site{REF}; # needed for substitution in the loop below
     
     my $numSamples=scalar(keys(%sample)); # TODO get this outside of the loop
     my $numSamplesMaskedHere=0;
@@ -98,6 +99,7 @@ sub reportMaskedGenomes{
   }
 
   # How many sites are masked
+  my $numHqSites      =$numSites - $masked100;
   my $percentMasked   =int($maskedSitesCounter/$numSites*10000)/100;
   my $percentMasked50 =int($masked50/$numSites*10000)/100;
   my $percentMasked100=int($masked100/$numSites*10000)/100;
@@ -111,13 +113,14 @@ sub reportMaskedGenomes{
   #while(my($minLength,$asmLength)=each(%$refInfo)){
     my $asmLength=$$refInfo{$minLength};
     my $minLengthStr=sprintf("%0.2f%s",int($minLength*100)/100000,"k");
-    my $percentHq=int($numSites/$asmLength*10000)/100;
+    my $percentHq=int($numHqSites/$asmLength*10000)/100;
     logmsg "With $minLengthStr min length contigs, $percentHq% is represented in the matrix";
   }
 }
 
 sub usage{
-  "$0: diagnoses a SNP matrix file
+  local $0=basename $0;
+  "Diagnoses a SNP matrix file
   Usage: $0 snpmatrix.tsv
   NOTE: snpmatrix.tsv must have as the first three columns: CHROM, POS, REF and must have subsequent columns pertaining to each sample
   -r reference.fasta (optional)
