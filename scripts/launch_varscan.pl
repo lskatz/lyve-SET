@@ -272,16 +272,17 @@ sub vcf_markAmbiguous{
   my $ucRef=uc($$x{REF}); # uppercase reference, to make it easier for str comparison
 
   # Figure out the alt allele (N) and the correct genotype integer
-  #my $gtInt=0; # for the GT, e.g., 1/1 or 2/2
-  #if($ucRef eq $$x{ALT}[0] || $$x{ALT}[0]=~/[Nn]/){
-  #  shift(@{ $$x{ALT} }); # unnecessary to mark the ref base in ALT
-  #  $gtInt=0;
-  #} else {
-  #  $gtInt=1;
-  #}
+  my $gtInt=0; # for the GT, e.g., 1/1 or 2/2
+  # Mark if it is the reference allele
+  if($ucRef eq $$x{ALT}[0] || $ucRef eq '.'){
+    #shift(@{ $$x{ALT} }); # unnecessary to mark the ref base in ALT
+    $gtInt=0;
+  } else {
+    $gtInt=1;
+  }
   #push(@{ $$x{ALT} }, "N");
   $$x{ALT}=["N"];
-  #$$x{gtypes}{$samplename}{GT}="$gtInt/$gtInt";
+  $$x{gtypes}{$samplename}{GT}="$gtInt/$gtInt";
 
   # empty the filter and then put on the fail reason
   @{$$x{FILTER}}=() if($$x{FILTER}[0] eq "PASS");
