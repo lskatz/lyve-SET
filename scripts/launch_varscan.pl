@@ -28,6 +28,7 @@ sub main{
   GetOptions($settings,qw(help reference=s tempdir=s altFreq=s coverage=i region=s exclude=s numcpus=i)) or die $!;
 
   my $bam=$ARGV[0] or die "ERROR: need bam\n".usage();
+  die "ERROR: only one bam allowed right now" if (@ARGV > 1);
   my $reference=$$settings{reference} or die "ERROR: need --reference\n".usage();
   my $refname=basename($reference,@fastaExt);
 
@@ -61,12 +62,7 @@ sub main{
   # Lyve-SET needs to alter some of the VCF in the third step, backfillVcfValues().
   my $pileup=mpileup($bam,$reference,$settings);
   my $vcf=varscan($pileup,$settings);
-  if($$settings{backfill}){
-    backfillVcfValues($vcf,$bam,$settings);
-  } else {
-    system("zcat $vcf");
-    die if $?;
-  }
+  backfillVcfValues($vcf,$bam,$settings);
 
   # remove temporary files
   unlink($_) for($pileup,$vcf);
@@ -195,8 +191,7 @@ sub backfillVcfValues{
     $$x{ALT}=[$$x{ALT}[0]];
     $$x{FILTER}=[$$x{FILTER}[0]];
 
-    # Put in exactly what the alternate call is
-    # $$x{ALT}[0]=$$x{REF} if($$x{ALT}[0] eq '.');
+    # It's a SNP if it isn't the same as REF and isn't a dot
     my $is_snp=0;
     if($$x{ALT}[0] ne $$x{REF} && $$x{ALT}[0] ne '.'){
       $is_snp=1;
@@ -284,12 +279,14 @@ sub vcf_markAmbiguous{
   } else {
     $gtInt=2;
   }
-  push(@{ $$x{ALT} }, "N");
+  #push(@{ $$x{ALT} }, "N");
+  $$x{ALT}=["N"];
   $$x{gtypes}{$samplename}{GT}="$gtInt/$gtInt";
 
   # empty the filter and then put on the fail reason
   @{$$x{FILTER}}=() if($$x{FILTER}[0] eq "PASS");
   push(@{$$x{FILTER}},$reason);
+  #$$x{FILTER}=[$reason];
 }
 
 # Get a hash of seqname->{pos} from a bed file
