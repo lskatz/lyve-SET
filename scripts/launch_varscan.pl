@@ -61,7 +61,12 @@ sub main{
   # Lyve-SET needs to alter some of the VCF in the third step, backfillVcfValues().
   my $pileup=mpileup($bam,$reference,$settings);
   my $vcf=varscan($pileup,$settings);
-  backfillVcfValues($vcf,$bam,$settings);
+  if($$settings{backfill}){
+    backfillVcfValues($vcf,$bam,$settings);
+  } else {
+    system("zcat $vcf");
+    die if $?;
+  }
 
   # remove temporary files
   unlink($_) for($pileup,$vcf);
@@ -191,9 +196,9 @@ sub backfillVcfValues{
     $$x{FILTER}=[$$x{FILTER}[0]];
 
     # Put in exactly what the alternate call is
-    $$x{ALT}[0]=$$x{REF} if($$x{ALT}[0] eq '.');
+    # $$x{ALT}[0]=$$x{REF} if($$x{ALT}[0] eq '.');
     my $is_snp=0;
-    if($$x{ALT}[0] ne $$x{REF}){
+    if($$x{ALT}[0] ne $$x{REF} && $$x{ALT}[0] ne '.'){
       $is_snp=1;
     }
 
