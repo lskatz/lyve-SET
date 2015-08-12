@@ -121,29 +121,30 @@ clean-phispy:
 	rm -rvf $(PREFIX)/lib/phispy
 
 install-samtools:
-	wget 'http://downloads.sourceforge.net/project/samtools/samtools/1.1/samtools-1.1.tar.bz2' -O $(TMPDIR)/samtools-1.1.tar.bz2
-	cd $(TMPDIR) && tar jxvf samtools-1.1.tar.bz2
-	mv $(TMPDIR)/samtools-1.1 $(PREFIX)/lib
-	cd $(PREFIX)/lib/samtools-1.1 && make
-	cd $(PREFIX)/lib/samtools-1.1/htslib-1.1 && make
-	ln -sf $(PREFIX)/lib/samtools-1.1/samtools $(PREFIX)/scripts/
-	ln -sf $(PREFIX)/lib/samtools-1.1/misc/wgsim $(PREFIX)/scripts/
-	ln -sf $(PREFIX)/lib/samtools-1.1/htslib-1.1/bgzip $(PREFIX)/scripts
-	ln -sf $(PREFIX)/lib/samtools-1.1/htslib-1.1/tabix $(PREFIX)/scripts
+	wget 'https://github.com/samtools/samtools/releases/download/1.2/samtools-1.2.tar.bz2' -O $(TMPDIR)/samtools-1.2.tar.bz2
+	cd $(TMPDIR) && tar jxvf samtools-1.2.tar.bz2
+	mv $(TMPDIR)/samtools-1.2 $(PREFIX)/lib
+	cd $(PREFIX)/lib/samtools-1.2 && make DFLAGS="-D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -D_CURSES_LIB=0" LIBCURSES="" 
+	cd $(PREFIX)/lib/samtools-1.2/htslib-1.2.1 && make
+	ln -sf $(PREFIX)/lib/samtools-1.2/samtools $(PREFIX)/scripts/
+	ln -sf $(PREFIX)/lib/samtools-1.2/misc/wgsim $(PREFIX)/scripts/
+	ln -sf $(PREFIX)/lib/samtools-1.2/htslib-1.2.1/bgzip $(PREFIX)/scripts
+	ln -sf $(PREFIX)/lib/samtools-1.2/htslib-1.2.1/tabix $(PREFIX)/scripts
 
 clean-samtools:
 	rm -rvf $(PREFIX)/lib/samtools*
 
 install-bcftools:
-	wget 'http://downloads.sourceforge.net/project/samtools/samtools/1.1/bcftools-1.1.tar.bz2' -O $(TMPDIR)/bcftools-1.1.tar.bz2
-	cd $(TMPDIR) && tar jxvf bcftools-1.1.tar.bz2
-	mv $(TMPDIR)/bcftools-1.1 $(PREFIX)/lib
-	cd $(PREFIX)/lib/bcftools-1.1 && make
-	ln -s $(PREFIX)/lib/bcftools-1.1/bcftools $(PREFIX)/scripts
-	ln -s $(PREFIX)/lib/bcftools-1.1/vcfutils.pl $(PREFIX)/scripts
+	# bcftools-1.2.tar.bz2  htslib-1.2.1.tar.bz2  samtools-1.2.tar.bz2
+	wget 'https://github.com/samtools/bcftools/releases/download/1.2/bcftools-1.2.tar.bz2' -O $(TMPDIR)/bcftools-1.2.tar.bz2
+	cd $(TMPDIR) && tar jxvf bcftools-1.2.tar.bz2
+	mv $(TMPDIR)/bcftools-1.2 $(PREFIX)/lib/bcftools-1.2
+	cd $(PREFIX)/lib/bcftools-1.2 && make
+	ln -s $(PREFIX)/lib/bcftools-1.2/bcftools $(PREFIX)/scripts
+	ln -s $(PREFIX)/lib/bcftools-1.2/vcfutils.pl $(PREFIX)/scripts
 
 clean-bcftools:
-	rm -rfv $(PREFIX)/lib/bcftools-1.1/bcftools $(PREFIX)/lib/bcftools-1.1/vcfutils.pl $(PREFIX)/lib/bcftools*
+	rm -rfv $(PREFIX)/lib/bcftools-1.2/bcftools $(PREFIX)/lib/bcftools-1.2/vcfutils.pl $(PREFIX)/lib/bcftools*
 
 install-smalt:
 	wget --continue 'http://downloads.sourceforge.net/project/smalt/smalt-0.7.6-static.tar.gz' -O $(TMPDIR)/smalt-0.7.6-static.tar.gz
@@ -196,7 +197,7 @@ install-perlModules:
 	@echo "Installing Perl modules using cpanminus"
 	#for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Descriptive Statistics::Basic Graph::Centrality::Pagerank String::Escape Statistics::LineFit; do
 	for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Basic Graph::Centrality::Pagerank String::Escape Statistics::LineFit; do \
-	  perl scripts/cpanm -L $(PREFIX)/lib $$package; \
+	  perl scripts/cpanm --self-contained -L $(PREFIX)/lib $$package; \
 		if [ $$? -gt 0 ]; then exit 1; fi; \
 	done;
 	@echo "Done with Perl modules"
