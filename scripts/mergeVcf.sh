@@ -57,7 +57,7 @@ mkdir -pv "$TEMPDIR"; # just in case
 echo "$script: temporary directory is $TEMPDIR";
 echo "$script: Running bcftools merge";
 export IN;
-echo "$REGION" | xargs -P $NUMCPUS -n 1 -I {} bash -c 'echo "'$script': merging SNPs in {}"; bcftools merge --regions "{}" $IN --force-samples -o '$TEMPDIR'/merged.$$.vcf;'
+echo "$REGION" | xargs -P $NUMCPUS -n 1 -I {} bash -c 'echo "'$script': merging SNPs in {}"; bcftools merge --apply-filters isIndel --regions "{}" --force-samples -o '$TEMPDIR'/merged.$$.vcf $IN;'
 if [ $? -gt 0 ]; then
   echo "$script: ERROR with bcftools merge"
   rm -rvf $TEMPDIR;
