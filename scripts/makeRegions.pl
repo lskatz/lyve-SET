@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 use Getopt::Long;
+use List::Util qw/sum/;
 use File::Basename qw/fileparse basename/;
 use Bio::Perl;
 
@@ -18,9 +19,12 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help chunksize=i));
+  GetOptions($settings,qw(help chunksize=i numchunks=i));
   die usage() if($$settings{help});
-  $$settings{chunksize}||=100000;
+  $$settings{chunksize}||=0;
+  if(!$$settings{chunksize}){
+    $$settings{numchunks}||=32;
+  }
 
   my $infile=$ARGV[0];
   die "ERROR: need infile file!\n".usage() if(!$infile);
@@ -30,13 +34,25 @@ sub main{
   if($suffix=~/$bamExtRegex/){
     $contigLength=bamLengths($infile,$settings);
   } elsif($suffix=~/$fastaExtRegex/){
-    ...;
+    $contigLength=fastaLengths($infile,$settings);
   } else {
     die "ERROR: I do not understand extension $suffix";
   }
+
   printChunks($contigLength,$settings);
 
   return 0;
+}
+
+sub fastaLengths{
+  my($fasta,$settings)=@_;
+  my $in=Bio::SeqIO->new(-file=>$fasta,-format=>"fasta");
+
+  my %length;
+  while(my $seq=$in->next_seq){
+    $length{$seq->id}=$seq->length;
+  }
+  return \%length;
 }
 
 sub bamLengths{
@@ -64,6 +80,13 @@ sub bamLengths{
 sub printChunks{
   my($contigLength,$settings)=@_;
   
+  # If the number of chunks is set, then set the chunk length
+  # equal to the size divided by the number desired.
+  if($$settings{numchunks}){
+    my $totalLength=sum(values(%$contigLength));
+    $$settings{chunksize}=int($totalLength/$$settings{numchunks})+1;
+  }
+
   my $chunksize=$$settings{chunksize};
   while(my($seqname,$length)=each(%$contigLength)){
     for(my $start=1;$start<$length;$start+=$chunksize){
@@ -76,11 +99,12 @@ sub printChunks{
 }
 
 sub usage{
-  "Creates a list of regions of a bam file, suitable for samtools and bcftools
+  "Creates a list of regions of a bam file, suitable for samtools' and bcftools' regions flag
   Usage: $0 infile > regions.txt
   infile must either have an extension of either .bam or .fasta
 
-  --chunksize  100000  The size of each region
+  --chunksize  0   The size of each region.
+  --numchunks  32  If chunksize is not set, how many chunks should there be?
   "
 }
 
