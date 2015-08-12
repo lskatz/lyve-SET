@@ -14,14 +14,13 @@ my $fastaExtRegex=join('$|',@fastaExt).'$';
 my $bamExtRegex=join('$|',@bamExt).'$';
 
 local $0=fileparse $0;
-sub logmsg{print STDERR "$0: @_\n";}
 exit(main());
 
 sub main{
   my $settings={};
   GetOptions($settings,qw(help chunksize=i));
   die usage() if($$settings{help});
-  $$settings{chunksize}||=10000;
+  $$settings{chunksize}||=100000;
 
   my $infile=$ARGV[0];
   die "ERROR: need infile file!\n".usage() if(!$infile);
@@ -81,7 +80,7 @@ sub usage{
   Usage: $0 infile > regions.txt
   infile must either have an extension of either .bam or .fasta
 
-  --chunksize  10000  The size of each region
+  --chunksize  100000  The size of each region
   "
 }
 
