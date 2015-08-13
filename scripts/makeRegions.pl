@@ -33,6 +33,7 @@ sub main{
   for my $infile(@ARGV){
     my $contigLength={};
     my($name,$path,$suffix)=fileparse($infile,@bamExt,@fastaExt,@vcfExt);
+    logmsg "Reading $infile with extension $suffix";
     if($suffix=~/$bamExtRegex/){
       $contigLength=bamLengths($infile,$settings);
     } elsif($suffix=~/$fastaExtRegex/){
@@ -89,14 +90,33 @@ sub bamLengths{
 
 sub vcfLengths{
   my($vcf,$settings)=@_;
-  my %max;
-  open(VCFGZ,"bcftools index -s $vcf |") or die "ERROR: could not open $vcf for reading: $!";
+  
+  # See if ##reference=reference can be found, and if so,
+  # if this script can parse that fasta file for lengths.
+  my $fasta;
+  open(VCFGZ,"zgrep '^##reference' $vcf | ") or die "ERROR: could not open $vcf for reading: $!";
   while(<VCFGZ>){
-    chomp;
-    my($seqname,$start,$end)=split /\t/;
-    $start=1 if($start eq '.');
-    $max{$seqname}=$end;
+    if(/^##reference=(.+)/){
+      $fasta=$1;
+      last;
+    }
   }
+  close VCFGZ;
+  if($fasta){
+    return fastaLengths($fasta,$settings);
+  }
+
+  # If a reference is not found, then just find the coordinates
+  # in the file itself (slow step)
+  my %max;
+  open(VCFGZ,"zcat $vcf | cut -f 1,2 | sort -k1,1 -k2,2nr |") or die "ERROR: could not open $vcf for reading: $!";
+  while(<VCFGZ>){
+    next if(/^#/);
+    my($seqname,$pos)=split /\t/;
+    $max{$seqname}=$pos+0 if(!defined($max{$seqname}))
+  }
+  close VCFGZ;
+  die Dumper \%max;
   return \%max;
 }
 
