@@ -88,6 +88,11 @@ sub bamLengths{
   return \%max;
 }
 
+# Finding the length of a VCF is sort of difficult.
+# There are three different ways to find it:
+#   1. The ##reference line, and then parsing the fasta file
+#   2. The bcftools index -s function
+#   3. Parsing the file to find the max coordinate per seqname (slow)
 sub vcfLengths{
   my($vcf,$settings)=@_;
   
@@ -98,7 +103,9 @@ sub vcfLengths{
   while(<VCFGZ>){
     if(/^##reference=(.+)/){
       $fasta=$1;
-      last;
+      last if(-e $fasta);
+
+      logmsg "Found reference genome $fasta in the vcf file but it does not exist where I expect it";
     }
   }
   close VCFGZ;
@@ -106,9 +113,20 @@ sub vcfLengths{
     return fastaLengths($fasta,$settings);
   }
 
-  # If a reference is not found, then just find the coordinates
-  # in the file itself (slow step)
-  my %max;
+  my %max; # used for any of the next methods
+
+  # See if bcftools can help find the length if the ref is not found
+  open(VCFGZ,"bcftools index -s $vcf | ") or warn "ERROR: could not open $vcf for reading with bcftools: $!";
+  while(<VCFGZ>){
+    chomp;
+    my($seqname,$start,$stop)=split /\t/;
+    $max{$seqname}=$stop;
+  }
+  close VCFGZ;
+  return \%max if(keys(%max)>1);
+
+  # If a reference is not found and bcftools didn't come through, 
+  # then just find the coordinates in the file itself (slow step)
   open(VCFGZ,"zcat $vcf | cut -f 1,2 | sort -k1,1 -k2,2nr |") or die "ERROR: could not open $vcf for reading: $!";
   while(<VCFGZ>){
     next if(/^#/);
