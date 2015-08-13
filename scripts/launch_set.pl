@@ -713,7 +713,7 @@ sub variantsToMatrix{
   #}
   
   # mergevcf deletes its tmpdir and so we need to make a new one
-  my $tmpdir=tempdir("$$settings{tmpdir}/mergevcfXXXXXX",CLEANUP=>1);
+  my $tmpdir=tempdir("$$settings{tmpdir}/mergevcfXXXXXX",CLEANUP=>0);
 
   my $mergexopts="";
   $mergexopts.="-r $ref.regions.txt" if(-e "$ref.regions.txt" && -s "$ref.regions.txt" > 0);
