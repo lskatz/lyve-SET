@@ -17,6 +17,7 @@ use lib "$FindBin::RealBin/../lib/lib/perl5";
 
 use strict;
 use warnings;
+use POSIX qw/strftime/;
 use Bio::Perl;
 use Data::Dumper;
 use Getopt::Long;
@@ -156,6 +157,8 @@ sub main{
   $settingsString.=join("\t=\t",$_,$$settings{$_})."\n" for (sort {$a cmp $b} keys(%$settings));
   logmsg "Raw settings are as follows\n$settingsString";
 
+  logmsg "Lyve-SET started at ".strftime("\%F \%T",localtime());
+
 
   #####################################
   # Go through the major steps of SET #
@@ -176,6 +179,8 @@ sub main{
   symlink("$absDir/out.informative.fasta","$outPrefix.fasta") if(-e "$absDir/out.informative.fasta");
   symlink("$$settings{msadir}/out.pairwise.tsv","$outPrefix.pairwise.tallskinny.tsv") if(-e "$absDir/out.pairwise.tsv");
   symlink("$$settings{msadir}/out.pairwiseMatrix.tsv","$outPrefix.pairwise.matrix.tsv") if(-e "$absDir/out.pairwiseMatrix.tsv");
+
+  logmsg "Finished at ".strftime("\%F \%T",localtime());
 
   return 0;
 }
