@@ -22,6 +22,7 @@ use Data::Dumper;
 use Getopt::Long;
 use File::Basename;
 use File::Spec::Functions qw/rel2abs abs2rel/;
+use File::Temp qw/tempdir/;
 use threads;
 use Thread::Queue;
 use Schedule::SGELK;
@@ -705,8 +706,15 @@ sub variantsToMatrix{
   #  # let's make it a little bit more strict actually.
   #  $$settings{allowedFlanking}=$allowedFlanking*3;
   #}
+  
+  # mergevcf deletes its tmpdir and so we need to make a new one
+  my $tmpdir=tempdir("$$settings{tmpdir}/mergevcfXXXXXX",CLEANUP=>1);
 
-  $sge->pleaseExecute("mergeVcf.sh -n $$settings{numcpus} -t $$settings{tmpdir} -o $pooled $inVcf",{jobname=>"poolVcfs",numcpus=>$$settings{numcpus}});
+  my $mergexopts="";
+  $mergexopts.="-r $ref.regions.txt" if(-e "$ref.regions.txt" && -s "$ref.regions.txt" > 0);
+  my $mergeCommand="mergeVcf.sh $mergexopts -s -n $$settings{numcpus} -t $tmpdir -o $pooled $inVcf >&2";
+  logmsg $mergeCommand;
+  $sge->pleaseExecute($mergeCommand,{jobname=>"poolVcfs",numcpus=>$$settings{numcpus}});
   $sge->wrapItUp();
 
   return $pooled;
