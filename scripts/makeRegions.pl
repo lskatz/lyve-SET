@@ -10,9 +10,10 @@ use Bio::Perl;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
-use LyveSET qw/logmsg @bamExt @fastaExt/;
+use LyveSET qw/logmsg @bamExt @fastaExt @vcfExt/;
 my $fastaExtRegex=join('$|',@fastaExt).'$';
 my $bamExtRegex=join('$|',@bamExt).'$';
+my $vcfExtRegex=join('$|',@vcfExt).'$';
 
 local $0=fileparse $0;
 exit(main());
@@ -23,23 +24,32 @@ sub main{
   die usage() if($$settings{help});
   $$settings{chunksize}||=0;
   if(!$$settings{chunksize}){
-    $$settings{numchunks}||=32;
+    $$settings{numchunks}||=1;
   }
 
-  my $infile=$ARGV[0];
-  die "ERROR: need infile file!\n".usage() if(!$infile);
+  die "ERROR: need infile file!\n".usage() if(!@ARGV);
 
-  my $contigLength={};
-  my($name,$path,$suffix)=fileparse($infile,@bamExt,@fastaExt);
-  if($suffix=~/$bamExtRegex/){
-    $contigLength=bamLengths($infile,$settings);
-  } elsif($suffix=~/$fastaExtRegex/){
-    $contigLength=fastaLengths($infile,$settings);
-  } else {
-    die "ERROR: I do not understand extension $suffix";
+  my $cLength;
+  for my $infile(@ARGV){
+    my $contigLength={};
+    my($name,$path,$suffix)=fileparse($infile,@bamExt,@fastaExt,@vcfExt);
+    if($suffix=~/$bamExtRegex/){
+      $contigLength=bamLengths($infile,$settings);
+    } elsif($suffix=~/$fastaExtRegex/){
+      $contigLength=fastaLengths($infile,$settings);
+    } elsif($suffix=~/$vcfExtRegex/){
+      $contigLength=vcfLengths($infile,$settings);
+    } else {
+      die "ERROR: I do not understand extension $suffix";
+    }
+    
+    while(my($seqname,$length)=each(%$contigLength)){
+      $$cLength{$seqname}=$length if(!defined($$cLength{$seqname}));
+      $$cLength{$seqname}=$length if($$cLength{$seqname} < $length);
+    }
   }
 
-  printChunks($contigLength,$settings);
+  printChunks($cLength,$settings);
 
   return 0;
 }
@@ -77,6 +87,19 @@ sub bamLengths{
   return \%max;
 }
 
+sub vcfLengths{
+  my($vcf,$settings)=@_;
+  my %max;
+  open(VCFGZ,"bcftools index -s $vcf |") or die "ERROR: could not open $vcf for reading: $!";
+  while(<VCFGZ>){
+    chomp;
+    my($seqname,$start,$end)=split /\t/;
+    $start=1 if($start eq '.');
+    $max{$seqname}=$end;
+  }
+  return \%max;
+}
+
 sub printChunks{
   my($contigLength,$settings)=@_;
   
@@ -87,6 +110,7 @@ sub printChunks{
     $$settings{chunksize}=int($totalLength/$$settings{numchunks})+1;
   }
 
+  # Print out the regions
   my $chunksize=$$settings{chunksize};
   while(my($seqname,$length)=each(%$contigLength)){
     for(my $start=1;$start<$length;$start+=$chunksize){
@@ -100,11 +124,14 @@ sub printChunks{
 
 sub usage{
   "Creates a list of regions of a bam file, suitable for samtools' and bcftools' regions flag
-  Usage: $0 infile > regions.txt
-  infile must either have an extension of either .bam or .fasta
+  Usage: $0 infile [infile2...] > regions.txt
+  infile must either have an extension of either .bam, .vcf.gz, or .fasta.  Bam and vcf files must be indexed.
+  It's a good idea to give multiple vcf files since they don't really betray where the last coordinate is. In other words, another vcf file might have a snp beyond where the curren vcf's snps are
 
-  --chunksize  0   The size of each region.
-  --numchunks  32  If chunksize is not set, how many chunks should there be?
+  --chunksize  0  The size of each region.
+  --numchunks  1  If chunksize is not set, how many chunks should there be?
+                  NOTE: Despite what is requested, there will be at least 
+                  one chunk per contig.
   "
 }
 
