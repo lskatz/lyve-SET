@@ -106,6 +106,7 @@ sub vcfLengths{
       last if(-e $fasta);
 
       logmsg "Found reference genome $fasta in the vcf file but it does not exist where I expect it";
+      $fasta="";
     }
   }
   close VCFGZ;
@@ -134,7 +135,6 @@ sub vcfLengths{
     $max{$seqname}=$pos+0 if(!defined($max{$seqname}))
   }
   close VCFGZ;
-  die Dumper \%max;
   return \%max;
 }
 
