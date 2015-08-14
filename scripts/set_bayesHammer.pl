@@ -51,7 +51,7 @@ sub errorCorrect{
   }
 
   # Run spades
-  logmsg "DEBUG - skipping spades";
+  #logmsg "DEBUG - skipping spades";
   system("spades.py $spadesInParam -o $$settings{tempdir} --only-error-correction --disable-gzip-output -t $$settings{numcpus} >&2");
   die "ERROR with spades.py" if $?;
 

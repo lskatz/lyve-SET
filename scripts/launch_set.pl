@@ -157,6 +157,7 @@ sub main{
   $settingsString.=join("\t=\t",$_,$$settings{$_})."\n" for (sort {$a cmp $b} keys(%$settings));
   logmsg "Raw settings are as follows\n$settingsString";
 
+  my $startTimestamp=time();
   logmsg "Lyve-SET started at ".strftime("\%F \%T",localtime());
 
 
@@ -180,7 +181,12 @@ sub main{
   symlink("$$settings{msadir}/out.pairwise.tsv","$outPrefix.pairwise.tallskinny.tsv") if(-e "$absDir/out.pairwise.tsv");
   symlink("$$settings{msadir}/out.pairwiseMatrix.tsv","$outPrefix.pairwise.matrix.tsv") if(-e "$absDir/out.pairwiseMatrix.tsv");
 
+  my $stopTimestamp=time();
   logmsg "Finished at ".strftime("\%F \%T",localtime());
+  my $duration=$stopTimestamp-$startTimestamp;
+  my $minutes=int($duration/60);
+  my $seconds=$duration % 60;
+  logmsg "Duration: $minutes minutes, $seconds seconds";
 
   return 0;
 }
@@ -491,11 +497,11 @@ sub cleanReads{
     # 3. mv tmp/cleaned to ./file.fastq.gz
     if($$settings{read_cleaner} eq "cgp"){
       logmsg "Did not find $backup. Cleaning with CGP...";
-      $sge->pleaseExecute("run_assembly_trimClean.pl -i $file -o $tmp --auto --nosingletons --numcpus $$settings{numcpus} 2>&1 && mv -v $file $backup && mv -v $tmp $file",{numcpus=>$$settings{numcpus},jobname=>"clean$b"});
+      $sge->pleaseExecute("run_assembly_trimClean.pl -i $file -o $tmp --auto --nosingletons --numcpus $$settings{numcpus} 2>&1 && mv -v $file $backup && mv -v $tmp $file",{numcpus=>$$settings{numcpus},jobname=>"trimClean$b"});
     } elsif($$settings{read_cleaner} eq "bayeshammer"){
       logmsg "Did not find $backup. Cleaning with BayesHammer...";
-      die "Bayeshammer not implemented";
-      #...;
+      my $tmpdir=tempdir("$$settings{tmpdir}/bayeshammerXXXXXX",CLEANUP=>1);
+      $sge->pleaseExecute("set_bayesHammer.pl $file --numcpus $$settings{numcpus} --tempdir $tmpdir | gzip -c > $tmp && mv -v $file $backup && mv -v $tmp $file",{numcpus=>$$settings{numcpus},jobname=>"bayeshammer$b"});
     } else {
       logmsg "ERROR: I do not understand the read cleaner $$settings{read_cleaner}";
       die;
