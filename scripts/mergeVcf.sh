@@ -75,7 +75,8 @@ if [ $? -gt 0 ]; then
 fi
 
 echo "$script: Concatenating vcf output"
-bcftools concat --allow-overlaps --remove-duplicates $TEMPDIR/merged.*.vcf.gz > $TEMPDIR/concat.vcf
+bcftools concat $TEMPDIR/merged.*.vcf.gz > $TEMPDIR/concat.vcf
+#bcftools concat --allow-overlaps --remove-duplicates $TEMPDIR/merged.*.vcf.gz > $TEMPDIR/concat.vcf
 if [ $? -gt 0 ]; then
   echo "$script: ERROR with bcftools concat"
   rm -rvf $TEMPDIR;

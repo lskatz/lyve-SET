@@ -766,7 +766,8 @@ sub usage{
                                                converted to reference.gbk.fasta and will
                                                be used for SNP annotation. If a fasta
                                                is given, then no SNP annotation will
-                                               happen.
+                                               happen. Using a gbk or embl file is currently
+                                               experimental.
 
     SNP MATRIX OPTIONS
     --allowedFlanking  $$settings{allowedFlanking} allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
