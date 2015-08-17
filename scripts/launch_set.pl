@@ -17,18 +17,20 @@ use lib "$FindBin::RealBin/../lib/lib/perl5";
 
 use strict;
 use warnings;
+use POSIX qw/strftime/;
 use Bio::Perl;
 use Data::Dumper;
 use Getopt::Long;
 use File::Basename;
 use File::Spec::Functions qw/rel2abs abs2rel/;
+use File::Temp qw/tempdir/;
 use threads;
 use Thread::Queue;
 use Schedule::SGELK;
 use Config::Simple;
 use Number::Range;
 
-use LyveSET qw/@fastaExt @fastqExt @bamExt rangeUnion rangeInversion/;
+use LyveSET qw/@fastaExt @richseqExt @fastqExt @bamExt @vcfExt rangeUnion rangeInversion/;
 
 my ($name,$scriptsdir,$suffix)=fileparse($0);
 $scriptsdir=rel2abs($scriptsdir);
@@ -54,11 +56,12 @@ sub logmsg {
   }
   print $FH $msg;
 }
-local $SIG{'__DIE__'} = sub { local $0=basename $0; my $e = $_[0]; $e =~ s/(at [^\s]+? line \d+\.$)/\nStopped $1/; logmsg($e); die(); };
+#local $SIG{'__DIE__'} = sub { local $0=basename $0; my $e = $_[0]; $e =~ s/(at [^\s]+? line \d+\.$)/\nStopped $1/; logmsg($e); die(); };
 END{
   close $logmsgFh if(defined($logmsgFh) && fileno($logmsgFh) > 0);
 }
 
+my $invocation="$0 ".join(" ",@ARGV);
 my $sge=Schedule::SGELK->new(-verbose=>1,-numnodes=>20,-numcpus=>1);
 exit(main());
 
@@ -100,9 +103,34 @@ sub main{
   logmsg "Project was defined as $project";
   # Checks to make sure that this is a project
   #system("set_manage.pl '$project'"); die if $?;
+
   # Set the defaults if they aren't set already
-  $$settings{ref}||="$project/reference/reference.fasta";
+  #$$settings{ref}||="$project/reference/reference.fasta";
+  if($$settings{ref}){
+    $$settings{ref}=$$settings{ref}; # if set, then leave it alone.
+  } elsif(-e "$project/reference/reference.gbk"){
+    $$settings{ref}="$project/reference/reference.gbk.fasta"; # this file might not exist yet and will be created soon
+  } elsif(-e "$project/reference/reference.fasta"){
+    $$settings{ref}="$project/reference/reference.fasta";
+  } else {
+    die "ERROR: reference file was not given\n".usage($settings);
+  }
+  #
+  # If a richseq (gbk/embl) were given as the reference, convert it to fasta and update the variable to the fasta
+  $$settings{richseq}||=""; # the genbank or embl file
+  my($refname,$refdir,$refext)=fileparse($$settings{ref},@richseqExt);
+  if($refext=~/gbk$|gb$|embl$/){
+    $$settings{richseq}=$$settings{ref};
+    $$settings{ref}=$$settings{richseq}.".fasta";
+    die "ERROR: $$settings{richseq} does not exist" if(!-e $$settings{richseq});
+    richseqToFasta($$settings{richseq},$$settings{ref},$settings);
+  }
+
+  # Ok, it's a defined string, but does the file exist?
+  die "ERROR: Could not find the reference file at $$settings{ref}\n".usage($settings) if(!-e $$settings{ref});
+  my $ref=$$settings{ref}; # $ref is called so many times, it might as well be its own variable
   $$settings{refdir}||=dirname($$settings{ref});
+
   # Check SET directories' existence and set their defaults
   die "ERROR: could not find dir $project" if(!-e $project);
   for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir logdir)){
@@ -114,7 +142,8 @@ sub main{
   }
 
   # SGE params
-  $$settings{workingdir}=$$settings{logdir};
+  mkdir "$$settings{logdir}/SGELK" if(!-d "$$settings{logdir}/SGELK");
+  $$settings{workingdir}="$$settings{logdir}/SGELK";
   for (qw(workingdir numnodes numcpus keep qsubxopts queue)){
     $sge->set($_,$$settings{$_}) if($$settings{$_});
   }
@@ -122,11 +151,15 @@ sub main{
   # open the log file now that we know the logdir is there
   open($logmsgFh,">$$settings{logdir}/launch_set.log") or die "ERROR: could not open log file $$settings{logdir}/launch_set.log";
   logmsg "======\nOpened logfile at $$settings{logdir}/launch_set.log\n=====";
+  logmsg "Called Lyve-SET as follows:\n\n  $invocation\n";
 
-  # Check the reference parameter
-  die "ERROR: reference file was not given\n".usage($settings) if(!defined($$settings{ref}));
-  die "ERROR: Could not find the reference file at $$settings{ref}\n".usage($settings) if(!-f $$settings{ref});
-  my $ref=$$settings{ref};
+  my $settingsString="";
+  $settingsString.=join("\t=\t",$_,$$settings{$_})."\n" for (sort {$a cmp $b} keys(%$settings));
+  logmsg "Raw settings are as follows\n$settingsString";
+
+  my $startTimestamp=time();
+  logmsg "Lyve-SET started at ".strftime("\%F \%T",localtime());
+
 
   #####################################
   # Go through the major steps of SET #
@@ -136,6 +169,7 @@ sub main{
   indexReference($ref,$settings);
   mapReads($ref,$$settings{readsdir},$$settings{bamdir},$settings);
   variantCalls($ref,$$settings{bamdir},$$settings{vcfdir},$settings);
+  annotateVariants($$settings{richseq},$$settings{vcfdir},$settings);
   compareTaxa($ref,$settings); # SNP matrix, alignment, trees
 
   # Find the output files
@@ -146,6 +180,13 @@ sub main{
   symlink("$absDir/out.informative.fasta","$outPrefix.fasta") if(-e "$absDir/out.informative.fasta");
   symlink("$$settings{msadir}/out.pairwise.tsv","$outPrefix.pairwise.tallskinny.tsv") if(-e "$absDir/out.pairwise.tsv");
   symlink("$$settings{msadir}/out.pairwiseMatrix.tsv","$outPrefix.pairwise.matrix.tsv") if(-e "$absDir/out.pairwiseMatrix.tsv");
+
+  my $stopTimestamp=time();
+  logmsg "Finished at ".strftime("\%F \%T",localtime());
+  my $duration=$stopTimestamp-$startTimestamp;
+  my $minutes=int($duration/60);
+  my $seconds=$duration % 60;
+  logmsg "Duration: $minutes minutes, $seconds seconds";
 
   return 0;
 }
@@ -175,6 +216,19 @@ sub readGlobalSettings{
   }
 
   return \%settingsCopy;
+}
+
+sub richseqToFasta{
+  my($infile,$outfile,$settings)=@_;
+  logmsg "Converting $infile to $outfile";
+  my $seqin=Bio::SeqIO->new(-file=>"$infile");
+  my $seqout=Bio::SeqIO->new(-file=>">$outfile");
+  while(my $seq=$seqin->next_seq){
+    $seq->desc(" ");
+    $seqout->write_seq($seq);
+  }
+  $seqin->close;
+  $seqout->close;
 }
 
 sub simulateReads{
@@ -218,6 +272,9 @@ sub simulateReads{
 
 sub maskReference{
   my($ref,$settings)=@_;
+
+  my $unmaskedRegions="$$settings{refdir}/unmaskedRegions.bed";
+  return $unmaskedRegions if(-e $unmaskedRegions);
 
   # Make the directory where these masking coordinates go
   my $maskDir="$$settings{refdir}/maskedRegions";
@@ -288,8 +345,8 @@ sub maskReference{
   }
 
   # Write inverted (unmasked) regions to a file
-  my $unmaskedRegions="$$settings{refdir}/unmaskedRegions.bed";
-  open(UNMASKEDBED,">$unmaskedRegions") or die "ERROR: could not open $unmaskedRegions: $!";
+  my $unmaskedRegionsTmp="$unmaskedRegions.tmp";
+  open(UNMASKEDBED,">$unmaskedRegionsTmp") or die "ERROR: could not open $unmaskedRegionsTmp: $!";
   while(my($contig,$RangeObj)=each(%unmaskedRange)){
     for my $range(split(/,/,$RangeObj->range)){
       my($min,$max)=split(/\.\./,$range);
@@ -298,6 +355,7 @@ sub maskReference{
     }
   }
   close UNMASKEDBED;
+  system("mv -v $unmaskedRegions.tmp $unmaskedRegions");
 
   logmsg "Inverted masked regions from $maskedRegions and put them into $unmaskedRegions";
   logmsg "I now know where unmasked regions are, as they are listed in $unmaskedRegions.";
@@ -439,11 +497,11 @@ sub cleanReads{
     # 3. mv tmp/cleaned to ./file.fastq.gz
     if($$settings{read_cleaner} eq "cgp"){
       logmsg "Did not find $backup. Cleaning with CGP...";
-      $sge->pleaseExecute("run_assembly_trimClean.pl -i $file -o $tmp --auto --nosingletons --numcpus $$settings{numcpus} 2>&1 && mv -v $file $backup && mv -v $tmp $file",{numcpus=>$$settings{numcpus},jobname=>"clean$b"});
+      $sge->pleaseExecute("run_assembly_trimClean.pl -i $file -o $tmp --auto --nosingletons --numcpus $$settings{numcpus} 2>&1 && mv -v $file $backup && mv -v $tmp $file",{numcpus=>$$settings{numcpus},jobname=>"trimClean$b"});
     } elsif($$settings{read_cleaner} eq "bayeshammer"){
       logmsg "Did not find $backup. Cleaning with BayesHammer...";
-      die "Bayeshammer not implemented";
-      #...;
+      my $tmpdir=tempdir("$$settings{tmpdir}/bayeshammerXXXXXX",CLEANUP=>1);
+      $sge->pleaseExecute("set_bayesHammer.pl $file --numcpus $$settings{numcpus} --tempdir $tmpdir | gzip -c > $tmp && mv -v $file $backup && mv -v $tmp $file",{numcpus=>$$settings{numcpus},jobname=>"bayeshammer$b"});
     } else {
       logmsg "ERROR: I do not understand the read cleaner $$settings{read_cleaner}";
       die;
@@ -568,6 +626,18 @@ sub variantCalls{
   return 1;
 }
 
+sub annotateVariants{
+  my($richseq,$vcfdir,$settings)=@_;
+  return if(!$richseq);
+
+  for my $vcf(glob("$vcfdir/*.vcf.gz")){
+    my $b=basename($vcf,@vcfExt);
+    $sge->pleaseExecute("launch_snpeff.pl --genbank $richseq --outdir $vcfdir.annotated --numcpus 1 $vcf",{numcpus=>1,jobname=>"snpeff$b"});
+  }
+  # No need to wrapItUp() since nothing depends on these annotations
+}
+
+
 # returns the last SGE job information in a hash ref
 sub indexAndCompressVcf{
   my($vcf,$holdjid,$settings)=@_;
@@ -647,8 +717,15 @@ sub variantsToMatrix{
   #  # let's make it a little bit more strict actually.
   #  $$settings{allowedFlanking}=$allowedFlanking*3;
   #}
+  
+  # mergevcf deletes its tmpdir and so we need to make a new one
+  my $tmpdir=tempdir("$$settings{tmpdir}/mergevcfXXXXXX",CLEANUP=>0);
 
-  $sge->pleaseExecute("mergeVcf.sh -o $pooled $inVcf",{jobname=>"poolVcfs",numcpus=>1});
+  my $mergexopts="";
+  $mergexopts.="-r $ref.regions.txt" if(-e "$ref.regions.txt" && -s "$ref.regions.txt" > 0);
+  my $mergeCommand="mergeVcf.sh $mergexopts -s -n $$settings{numcpus} -t $tmpdir -o $pooled $inVcf >&2";
+  logmsg $mergeCommand;
+  $sge->pleaseExecute($mergeCommand,{jobname=>"poolVcfs",numcpus=>$$settings{numcpus}});
   $sge->wrapItUp();
 
   return $pooled;
@@ -687,10 +764,16 @@ sub usage{
   my $help="Launches the Lyve-SET pipeline
     Please visit http://github.com/lskatz/Lyve-SET for more information.
 
-    Usage: $0 [project] [-ref reference.fasta]
+    Usage: $0 [project] [-ref reference.fasta|reference.gbk]
     If project is not given, then it is assumed to be the current working directory.
     If reference is not given, then it is assumed to be proj/reference/reference.fasta
-    -ref      proj/reference/reference.fasta   The reference genome assembly
+    -ref      proj/reference/reference.fasta   The reference genome assembly. If it is 
+                                               a genbank or embl file, then it will be 
+                                               converted to reference.gbk.fasta and will
+                                               be used for SNP annotation. If a fasta
+                                               is given, then no SNP annotation will
+                                               happen. Using a gbk or embl file is currently
+                                               experimental.
 
     SNP MATRIX OPTIONS
     --allowedFlanking  $$settings{allowedFlanking} allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
@@ -711,8 +794,8 @@ sub usage{
     -asm      $$settings{asmdir} directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
 
     SKIP CERTAIN STEPS
-    --nomask-phages                  Do not search for and mask phages in the reference genome
-    --nomask-cliffs                  Do not search for and mask 'Cliffs' in pileups
+    --mask-phages                    Search for and mask phages in the reference genome
+    --mask-cliffs                    Search for and mask 'Cliffs' in pileups
     --nomatrix                       Do not create an hqSNP matrix
     --nomsa                          Do not make a multiple sequence alignment
     --notrees                        Do not make phylogenies

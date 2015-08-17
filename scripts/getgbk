@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 # Authors: Peter Fisher Hallin, Matloob Qureshi
 # For license see /usr/biotools/CMG-biotools.license

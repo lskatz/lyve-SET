@@ -7,11 +7,17 @@ use Term::ANSIColor;
 use Data::Dumper;
 use threads;
 
-use FindBin;
-use lib "$FindBin::Bin/../lib/lib/perl5";
+use FindBin qw/$Bin $Script $RealBin $RealScript/;
+use lib dirname($INC{"LyveSET.pm"})."/lib/perl5";
 use Number::Range;
 
-our @EXPORT_OK = qw(logmsg rangeInversion rangeUnion @fastqExt @fastaExt @bamExt @vcfExt);
+BEGIN{
+  #print $INC{"Number/Range.pm"}."\n\n";;
+}
+our @EXPORT_OK = qw(
+           logmsg rangeInversion rangeUnion 
+           @fastqExt @fastaExt @bamExt @vcfExt @richseqExt
+         );
 
 local $0=basename $0;
 
@@ -22,6 +28,7 @@ our @fastqExt=qw(.fastq.gz .fastq .fq .fq.gz);
 our @fastaExt=qw(.fasta .fna .faa .mfa .fas .fa);
 our @bamExt=qw(.sorted.bam .bam);
 our @vcfExt=qw(.vcf.gz .vcf);
+our @richseqExt=qw(.gbk .gb .embl);
 
 #################################################
 ### COMMON SUBS/TOOLS (not object subroutines) ##

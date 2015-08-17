@@ -73,7 +73,7 @@ sub mapReads{
     logmsg "Found bed file of regions to accept and so I am using it! $regions";
     $$settings{samtoolsxopts}.="-L $regions ";
   }
-  $$settings{samtoolsxopts}.="-F 4 "; # only keep mapped reads to save on space
+  #$$settings{samtoolsxopts}.="-F 4 "; # only keep mapped reads to save on space
 
   # PE reads or not?  Mapping differently for different types.
   if(is_fastqPE($query,$settings)){

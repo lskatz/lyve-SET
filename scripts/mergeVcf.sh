@@ -2,11 +2,23 @@
 # Uses bcftools to merge vcf files
 
 script=$(basename $0);
+bindir=$(dirname $0);
+export PATH=$bindir:$PATH; # enforce the Lyve-SET path
 
-while getopts "o:" o; do
+NUMCPUS=1; # default number of cpus
+while getopts "o:n:t:r:s" o; do
   case "${o}" in
     o)
       OUT="$OPTARG"
+      ;;
+    n)
+      NUMCPUS="$OPTARG"
+      ;;
+    t)
+      TEMPDIR="$OPTARG"
+      ;;
+    s)
+      ALSOSNPS=1
       ;;
     *)
       echo "ERROR: I do not understand option $OPTARG"
@@ -19,37 +31,104 @@ IN="$@";
 if [ "$IN" == "" ] || [ "$OUT" == "" ]; then
   echo "$script: merges VCF files that are compressed with bgzip and indexed with tabix"
   echo "Usage: $script -o pooled.vcf.gz *.vcf.gz"
-  echo "  -o output.vcf.gz  The output compressed VCF file"
+  echo "  -o output.vcf.gz         The output compressed VCF file"
+  echo "  -t /tmp/mergeVcfXXXXXX   A temporary directory that will be completely removed upon exit"
+  echo "  -s                       Output SNPs only file in addition to the whole thing"
   exit 1;
 fi
 
-# zcat out.pooled.vcf.gz|perl -lane 'if(/^#/){print;} elsif($F[4] ne "N"){ print; } else { $numF=@F; $has_hq=0; for my $info(@F[8..$numF-1]){ $gt=substr((split(/:/,$info))[0],0,1); $has_hq=1 if($gt=~/[ATCG0\.,]/i);} print if($has_hq); }' | grep -cv '#'
+SNPSOUT=$(dirname $OUT)/$(basename $OUT .vcf.gz)".snps.vcf.gz"
 
-# This command does the following:
-# 1. bcftools merge (merging VCF samples into one)
-# 2. Checks to see if the site is high-quality or not
-#   a. Is it a header or is there no ambiguous alt call? -- print.
-#   b. Is there at least one sample with an unambiguous base call? --print.
-#   c. Are all bases ambiguous? -- skip
-command="bcftools merge $IN --force-samples | \
-perl -lane 'if(/^#/){print;} elsif(\$F[4] ne \"N\"){ print; } else { \$numF=@F; \$has_hq=0; for my \$info(@F[9..\$numF-1]){ \$gt=substr((split(/:/,\$info))[0],0,1); \$has_hq=1 if(\$gt=~/[ATCG0\.,]/i);} print if(\$has_hq); }' |\
-bgzip -c > $OUT.tmp
-"
-eval $command
-if [ $? -gt 0 ]; then
-  echo -e "ERROR with bcftools:\n  $command";
-  rm -vf $OUT.tmp
-  exit 1;
-fi;
-mv -v $OUT.tmp $OUT
-if [ $? -gt 0 ]; then
-  echo "ERROR moving $OUT.tmp to $OUT";
-  exit 1;
-fi;
+if [ "$TEMPDIR" == "" ]; then
+  TEMPDIR=$(mktemp -d /tmp/mergeVcf.XXXXXX);
+fi
+mkdir -pv "$TEMPDIR"; # just in case
 
-tabix $OUT
-if [ $? -gt 0 ]; then
-  echo "ERROR with tabix"
+# Run makeRegions.pl based on how many cpus there are 
+# and really parallelize this script!
+echo "$script: Dividing the genome into regions, making it easier to multithread"
+makeRegions.pl --numchunks $NUMCPUS $IN > $TEMPDIR/regions.txt
+if [ $? -gt 0 ]; then 
+  echo "$script: ERROR running makeRegions.pl!";
+  rm -rvf $TEMPDIR;
   exit 1;
-fi;
+fi
+REGION=$(cat $TEMPDIR/regions.txt);
+
+# Figure out regions names using the VCF index files.
+# Do not multithread xargs here because of race conditions and stdout.
+if [ "$REGION" == "" ]; then 
+  REGION=$(echo "$IN" | xargs -P 1 -n 1 tabix -l | sort | uniq);
+fi
+
+
+# Multithread, one thread per region
+echo "$script: temporary directory is $TEMPDIR";
+echo "$script: Running bcftools merge";
+export IN;
+export script;
+echo "$REGION" | xargs -P $NUMCPUS -n 1 -I {} bash -c 'echo "$script: merging SNPs in {}"; out='$TEMPDIR'/merged.$$.vcf; bcftools merge --merge all --regions "{}" --force-samples -o $out $IN && bgzip $out && tabix $out.gz && echo "$script: finished with region {}";'
+if [ $? -gt 0 ]; then
+  echo "$script: ERROR with bcftools merge"
+  rm -rvf $TEMPDIR;
+  exit 1;
+fi
+
+echo "$script: Concatenating vcf output"
+bcftools concat $TEMPDIR/merged.*.vcf.gz > $TEMPDIR/concat.vcf
+#bcftools concat --allow-overlaps --remove-duplicates $TEMPDIR/merged.*.vcf.gz > $TEMPDIR/concat.vcf
+if [ $? -gt 0 ]; then
+  echo "$script: ERROR with bcftools concat"
+  rm -rvf $TEMPDIR;
+  exit 1;
+fi
+
+# Generate a SNPs-only merged file, if requested
+if [ "$ALSOSNPS" == 1 ]; then
+  echo "$script: parsing $TEMPDIR/concat.vcf for SNPs"
+  bcftools annotate --include '%TYPE="snp"' $TEMPDIR/concat.vcf > $TEMPDIR/hqPos.vcf
+  if [ $? -gt 0 ]; then
+    echo "$script: ERROR with bcftools annotate"
+    rm -rvf $TEMPDIR;
+    exit 1;
+  fi
+else
+  echo "$script: user did not request SNPs-only file also"
+fi
+
+# BGzip, tabix, and mv hqSNPs and concat vcfs
+for VCF in $TEMPDIR/concat.vcf $TEMPDIR/hqPos.vcf; do
+  if [ ! -e "$VCF" ]; then
+    continue;
+  fi;
+
+  bgzip $VCF
+  if [ $? -gt 0 ]; then
+    echo "$script: ERROR with bgzip $VCF"
+    rm -rvf $TEMPDIR;
+    exit 1;
+  fi
+  tabix $VCF.gz
+  if [ $? -gt 0 ]; then
+    echo "$script: ERROR with tabix $VCF.gz"
+    rm -rvf $TEMPDIR;
+    exit 1;
+  fi
+done
+
+# mv over the SNPs-only files
+if [ "$ALSOSNPS" == 1 ]; then
+  mv -v $TEMPDIR/hqPos.vcf.gz $SNPSOUT
+  mv -v $TEMPDIR/hqPos.vcf.gz.tbi $SNPSOUT.tbi
+  echo "$script: SNPs-only file can be found in $SNPSOUT";
+fi
+
+# Lastly, mv over the large file
+mv -v $TEMPDIR/concat.vcf.gz $OUT
+mv -v $TEMPDIR/concat.vcf.gz.tbi $OUT.tbi
+echo "$script: Output file can be found in $OUT"
+
+rm -rvf $TEMPDIR;
+
+exit 0;
 

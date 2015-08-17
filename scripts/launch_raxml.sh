@@ -56,6 +56,10 @@ fi;
 # so that higher priority overrides the previous choice.
 which raxmlHPC 1>/dev/null 2>&1 && EXEC=$(which raxmlHPC)
 which raxmlHPC-PTHREADS 1>/dev/null 2>&1 && EXEC=$(which raxmlHPC-PTHREADS)
+if [ "$EXEC" == "" ]; then
+  echo "ERROR: I did not find raxml in the path!";
+  exit 1;
+fi;
 
 # Raxml-pthreads must have >1 cpu and so fix it if that happens
 if [ $EXEC == "raxmlHPC-PTHREADS" ]; then
