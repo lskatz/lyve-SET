@@ -1,6 +1,6 @@
 # Author: Lee Katz <lkatz@cdc.gov>
 # Lyve-SET
-
+ 
 PREFIX := $(PWD)
 PROFILE := $(HOME)/.bashrc
 PROJECT := "setTestProject"
@@ -18,27 +18,10 @@ PREFIXNOTE="Must be an absolute path directory. Default: $(PWD)"
 
 ###################################
 
-default: help
+default: install 
 
 help:
-	@echo 0. COMMON VARIABLES
-	@echo $(T) PREFIX=$(PREFIX) $(PREFIXNOTE)
-	@echo $(T) NUMCPUS=$(NUMCPUS)
-	@echo $(T) PROJECT=$(PROJECT)
-	@echo
-	@echo 1. INSTALL CHOICES
-	@echo $(T) all - Perform install, env, and clean. All parameters are valid to use here.
-	@echo $(T) install - copy all files over to an installation directory. Installs most prerequisites.
-	@echo $(T) cuttingedge - download and install the most up to date code. Does not include 'make env' or any prerequisites. Can be used instead of 'make install'
-	@echo
-	@echo 2. ENVIRONMENT CHECK
-	@echo $(T) env - put all environmental variables into a profile file
-	@echo $(T2) PROFILE=$(PROFILE)
-	@echo $(T) check - check to see if all prerequisites are installed
-	@echo $(T) test - create a test project using the test data found in the installation directory
-	@echo
-	@echo 3. OTHER
-	@echo $(T) clean - delete the temporary files. Does not remove the result of 'make env.'
+	@echo "Please see README.md for additional help"
 
 all: install env clean
 
@@ -47,10 +30,10 @@ install: install-prerequisites
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-samtools install-bcftools install-smalt install-snap install-raxml install-perlModules install-config
+install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-samtools install-bcftools install-smalt install-snap install-raxml install-perlModules install-config install-snpEff
 	@echo DONE installing prerequisites
 
-clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-perlModules clean-config
+clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-perlModules clean-config clean-snpEff
 	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
 
 install-mkdir:
@@ -113,13 +96,11 @@ install-snpEff:
 	cd $(PREFIX)/lib && unzip -o snpEff_latest_core.zip
 	mv $(PREFIX)/lib/snpEff/snpEff.jar $(PREFIX)/lib/.
 	mv $(PREFIX)/lib/snpEff/snpEff.config $(PREFIX)/config/original/snpEff.conf
-	cp $(PREFIX)/config/original/snpEff.conf $(PREFIX)/config/snpEff.conf
 	rm -rf $(PREFIX)/lib/snpEff_latest_core.zip
 	rm -rf $(PREFIX)/lib/snpEff
 
 clean-snpEff:
 	rm -rvf $(PREFIX)/lib/snpEff.jar
-	rm -rvf $(PREFIX)/config/original/snpEff.conf
 
 install-phast: check-blast
 	mkdir -p $(PREFIX)/lib/phast
@@ -140,29 +121,30 @@ clean-phispy:
 	rm -rvf $(PREFIX)/lib/phispy
 
 install-samtools:
-	wget 'http://downloads.sourceforge.net/project/samtools/samtools/1.1/samtools-1.1.tar.bz2' -O $(TMPDIR)/samtools-1.1.tar.bz2
-	cd $(TMPDIR) && tar jxvf samtools-1.1.tar.bz2
-	mv $(TMPDIR)/samtools-1.1 $(PREFIX)/lib
-	cd $(PREFIX)/lib/samtools-1.1 && make
-	cd $(PREFIX)/lib/samtools-1.1/htslib-1.1 && make
-	ln -sf $(PREFIX)/lib/samtools-1.1/samtools $(PREFIX)/scripts/
-	ln -sf $(PREFIX)/lib/samtools-1.1/misc/wgsim $(PREFIX)/scripts/
-	ln -sf $(PREFIX)/lib/samtools-1.1/htslib-1.1/bgzip $(PREFIX)/scripts
-	ln -sf $(PREFIX)/lib/samtools-1.1/htslib-1.1/tabix $(PREFIX)/scripts
+	wget 'https://github.com/samtools/samtools/releases/download/1.2/samtools-1.2.tar.bz2' -O $(TMPDIR)/samtools-1.2.tar.bz2
+	cd $(TMPDIR) && tar jxvf samtools-1.2.tar.bz2
+	mv $(TMPDIR)/samtools-1.2 $(PREFIX)/lib
+	cd $(PREFIX)/lib/samtools-1.2 && make DFLAGS="-D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -D_CURSES_LIB=0" LIBCURSES="" 
+	cd $(PREFIX)/lib/samtools-1.2/htslib-1.2.1 && make
+	ln -sf $(PREFIX)/lib/samtools-1.2/samtools $(PREFIX)/scripts/
+	ln -sf $(PREFIX)/lib/samtools-1.2/misc/wgsim $(PREFIX)/scripts/
+	ln -sf $(PREFIX)/lib/samtools-1.2/htslib-1.2.1/bgzip $(PREFIX)/scripts
+	ln -sf $(PREFIX)/lib/samtools-1.2/htslib-1.2.1/tabix $(PREFIX)/scripts
 
 clean-samtools:
 	rm -rvf $(PREFIX)/lib/samtools*
 
 install-bcftools:
-	wget 'http://downloads.sourceforge.net/project/samtools/samtools/1.1/bcftools-1.1.tar.bz2' -O $(TMPDIR)/bcftools-1.1.tar.bz2
-	cd $(TMPDIR) && tar jxvf bcftools-1.1.tar.bz2
-	mv $(TMPDIR)/bcftools-1.1 $(PREFIX)/lib
-	cd $(PREFIX)/lib/bcftools-1.1 && make
-	ln -s $(PREFIX)/lib/bcftools-1.1/bcftools $(PREFIX)/scripts
-	ln -s $(PREFIX)/lib/bcftools-1.1/vcfutils.pl $(PREFIX)/scripts
+	# bcftools-1.2.tar.bz2  htslib-1.2.1.tar.bz2  samtools-1.2.tar.bz2
+	wget 'https://github.com/samtools/bcftools/releases/download/1.2/bcftools-1.2.tar.bz2' -O $(TMPDIR)/bcftools-1.2.tar.bz2
+	cd $(TMPDIR) && tar jxvf bcftools-1.2.tar.bz2
+	mv $(TMPDIR)/bcftools-1.2 $(PREFIX)/lib/bcftools-1.2
+	cd $(PREFIX)/lib/bcftools-1.2 && make
+	ln -s $(PREFIX)/lib/bcftools-1.2/bcftools $(PREFIX)/scripts
+	ln -s $(PREFIX)/lib/bcftools-1.2/vcfutils.pl $(PREFIX)/scripts
 
 clean-bcftools:
-	rm -rfv $(PREFIX)/lib/bcftools-1.1/bcftools $(PREFIX)/lib/bcftools-1.1/vcfutils.pl $(PREFIX)/lib/bcftools*
+	rm -rfv $(PREFIX)/lib/bcftools-1.2/bcftools $(PREFIX)/lib/bcftools-1.2/vcfutils.pl $(PREFIX)/lib/bcftools*
 
 install-smalt:
 	wget --continue 'http://downloads.sourceforge.net/project/smalt/smalt-0.7.6-static.tar.gz' -O $(TMPDIR)/smalt-0.7.6-static.tar.gz
@@ -213,8 +195,9 @@ clean-edirect:
 
 install-perlModules:
 	@echo "Installing Perl modules using cpanminus"
-	for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Descriptive Statistics::Basic Graph::Centrality::Pagerank String::Escape Statistics::LineFit; do \
-	  perl scripts/cpanm -L $(PREFIX)/lib $$package; \
+	#for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Descriptive Statistics::Basic Graph::Centrality::Pagerank String::Escape Statistics::LineFit; do
+	for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Basic Graph::Centrality::Pagerank String::Escape Statistics::LineFit; do \
+	  perl scripts/cpanm --self-contained -L $(PREFIX)/lib $$package; \
 		if [ $$? -gt 0 ]; then exit 1; fi; \
 	done;
 	@echo "Done with Perl modules"
@@ -228,34 +211,13 @@ install-config:
 clean-config:
 	rm -v $(PREFIX)/config/*.conf
 
-cuttingedge: install-mkdir cuttingedge-gitclone install-prerequisites
-	@echo "DONE installing the cutting edge version"
-
-cuttingedge-gitclone:
-	git clone --recursive https://github.com/lskatz/lyve-SET.git $(PREFIX)/build/Lyve-SET
-	rm -r $(PREFIX)/build/Lyve-SET/build # avoid directory-not-empty error
-	mv -vf $(PREFIX)/build/Lyve-SET/* $(PREFIX)/
-
-
 env:
 	echo "#Lyve-SET" >> $(PROFILE)
 	echo "export PATH=\$$PATH:$(PREFIX)/scripts" >> $(PROFILE)
 	echo "export PERL5LIB=\$$PERL5LIB:$(PREFIX)/lib" >> $(PROFILE)
 
 test:
-	@echo "Test data set given by CFSAN's snp-pipeline package found at https://github.com/CFSAN-Biostatistics/snp-pipeline"
-	set_manage.pl --create $(PROJECT)
-	set_manage.pl $(PROJECT) --add-reads $(PREFIX)/testdata/reads/sample1.fastq.gz
-	set_manage.pl $(PROJECT) --add-reads $(PREFIX)/testdata/reads/sample2.fastq.gz
-	set_manage.pl $(PROJECT) --add-reads $(PREFIX)/testdata/reads/sample3.fastq.gz
-	set_manage.pl $(PROJECT) --add-reads $(PREFIX)/testdata/reads/sample4.fastq.gz
-	set_manage.pl $(PROJECT) --change-reference $(PREFIX)/testdata/reference/lambda_virus.fasta
-	set_manage.pl $(PROJECT) --add-assembly $(PREFIX)/testdata/reference/lambda_virus.fasta
-	launch_set.pl $(PROJECT) --numcpus $(NUMCPUS)
-
-test-download-data:
-	@echo "Downloading test data sets"
-	set_downloadTestData.pl all
+	set_test.pl lambda lambda --numcpus $(NUMCPUS) 
 
 check: check-sys check-Lyve-SET-PATH check-CGP-assembly check-Lyve-SET check-PERL check-smalt check-freebayes check-raxml check-freebayes check-phyml check-blast
 	@echo --OK

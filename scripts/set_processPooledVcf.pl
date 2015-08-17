@@ -11,6 +11,7 @@ use File::Basename;
 use File::Spec;
 use File::Temp qw/tempdir/;
 use Bio::Perl;
+use Bio::TreeIO;
 use File::Copy qw/move copy/;
 use threads;
 use Thread::Queue;
@@ -71,16 +72,46 @@ sub main{
     die "ERROR: could not move $$settings{tempdir}/$_.suffix: $!" if $?;
   }
 
+  # TODO: reroot the tree
+  #rerootLongestBranch("$$settings{prefix}.RAxML_bipartitions",$settings);
+
   # Get combined distance statistics on the tree
   system("cladeDistancesFromTree.pl -t $$settings{prefix}.RAxML_bipartitions -p $$settings{prefix}.pairwise.tsv --outprefix $$settings{prefix}");
   die "ERROR with cladeDistancesFromTree.pl" if $?;
 
   return 0;
 }
+
+sub rerootLongestBranch{
+  my($file,$settings)=@_;
+  
+  my $tmpTree="$file.rerooted";
+  my $tree=Bio::TreeIO->new(-file=>$file,-format=>"newick")->next_tree;
+  my $out=Bio::TreeIO->new(-file=>">$tmpTree",-format=>"newick");
+
+  my @node=$tree->get_nodes;
+  my $outgroup=$node[0];
+  my $longest=$node[0]->branch_length || 0;
+
+  for(my $i=1;$i<@node;$i++){
+    if($node[$i]->branch_length() > $longest){
+      $longest=$node[$i]->branch_length;
+      $outgroup=$node[$i];
+      #print join("\t",$outgroup->id,$longest)."\n";
+    }
+  }
+
+  $tree->reroot($outgroup);
+  
+  $out->write_tree($tree);
+  system("mv -v $tmpTree $file");
+  die if $?;
+}
+
 sub usage{
   local $0=basename $0;
   "Process a pooled VCF and get useful information
-  Usage: $0 file.fasta
+  Usage: $0 file.vcf.gz
   --prefix  ./out     Output file prefix. Default: current working directory
   --numcpus 1         Number of threads to use
   "

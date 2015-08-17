@@ -28,6 +28,7 @@ sub main{
   GetOptions($settings,qw(help reference=s tempdir=s altFreq=s coverage=i region=s exclude=s numcpus=i)) or die $!;
 
   my $bam=$ARGV[0] or die "ERROR: need bam\n".usage();
+  die "ERROR: only one bam allowed right now" if (@ARGV > 1);
   my $reference=$$settings{reference} or die "ERROR: need --reference\n".usage();
   my $refname=basename($reference,@fastaExt);
 
@@ -98,7 +99,7 @@ sub mpileup{
 
   # Multithread a pileup so that each region gets piped into a file.
   # Then, these individual files can be combined at a later step.
-  my $command="echo \"$regions\" | xargs -P $$settings{numcpus} -n 1 -I {} sh -c 'echo \"MPileup on {}\" >&2; rm -fv $$settings{tempdir}/$b.*.mpileup; samtools mpileup -f $reference $xopts --region \"{}\" $bam > $$settings{tempdir}/$b.\$\$.mpileup' ";
+  my $command="echo \"$regions\" | xargs -P $$settings{numcpus} -n 1 -I {} sh -c 'echo \"MPileup on {}\" >&2; rm -fv $$settings{tempdir}/$b.*.mpileup >&2; samtools mpileup -f $reference $xopts --region \"{}\" $bam > $$settings{tempdir}/$b.\$\$.mpileup' ";
   logmsg "Running mpileup:\n  $command";
   system($command);
   die "ERROR with xargs and samtools mpileup" if $?;
@@ -190,10 +191,9 @@ sub backfillVcfValues{
     $$x{ALT}=[$$x{ALT}[0]];
     $$x{FILTER}=[$$x{FILTER}[0]];
 
-    # Put in exactly what the alternate call is
-    $$x{ALT}[0]=$$x{REF} if($$x{ALT}[0] eq '.');
+    # It's a SNP if it isn't the same as REF and isn't a dot
     my $is_snp=0;
-    if($$x{ALT}[0] ne $$x{REF}){
+    if($$x{ALT}[0] ne $$x{REF} && $$x{ALT}[0] ne '.'){
       $is_snp=1;
     }
 
@@ -272,19 +272,22 @@ sub vcf_markAmbiguous{
   my $ucRef=uc($$x{REF}); # uppercase reference, to make it easier for str comparison
 
   # Figure out the alt allele (N) and the correct genotype integer
-  my $gtInt=1; # for the GT, e.g., 1/1 or 2/2
-  if($ucRef eq $$x{ALT}[0] || $$x{ALT}[0]=~/[Nn]/){
-    shift(@{ $$x{ALT} }); # unnecessary to mark the ref base in ALT
-    $gtInt=1;
+  my $gtInt=0; # for the GT, e.g., 1/1 or 2/2
+  # Mark if it is the reference allele
+  if($ucRef eq $$x{ALT}[0] || $ucRef eq '.'){
+    #shift(@{ $$x{ALT} }); # unnecessary to mark the ref base in ALT
+    $gtInt=0;
   } else {
-    $gtInt=2;
+    $gtInt=1;
   }
-  push(@{ $$x{ALT} }, "N");
+  #push(@{ $$x{ALT} }, "N");
+  $$x{ALT}=["N"];
   $$x{gtypes}{$samplename}{GT}="$gtInt/$gtInt";
 
   # empty the filter and then put on the fail reason
   @{$$x{FILTER}}=() if($$x{FILTER}[0] eq "PASS");
   push(@{$$x{FILTER}},$reason);
+  #$$x{FILTER}=[$reason];
 }
 
 # Get a hash of seqname->{pos} from a bed file
