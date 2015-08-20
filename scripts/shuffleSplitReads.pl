@@ -99,6 +99,7 @@ sub usage{
   "$0: shuffle a set of fastq files into a directory. Uses run_assembly_shuffleReads.pl.
   Usage: $0 *.fastq.gz -o outdir
   --outdir  output directory
+  --numcpus How many sets of reads to shuffle at once.  Be careful of disk I/O.
   --regex   A regular expression with parentheses to capture the basename of both F/R files. Also must have parentheses to capture the second half of the filename.
   "
 }
