@@ -20,8 +20,9 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help chunksize=i numchunks=i));
+  GetOptions($settings,qw(help chunksize=i numchunks=i minlength=i));
   die usage() if($$settings{help});
+  $$settings{minlength}||=1;
   $$settings{chunksize}||=0;
   if(!$$settings{chunksize}){
     $$settings{numchunks}||=1;
@@ -170,6 +171,7 @@ sub usage{
   --numchunks  1  If chunksize is not set, how many chunks should there be?
                   NOTE: Despite what is requested, there will be at least 
                   one chunk per contig.
+  --minlength  1  The minimum number of base pairs allowed per chunk
   "
 }
 
