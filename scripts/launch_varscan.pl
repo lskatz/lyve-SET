@@ -77,29 +77,20 @@ sub mpileup{
   return $pileup if(-e $pileup && -s $pileup > 0);
   logmsg "Creating a pileup $pileup";
 
-  # Figure out any defined seqnames
-  my @seqname;
-  open(SAMTOOLS,"samtools view -H '$bam' | ") or die "ERROR: could not open $bam with samtools: $!";
-  while(<SAMTOOLS>){
-    next if(!/^\@SQ/);
-    chomp;
-    my @F=split /\t/;
-    for(@F){
-      my($key,$value)=split /:/;
-      push(@seqname,$value) if($key eq 'SN');
-    }
-  }
-  close SAMTOOLS;
-  my $regions=join("\n",@seqname)."\n";
+  # Figure out any regions
+  my $regions=`makeRegions.pl --numchunks $$settings{numcpus} $bam`;
 
   # Figure out mpileup options
   my $xopts="";
   $xopts.="-Q 0 -B "; # assume that all reads have been properly filtered at this point and that mappings are good
   $xopts.="--positions $$settings{region} " if($$settings{region});
 
+  # Make sure that no other pileup file gets in the way.
+  system("rm -fv $$settings{tempdir}/$b.*.mpileup >&2");
+
   # Multithread a pileup so that each region gets piped into a file.
   # Then, these individual files can be combined at a later step.
-  my $command="echo \"$regions\" | xargs -P $$settings{numcpus} -n 1 -I {} sh -c 'echo \"MPileup on {}\" >&2; rm -fv $$settings{tempdir}/$b.*.mpileup >&2; samtools mpileup -f $reference $xopts --region \"{}\" $bam > $$settings{tempdir}/$b.\$\$.mpileup' ";
+  my $command="echo \"$regions\" | xargs -P $$settings{numcpus} -n 1 -I {} sh -c 'echo \"MPileup on {}\" >&2; samtools mpileup -f $reference $xopts --region \"{}\" $bam > $$settings{tempdir}/$b.\$\$.mpileup' ";
   logmsg "Running mpileup:\n  $command";
   system($command);
   die "ERROR with xargs and samtools mpileup" if $?;
@@ -107,7 +98,7 @@ sub mpileup{
   # Concatenate the output into a single file.
   # Individual regions are already sorted, thanks to the way mpileup works.
   logmsg "Sorting mpileup results into a combined file";
-  system("cat $$settings{tempdir}/$b.*.mpileup > $pileup && rm -f $$settings{tempdir}/$b.*.mpileup");
+  system("sort -k1,1 -k2,2n $$settings{tempdir}/$b.*.mpileup > $pileup && rm -f $$settings{tempdir}/$b.*.mpileup");
   die "ERROR with sorting mpileup results and then deleting the intermediate files" if $?;
 
   return $pileup;
