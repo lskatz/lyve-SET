@@ -33,6 +33,7 @@ if [ "$IN" == "" ] || [ "$OUT" == "" ]; then
   echo "Usage: $script -o pooled.vcf.gz *.vcf.gz"
   echo "  -o output.vcf.gz         The output compressed VCF file"
   echo "  -t /tmp/mergeVcfXXXXXX   A temporary directory that will be completely removed upon exit"
+  echo "  -n 1                     Number of CPUs"
   echo "  -s                       Output SNPs only file in addition to the whole thing"
   exit 1;
 fi
@@ -102,12 +103,17 @@ for VCF in $TEMPDIR/concat.vcf $TEMPDIR/hqPos.vcf; do
     continue;
   fi;
 
+  echo "$script: Sorting $VCF and removing indels";
+  vcf-sort $VCF | bcftools annotate --include '%TYPE!="indel" && %FILTER!="isIndel"' > $VCF.tmp && mv $VCF.tmp $VCF;
+
+  echo "$script: compressing $VCF";
   bgzip $VCF
   if [ $? -gt 0 ]; then
     echo "$script: ERROR with bgzip $VCF"
     rm -rvf $TEMPDIR;
     exit 1;
   fi
+  echo "$script: indexing $VCF";
   tabix $VCF.gz
   if [ $? -gt 0 ]; then
     echo "$script: ERROR with tabix $VCF.gz"
@@ -131,4 +137,3 @@ echo "$script: Output file can be found in $OUT"
 rm -rvf $TEMPDIR;
 
 exit 0;
-
