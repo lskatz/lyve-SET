@@ -21,10 +21,11 @@ $0=fileparse $0;
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(tree=s pairwise=s outprefix=s help outputType=s bootstrap=i)) or die $!;
+  GetOptions($settings,qw(tree=s pairwise=s outprefix=s help outputType=s bootstrap=i nameTrim=i)) or die $!;
   die usage($settings) if($$settings{help});
   $$settings{outputType}||="merged";
   $$settings{bootstrap}||=70;
+  $$settings{nameTrim}||=30;
   
   # required parameters
   for(qw(tree pairwise outprefix)){
@@ -36,10 +37,10 @@ sub main{
   }
 
   logmsg "Reading the pairwise file";
-  my $pairwise=readPairwise($$settings{pairwise},$settings);
+  my $pairwise=readPairwise($$settings{pairwise},$$settings{nameTrim},$settings);
   
   logmsg "Reading the tree and assigning names to high bootstrap nodes";
-  my ($treeArr, $labelHash, $allLeafArr) = readSigClades($$settings{tree},$$settings{bootstrap},$settings);
+  my ($treeArr, $labelHash, $allLeafArr) = readSigClades($$settings{tree},$$settings{bootstrap},$$settings{nameTrim},$settings);
 
   logmsg "Reading high bootstrap nodes and outputing statistics";
   my ($pairwiseCladeStats, $singletonCladeStats, $singletonTaxaStats, $treeStats) = generateSigCladeStats($labelHash, $pairwise, $allLeafArr, $settings);
@@ -53,12 +54,16 @@ sub main{
 
 # Read the pairwise file.
 sub readPairwise{
-  my($pairwise,$settings)=@_;
+  my($pairwise,$nameTrim,$settings)=@_;
   my %dist;
   open(PAIRWISE,$pairwise) or die "ERROR: could not read $pairwise:$!";
   while(<PAIRWISE>){
     chomp;
     my($g1,$g2,$dist)=split /\t/;
+    $g1=substr($g1,0,$nameTrim);
+    $g2=substr($g2,0,$nameTrim);
+    next if($g1 eq $g2);
+    
     $dist{$g1}{$g2}=$dist;
     $dist{$g2}{$g1}=$dist;
   }
@@ -92,7 +97,7 @@ sub countAncNodes{
 # Returns : 	Newick tree relabeled with unique node labels
 #			Hash keyed to unique node labels pointing to lists of descendent leaves for each label
 sub readSigClades{
-  my($infile,$bootstrapthreshold,$settings)=@_;
+  my($infile,$bootstrapthreshold,$nameTrim,$settings)=@_;
   my @bootTree;	# Tree with significant nodes labeled with letters
   my $i=0;
   my %labels = ();	# Descendent taxa leaf name lists keyed to each significant node's label
@@ -116,6 +121,7 @@ sub readSigClades{
         my $taxonId=$taxon->id;
         next if(!$taxonId);
         next if(!$taxon->is_Leaf);
+        $taxonId=substr($taxonId,0,$nameTrim);
         push(@d,$taxonId); #if(defined $$pairwise{$taxonId});
       }
       @d=sort{$a cmp $b} @d;
@@ -128,8 +134,8 @@ sub readSigClades{
       # If the bootstrap is low then skip
       if($bootstrap < $bootstrapthreshold){
         logmsg "Skipping node '$bootstrap' due to the low bootstrap values";
-        $node->bootstrap(1); # give it a really low fst
-        $node->id(1);        # give it a really low fst
+        $node->bootstrap(''); # give it a really low fst
+        $node->id('');        # give it a really low fst
         next;
       }
 
@@ -369,9 +375,12 @@ sub usage{
   --bootstrap 70 (default) The percent threshold for significant bootstrap 
   	values. Only nodes with bootstrap values higher than this number will 
   	be included in pairwise by node and individual node statistic calculations.
+  --nameTrim 30 (default) The character limit for taxa sample ID names both in
+     the pairwise distance file and tree file. If a name in either file is 
+     longer than this value, it will be trimmed.
   
   Example: 
-  $0 applyFstToTree.pl -p pairwise.tsv -t 4b.dnd --outprefix out --outputType split --bootstrap 80
+  $0 applyFstToTree.pl -p pairwise.tsv -t 4b.dnd --outprefix out --outputType split --bootstrap 80 --nameTrim 20
   ";
   return $help;
 }
