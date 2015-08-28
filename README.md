@@ -52,9 +52,11 @@ To see the help for any script, run it without options or with `--help`.  For ex
     --logdir  logdir/         Where to put log files. Qsub commands are also stored here.
     -asm      asmdir/         directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
 
-    SKIP CERTAIN STEPS
+    PERFORM CERTAIN STEPS
     --mask-phages                    Search for and mask phages in the reference genome
     --mask-cliffs                    Search for and mask 'Cliffs' in pileups
+
+    SKIP CERTAIN STEPS
     --nomatrix                       Do not create an hqSNP matrix
     --nomsa                          Do not make a multiple sequence alignment
     --notrees                        Do not make phylogenies
