@@ -140,8 +140,8 @@ install-bcftools:
 	cd $(TMPDIR) && tar jxvf bcftools-1.2.tar.bz2
 	mv $(TMPDIR)/bcftools-1.2 $(PREFIX)/lib/bcftools-1.2
 	cd $(PREFIX)/lib/bcftools-1.2 && make
-	ln -s $(PREFIX)/lib/bcftools-1.2/bcftools $(PREFIX)/scripts
-	ln -s $(PREFIX)/lib/bcftools-1.2/vcfutils.pl $(PREFIX)/scripts
+	ln -sf $(PREFIX)/lib/bcftools-1.2/bcftools $(PREFIX)/scripts
+	ln -sf $(PREFIX)/lib/bcftools-1.2/vcfutils.pl $(PREFIX)/scripts
 
 clean-bcftools:
 	rm -rfv $(PREFIX)/lib/bcftools-1.2/bcftools $(PREFIX)/lib/bcftools-1.2/vcfutils.pl $(PREFIX)/lib/bcftools*
