@@ -26,11 +26,24 @@ Usage
 -----
 To see the help for any script, run it without options or with `--help`.  For example, `set_test.pl -h`.  The following is the help for the main script, `launch_set.pl`:
 
-    Usage: launch_set.pl [project] [-ref reference.fasta]
+    Usage: launch_set.pl [project] [-ref reference.fasta|reference.gbk]
     If project is not given, then it is assumed to be the current working directory.
     If reference is not given, then it is assumed to be proj/reference/reference.fasta
+    -ref      proj/reference/reference.fasta   The reference genome assembly. If it is
+                                               a genbank or embl file, then it will be
+                                               converted to reference.gbk.fasta and will
+                                               be used for SNP annotation. If a fasta
+                                               is given, then no SNP annotation will
+                                               happen. Using a gbk or embl file is currently
+                                               experimental.
+
+    SNP MATRIX OPTIONS
+    --allowedFlanking  0               allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+    --min_alt_frac     0.75  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
+    --min_coverage     10  Minimum coverage needed before a SNP is called. Otherwise, 'N'
+
     Where parameters with a / are directories
-    -ref      proj/reference/reference.fasta   The reference genome assembly
+    LOCATIONS OF FILE DIRECTORIES
     -reads    readsdir/       where fastq and fastq.gz files are located
     -bam      bamdir/         where to put bams
     -vcf      vcfdir/         where to put vcfs
@@ -39,30 +52,26 @@ To see the help for any script, run it without options or with `--help`.  For ex
     --logdir  logdir/         Where to put log files. Qsub commands are also stored here.
     -asm      asmdir/         directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
 
-    SNP MATRIX OPTIONS
-    --allowedFlanking  0               allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
-    --min_alt_frac     0.75  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
-    --min_coverage     10  Minimum coverage needed before a SNP is called. Otherwise, 'N'
-    --rename-taxa      ''  A perl regex to rename taxa in the MSA. See set_processMsa.pl for details and examples.  Use additional escapes for special characters, e.g. 's/\\..*//'
-
     SKIP CERTAIN STEPS
-    --nomask-phages                  Do not search for and mask phages in the reference genome
+    --mask-phages                    Search for and mask phages in the reference genome
+    --mask-cliffs                    Search for and mask 'Cliffs' in pileups
     --nomatrix                       Do not create an hqSNP matrix
     --nomsa                          Do not make a multiple sequence alignment
     --notrees                        Do not make phylogenies
+    --singleend                      Treat everything like single-end. Useful for when you think there is a single-end/paired-end bias.
     OTHER SHORTCUTS
-    --fast                           Shorthand for --downsample --mapper snap --nomask-phages --sample-sites
+    --fast                           Shorthand for --downsample --mapper snap --nomask-phages --nomask-cliffs --sample-sites
+    --presets ""                   See presets.conf for more information
     --downsample                     Downsample all reads to 50x. Approximated according to the ref genome assembly
     --sample-sites                   Randomly choose a genome and find SNPs in a quick and dirty way. Then on the SNP-calling stage, only interrogate those sites for SNPs for each genome (including the randomly-sampled genome).
     MODULES
+    --read_cleaner    Which read cleaner?  Choices: none, CGP, BayesHammer
     --mapper       smalt             Which mapper? Choices: smalt, snap
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue        all.q             The default queue to use.
-    --numnodes     20                maximum number of nodes
+    --numnodes     50                maximum number of nodes
     --numcpus      1                 number of cpus
     --qsubxopts    '-N lyve-set'     Extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
-    OTHER
-    --info         version           Display information about Lyve-SET. The only option right now is 'version' and it is turned on by default
 
 
 Run a test dataset
