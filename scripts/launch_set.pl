@@ -409,9 +409,11 @@ sub mapReads{
 
   my $snapxopts="";
   my $smaltxopts="";
+  my $stampyxopts="";
   if($$settings{singleend}){
     $smaltxopts.="--pairedend 1";
     $snapxopts.= "--pairedend 1";
+    $stampyxopts.= "--pairedend 1";
   }
 
   my (@bam,@job);
@@ -431,6 +433,8 @@ sub mapReads{
       $sge->pleaseExecute("$scriptsdir/launch_smalt.pl $smaltxopts -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} ",{jobname=>"smalt$b"});
     } elsif($$settings{mapper} eq 'snap'){
       $sge->pleaseExecute("$scriptsdir/launch_snap.pl $snapxopts -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} ",{jobname=>"snap$b"});
+    } elsif($$settings{mapper} eq 'stampy'){
+      $sge->pleaseExecute("$scriptsdir/launch_stampy.sh $stampyxopts -r $ref -f $fastq -b $bamPrefix.sorted.bam -t $tmpdir --numcpus $$settings{numcpus} ",{jobname=>"stampy$b"});
     } else {
       die "ERROR: I do not understand the mapper $$settings{mapper}";
     }
