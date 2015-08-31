@@ -68,7 +68,7 @@ To see the help for any script, run it without options or with `--help`.  For ex
     --sample-sites                   Randomly choose a genome and find SNPs in a quick and dirty way. Then on the SNP-calling stage, only interrogate those sites for SNPs for each genome (including the randomly-sampled genome).
     MODULES
     --read_cleaner    Which read cleaner?  Choices: none, CGP, BayesHammer
-    --mapper       smalt             Which mapper? Choices: smalt, snap
+    --mapper       smalt             Which mapper? Choices: smalt, snap, stampy
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue        all.q             The default queue to use.
     --numnodes     50                maximum number of nodes

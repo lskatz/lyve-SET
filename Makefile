@@ -30,10 +30,10 @@ install: install-prerequisites
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-samtools install-bcftools install-smalt install-snap install-raxml install-perlModules install-config install-snpEff
+install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-samtools install-bcftools install-smalt install-snap install-raxml install-perlModules install-config install-snpEff install-stampy
 	@echo DONE installing prerequisites
 
-clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-perlModules clean-config clean-snpEff
+clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-perlModules clean-config clean-snpEff clean-stampy
 	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
 
 install-mkdir:
@@ -83,7 +83,6 @@ clean-vcftools:
 	rm -rvf $(PREFIX)/lib/vcftools_0.1.12b
 	rm -vf $(PREFIX)/scripts/vcf-sort
 	rm -vf $(PREFIX)/lib/Vcf.pm
-
 
 install-varscan:
 	wget 'http://downloads.sourceforge.net/project/varscan/VarScan.v2.3.7.jar' -O $(PREFIX)/lib/varscan.v2.3.7.jar
@@ -165,6 +164,15 @@ install-snap:
 
 clean-snap:
 	rm -rvf $(PREFIX)/lib/snap $(PREFIX)/scripts/snap $(PREFIX)/scripts/snapxl
+
+install-stampy:
+	wget www.well.ox.ac.uk/bioinformatics/Software/Stampy-latest.tgz -O $(TMPDIR)/Stampy-latest.tgz
+	mkdir $(PREFIX)/lib/stampy && tar zxvf $(TMPDIR)/Stampy-latest.tgz -C $(PREFIX)/lib/stampy --strip-components 1
+	cd $(PREFIX)/lib/stampy && make CXXFLAGS='-Wno-deprecated -Wunused-but-set-variable'
+	ln -sv $(PREFIX)/lib/stampy/stampy.py $(PREFIX)/scripts
+
+clean-stampy:
+	rm -rvf $(PREFIX)/lib/stampy
 
 install-raxml:
 	wget 'https://github.com/stamatak/standard-RAxML/archive/v8.1.16.tar.gz' -O $(TMPDIR)/raxml_v8.1.16.tar.gz
