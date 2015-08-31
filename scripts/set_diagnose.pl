@@ -5,6 +5,7 @@ use warnings;
 use Data::Dumper;
 use Getopt::Long;
 use File::Basename qw/fileparse basename/;
+use Statistics::Descriptive;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
@@ -35,7 +36,8 @@ sub main{
     for my $ext(@fastaExt){
       push(@fasta,(glob("$$settings{project}/reference/*.$ext")));
     }
-    # Find the first one that exists and has a nonzero filesize
+    # Find the first asm that exists and has a nonzero filesize,
+    # with priority for reference.fasta
     for my $fasta(@fasta){
       if(-e $fasta && -s $fasta > 0){
         $$settings{reference} ||= $fasta;
@@ -66,6 +68,12 @@ sub main{
   # Now do some diagnostics
   my $refInfo=readAssembly($settings);
   reportMaskedGenomes($$settings{matrix},$refInfo,$settings);
+  reportClusteredSnps($$settings{matrix},$refInfo,$settings);
+  if($$settings{project}){
+    for my $vcf(glob("$$settings{project}/vcf/*.vcf.gz")){
+      # make a temporary "matrix" of one sample and then reuse the reportClusteredSnps subroutine
+    }
+  }
 
   return 0;
 }
@@ -110,7 +118,7 @@ sub reportMaskedGenomes{
 
     # split that index into site info and sample info
     for(qw(CHROM POS REF)){
-      die "ERROR: field $_ was not found in $matrix" if(!$site{$_});
+      die "ERROR: field $_ was not found in $matrix\n" if(!$sample{$_});
       $site{$_}=$sample{$_};
       delete($sample{$_});
     }
@@ -162,6 +170,37 @@ sub reportMaskedGenomes{
     my $percentHq=int($numHqSites/$asmLength*10000)/100;
     logmsg "With $minLengthStr min length contigs, $percentHq% is represented in the matrix";
   }
+}
+
+sub reportClusteredSnps{
+  my($matrix,$refInfo,$settings)=@_;
+  
+  # Read the VCF
+  my %pos;
+  open(MATRIX,"filterMatrix.pl --noinvariant-loose < $matrix |") or die "ERROR: could not open $matrix for reading with filterMatrix.pl: $!";
+  my $header=<MATRIX>;
+  while(<MATRIX>){
+    my($seqname,$pos)=split(/\t/);
+    push(@{ $pos{$seqname} },$pos);
+  }
+  close MATRIX;
+
+  # Find clustering of SNPs
+  my @dist;
+  while(my($seqname,$posArr)=each(%pos)){
+    my @pos=sort {$a<=>$b} @$posArr;
+    for(my $i=1;$i<@pos;$i++){
+      push(@dist,$pos[$i]-$pos[$i-1]);
+    }
+  }
+
+  # Describe the distribution of SNP distances
+  my $stats=Statistics::Descriptive::Full->new();
+  $stats->add_data(@dist);
+  my $stdev=sprintf("%0.2f",$stats->standard_deviation);
+  my $avg=sprintf("%0.2f",$stats->mean);
+
+  logmsg "Average SNP distance within $matrix is $avg ± $stdev";
 }
 
 sub usage{
