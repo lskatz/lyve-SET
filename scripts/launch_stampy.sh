@@ -29,7 +29,6 @@ PAIREDEND=0
 
 nopts=$#
 for ((i=1 ; i <= nopts ; i++)); do
-  echo "$i $1 $2";
 	case "$1" in
 		-f | --fastq)  # single fastq input file
 			IN_FASTQ="$2"
