@@ -790,16 +790,17 @@ sub usage{
     Where parameters with a / are directories
     LOCATIONS OF FILE DIRECTORIES
     -reads    $$settings{readsdir} where fastq and fastq.gz files are located
-    -bam      $$settings{bamdir} where to put bams
-    -vcf      $$settings{vcfdir} where to put vcfs
+    --bamdir  $$settings{bamdir} where to put bams
+    --vcfdir  $$settings{vcfdir} where to put vcfs
     --tmpdir  $$settings{tmpdir} tmp/ Where to put temporary files
     --msadir  $$settings{msadir} multiple sequence alignment and tree files (final output)
     --logdir  $$settings{logdir} Where to put log files. Qsub commands are also stored here.
-    -asm      $$settings{asmdir} directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
+    --asmdir  $$settings{asmdir} directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
 
-    SKIP CERTAIN STEPS
+    PERFORM CERTAIN STEPS
     --mask-phages                    Search for and mask phages in the reference genome
     --mask-cliffs                    Search for and mask 'Cliffs' in pileups
+    SKIP CERTAIN STEPS
     --nomatrix                       Do not create an hqSNP matrix
     --nomsa                          Do not make a multiple sequence alignment
     --notrees                        Do not make phylogenies
@@ -811,9 +812,8 @@ sub usage{
     --sample-sites                   Randomly choose a genome and find SNPs in a quick and dirty way. Then on the SNP-calling stage, only interrogate those sites for SNPs for each genome (including the randomly-sampled genome).
     MODULES
     --read_cleaner $$settings{read_cleaner}   Which read cleaner?  Choices: none, CGP, BayesHammer
-    --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap";
-    #--snpcaller    $$settings{snpcaller}   Which SNP caller? Choices: freebayes, varscan
-    $help.="
+    --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap, stampy
+    --snpcaller    $$settings{snpcaller}   Which SNP caller? Only choice: varscan
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue        $$settings{queue}             The default queue to use.
     --numnodes     $$settings{numnodes}                maximum number of nodes
