@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Usage: $0 -f file.fastq -b file.bam -t tmp/ -r reference.fasta
   # -t tmp to set the temporary directory as 'tmp'
@@ -7,9 +7,10 @@
   # --pairedend <0|1|2> For 'auto', single-end, or paired-end respectively. Default: auto (0).
   # --minPercentIdentity 95  The percent identity between a read and its match before it can be mapped
 
+SCRIPT=$(basename $0);
 function usage() { 
 	echo "
-	Usage: $0 -f file.fastq -b file.bam -t tmp/ -r reference.fasta [-s '']
+	Usage: $SCRIPT -f file.fastq[.gz] -b file.bam -t tmp/ -r reference.fasta [-s '']
 		
 		-t [default: ./tmp] Path to temporary directory
 		-c [default: 1] Number of threads to use
@@ -28,6 +29,7 @@ PAIREDEND=0
 
 nopts=$#
 for ((i=1 ; i <= nopts ; i++)); do
+  echo "$i $1 $2";
 	case "$1" in
 		-f | --fastq)  # single fastq input file
 			IN_FASTQ="$2"
@@ -76,12 +78,17 @@ for ((i=1 ; i <= nopts ; i++)); do
 	esac
 done
 
+if [ "$IN_FASTQ" == "" ]; then
+  usage
+  exit 1
+fi
+
 # Create tmp dir (if absent)
 if [ ! -d "$TMP" ]; then
 	mkdir -p "$TMP"
 	echo '    Created temporary directory...'
 else
-	echo 'WARNING: files present in the specified tmp dir might disrupt analysis'
+	echo "WARNING: temporary directory $TMP already exists. Files present in the specified tmp dir might disrupt analysis"
 fi
 
 OUT_PREFIX=$(basename "$IN_FASTQ" .fastq)
