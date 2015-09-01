@@ -7,6 +7,7 @@ use Getopt::Long;
 use File::Basename qw/fileparse basename/;
 use Statistics::Descriptive;
 use File::Temp qw/tempdir/;
+use List::MoreUtils qw/uniq/;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
@@ -17,12 +18,13 @@ exit(main());
 sub main{
   my $settings={};
   die usage($settings) if(!@ARGV);
-  GetOptions($settings,qw(help reference=s project=s matrix=s));
-  $$settings{maskedThresholdPercent}=10;
-  $$settings{project}||="";
-  $$settings{reference}||="";
-  $$settings{matrix}||="";
-  $$settings{tempdir}||=tempdir(basename($0)."XXXXXX",TMPDIR=>1,CLEANUP=>1);
+  GetOptions($settings,qw(help reference=s project=s matrix=s maskedThresholdPercent=i clusteredStdevThreshold=i));
+  $$settings{maskedThresholdPercent} ||=25;
+  $$settings{clusteredStdevThreshold}||=2 ;
+  $$settings{project}                ||="";
+  $$settings{reference}              ||="";
+  $$settings{matrix}                 ||="";
+  $$settings{tempdir}                ||=tempdir(basename($0)."XXXXXX",TMPDIR=>1,CLEANUP=>1);
 
   die usage($settings) if($$settings{help});
 
@@ -73,15 +75,24 @@ sub main{
 
   # Now do some diagnostics
   my $refInfo=readAssembly($settings);
-  reportMaskedGenomes($$settings{matrix},$refInfo,$settings);
+
+  # Masked genomes
+  my $maskedGenomes=reportMaskedGenomes($$settings{matrix},$refInfo,$settings);
+
+  # Clustered SNPs
+  my %clusteredGenomes=();
   my ($avg,$stdev,$numOutliers)=reportClusteredSnps($$settings{matrix},$refInfo,$settings);
   logmsg "Overall SNP clustering is $avg ± $stdev, with $numOutliers statistically close SNPs";
   if($$settings{project}){
     for my $vcf(glob("$$settings{project}/vcf/*.vcf.gz")){
       ($avg,$stdev,$numOutliers)=reportClusteredSnps($vcf,$refInfo,$settings);
       logmsg "$vcf: $avg ± $stdev, with $numOutliers close SNPs";
+      $clusteredGenomes{basename($vcf)}=1 if($avg-$$settings{clusteredStdevThreshold}*$stdev > 0);
     }
   }
+
+  my @recommendationForRemoval=sort {$a cmp $b} uniq(keys(%$maskedGenomes), keys(%clusteredGenomes));
+  logmsg "Based on these findings, I would recommend that you remove these genomes:\n  ".join("\n  ",@recommendationForRemoval);
 
   return 0;
 }
@@ -105,6 +116,8 @@ sub readAssembly{
 sub reportMaskedGenomes{
   my($matrix,$refInfo,$settings)=@_;
   return 0 if(!$matrix);
+
+  my %removalRecommendation=();
 
   open(MATRIX,$matrix) or die "ERROR: could not open $matrix for reading: $!";
   my $header=<MATRIX>;
@@ -160,6 +173,7 @@ sub reportMaskedGenomes{
     my $count=$maskCounter{$sample};
     my $percentGenomeMasked=int($count/$numSites*10000)/100;
     logmsg "$sample is $percentGenomeMasked% masked" if($percentGenomeMasked > 10);
+    $removalRecommendation{$sample}=1;
   }
 
   # How many sites are masked
@@ -180,12 +194,14 @@ sub reportMaskedGenomes{
     my $percentHq=int($numHqSites/$asmLength*10000)/100;
     logmsg "With $minLengthStr min length contigs, $percentHq% is represented in the matrix";
   }
+
+  return \%removalRecommendation;
 }
 
 sub reportClusteredSnps{
   my($infile,$refInfo,$settings)=@_;
 
-  my($avg,$stdev,$numOutliers)=split(/\t/,"N/A\t" x 5);
+  my($avg,$stdev,$numOutliers)=split(/\t/,"0\t" x 5);
 
   return($avg,$stdev,$numOutliers) if(!$infile);
   
@@ -211,10 +227,11 @@ sub reportClusteredSnps{
   die "ERROR with filterMatrix.pl" if $?;
 
   # Read the matrix
-  open(MATRIX,$informativeMatrix) or die "ERROR: could not open $informativeMatrix for reading: $!";
+  open(MATRIX,"cut -f 1-5 $informativeMatrix |") or die "ERROR: could not open $informativeMatrix for reading: $!";
   my $header=<MATRIX>;
   while(<MATRIX>){
-    my($seqname,$pos)=split(/\t/);
+    chomp;
+    my($seqname,$pos,$id,$ref,$alt)=split(/\t/);
     push(@{ $pos{$seqname} },$pos);
   }
   close MATRIX;
@@ -234,7 +251,7 @@ sub reportClusteredSnps{
     $stats->add_data(@dist);
     $stdev=sprintf("%0.2f",$stats->standard_deviation);
     $avg=sprintf("%0.2f",$stats->mean);
-    $numOutliers=(grep {$_ < $avg - 2*$stdev} @dist);
+    $numOutliers=(grep {$_ < $avg - $$settings{clusteredStdevThreshold}*$stdev} @dist);
   } 
   return ($avg,$stdev,$numOutliers);
 }
@@ -249,7 +266,11 @@ sub usage{
   ";
   return $help if(!$$settings{help});
   $help.="
-  Alternate USAGE: $0 --matrix snpmatrix.tsv [-r reference.fasta]
+  ADDITIONAL OPTIONS
+  --clusteredStdevThreshold  2  How many stdevs from the mean do you allow for clustered SNPs?
+  --maskedThresholdPercent  10  What percent of the genome is allowed to be masked?
+
+  ALTERNATE USAGE: $0 --matrix snpmatrix.tsv [-r reference.fasta]
   note: snpmatrix.tsv must have as the first three columns: CHROM, POS, REF and must have subsequent columns pertaining to each sample
   ";
   return $help;
