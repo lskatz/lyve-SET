@@ -99,7 +99,7 @@ sub mapReads{
   }
 
   # Convert to bam
-  system("samtools view $$settings{samtoolsxopts} -bS -T $ref $tmpSamOut > $tmpOut");
+  system("samtools view $$settings{samtoolsxopts} -\@ $$settings{numcpus} -bS -T $ref $tmpSamOut > $tmpOut");
   die "ERROR with samtools view $$settings{samtoolsxopts}" if $?;
 
   logmsg "Transforming the output file with samtools";
