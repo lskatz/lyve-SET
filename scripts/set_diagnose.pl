@@ -6,10 +6,11 @@ use Data::Dumper;
 use Getopt::Long;
 use File::Basename qw/fileparse basename/;
 use Statistics::Descriptive;
+use File::Temp qw/tempdir/;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
-use LyveSET qw/logmsg @fastaExt/;
+use LyveSET qw/logmsg @fastaExt @vcfExt/;
 
 exit(main());
 
@@ -21,6 +22,7 @@ sub main{
   $$settings{project}||="";
   $$settings{reference}||="";
   $$settings{matrix}||="";
+  $$settings{tempdir}||=tempdir(basename($0)."XXXXXX",TMPDIR=>1,CLEANUP=>1);
 
   die usage($settings) if($$settings{help});
 
@@ -65,13 +67,19 @@ sub main{
     ($$settings{matrix})=@ARGV;
   }
 
+  if(!$$settings{matrix}){
+    logmsg "WARNING: no matrix was given";
+  }
+
   # Now do some diagnostics
   my $refInfo=readAssembly($settings);
   reportMaskedGenomes($$settings{matrix},$refInfo,$settings);
-  reportClusteredSnps($$settings{matrix},$refInfo,$settings);
+  my ($avg,$stdev,$numOutliers)=reportClusteredSnps($$settings{matrix},$refInfo,$settings);
+  logmsg "Overall SNP clustering is $avg ± $stdev, with $numOutliers statistically close SNPs";
   if($$settings{project}){
     for my $vcf(glob("$$settings{project}/vcf/*.vcf.gz")){
-      # make a temporary "matrix" of one sample and then reuse the reportClusteredSnps subroutine
+      ($avg,$stdev,$numOutliers)=reportClusteredSnps($vcf,$refInfo,$settings);
+      logmsg "$vcf: $avg ± $stdev, with $numOutliers close SNPs";
     }
   }
 
@@ -96,6 +104,8 @@ sub readAssembly{
 
 sub reportMaskedGenomes{
   my($matrix,$refInfo,$settings)=@_;
+  return 0 if(!$matrix);
+
   open(MATRIX,$matrix) or die "ERROR: could not open $matrix for reading: $!";
   my $header=<MATRIX>;
   $header=~s/^#//g;                # remove leading pound sign
@@ -173,11 +183,35 @@ sub reportMaskedGenomes{
 }
 
 sub reportClusteredSnps{
-  my($matrix,$refInfo,$settings)=@_;
+  my($infile,$refInfo,$settings)=@_;
+
+  my($avg,$stdev,$numOutliers)=split(/\t/,"N/A\t" x 5);
+
+  return($avg,$stdev,$numOutliers) if(!$infile);
   
-  # Read the VCF
-  my %pos;
-  open(MATRIX,"filterMatrix.pl --noinvariant-loose < $matrix |") or die "ERROR: could not open $matrix for reading with filterMatrix.pl: $!";
+  my %pos; # hash of contig=>[pos1,pos2,...]
+
+  # If this is a vcf, convert it to a matrix style, using Lyve-SET tools
+  my $matrix=$infile;  # by default, it is the infile but it could be a vcf
+  my $filterMatrixXopts="";
+  my($name,$path,$ext)=fileparse($matrix,@vcfExt);
+  if($ext){
+    my $tmpMatrix="$$settings{tempdir}/matrix.tsv";
+    system("pooledToMatrix.sh -o $tmpMatrix $matrix >/dev/null 2>&1");
+    die if $?;
+    $matrix=$tmpMatrix;
+    $filterMatrixXopts.="--noambiguities"; # noinvariant-loose is kind of buggy on a one-sample vcf
+  } else {
+    $filterMatrixXopts.="--noinvariant-loose";
+  }
+
+  # Filter the matrix to just SNPs. 
+  my $informativeMatrix="$$settings{tempdir}/informative.tsv";
+  system("filterMatrix.pl $filterMatrixXopts < $matrix > $informativeMatrix 2>/dev/null");
+  die "ERROR with filterMatrix.pl" if $?;
+
+  # Read the matrix
+  open(MATRIX,$informativeMatrix) or die "ERROR: could not open $informativeMatrix for reading: $!";
   my $header=<MATRIX>;
   while(<MATRIX>){
     my($seqname,$pos)=split(/\t/);
@@ -194,13 +228,15 @@ sub reportClusteredSnps{
     }
   }
 
-  # Describe the distribution of SNP distances
-  my $stats=Statistics::Descriptive::Full->new();
-  $stats->add_data(@dist);
-  my $stdev=sprintf("%0.2f",$stats->standard_deviation);
-  my $avg=sprintf("%0.2f",$stats->mean);
-
-  logmsg "Average SNP distance within $matrix is $avg ± $stdev";
+  # Describe the distribution of SNP distances if there are enough data points.
+  if(@dist > 1){
+    my $stats=Statistics::Descriptive::Full->new();
+    $stats->add_data(@dist);
+    $stdev=sprintf("%0.2f",$stats->standard_deviation);
+    $avg=sprintf("%0.2f",$stats->mean);
+    $numOutliers=(grep {$_ < $avg - 2*$stdev} @dist);
+  } 
+  return ($avg,$stdev,$numOutliers);
 }
 
 sub usage{
