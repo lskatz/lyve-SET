@@ -9,6 +9,8 @@ use Statistics::Descriptive;
 use File::Temp qw/tempdir/;
 use List::MoreUtils qw/uniq/;
 
+# TODO multithread
+
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
 use LyveSET qw/logmsg @fastaExt @vcfExt/;
@@ -87,7 +89,13 @@ sub main{
     for my $vcf(glob("$$settings{project}/vcf/*.vcf.gz")){
       ($avg,$stdev,$numOutliers)=reportClusteredSnps($vcf,$refInfo,$settings);
       logmsg "$vcf: $avg ± $stdev, with $numOutliers close SNPs";
-      $clusteredGenomes{basename($vcf)}=1 if($avg-$$settings{clusteredStdevThreshold}*$stdev > 0);
+
+      # Figure out if this genome should be thrown out
+      my $lowerLimit=$avg-$$settings{clusteredStdevThreshold}*$stdev;
+      my $name=basename($vcf);
+      $name=~s/^([^\.]+)\..*$/$1/;
+      $clusteredGenomes{$name}=1 if($lowerLimit > 0);
+      #last if(keys(%clusteredGenomes) > 0);
     }
   }
 
@@ -172,8 +180,10 @@ sub reportMaskedGenomes{
   for my $sample(@genome){
     my $count=$maskCounter{$sample};
     my $percentGenomeMasked=int($count/$numSites*10000)/100;
-    logmsg "$sample is $percentGenomeMasked% masked" if($percentGenomeMasked > 10);
-    $removalRecommendation{$sample}=1;
+    if($percentGenomeMasked > $$settings{maskedThresholdPercent}){
+      logmsg "$sample is $percentGenomeMasked% masked";
+      $removalRecommendation{$sample}=1;
+    }
   }
 
   # How many sites are masked
@@ -192,7 +202,7 @@ sub reportMaskedGenomes{
     my $asmLength=$$refInfo{$minLength};
     my $minLengthStr=sprintf("%0.2f%s",int($minLength*100)/100000,"k");
     my $percentHq=int($numHqSites/$asmLength*10000)/100;
-    logmsg "With $minLengthStr min length contigs, $percentHq% is represented in the matrix";
+    logmsg "With $minLengthStr min length contigs, $percentHq% of the reference genome is represented in the matrix";
   }
 
   return \%removalRecommendation;

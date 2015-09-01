@@ -163,14 +163,17 @@ sub main{
 
   #####################################
   # Go through the major steps of SET #
-  # ###################################
+  #####################################
   simulateReads($settings);
   maskReference($ref,$settings);
   indexReference($ref,$settings);
   mapReads($ref,$$settings{readsdir},$$settings{bamdir},$settings);
   variantCalls($ref,$$settings{bamdir},$$settings{vcfdir},$settings);
   annotateVariants($$settings{richseq},$$settings{vcfdir},$settings);
-  compareTaxa($ref,$settings); # SNP matrix, alignment, trees
+  compareTaxa($ref,$project,$settings); # SNP matrix, alignment, trees
+  #####################################
+  # Finished major steps              #
+  #####################################
 
   # Find the output files
   my $absDir=rel2abs($$settings{msadir}); # save the abs. path
@@ -662,7 +665,7 @@ sub indexAndCompressVcf{
 
 # Make a matrix, trees, etc
 sub compareTaxa{
-  my($ref,$settings)=@_;
+  my($ref,$project,$settings)=@_;
   my $pooled;
   if($$settings{matrix}){
     $pooled=variantsToMatrix($ref,$$settings{bamdir},$$settings{vcfdir},$$settings{msadir},$settings);
@@ -670,13 +673,6 @@ sub compareTaxa{
     logmsg "The matrix was not requested; wrapping up";
     return 1;
   }
-
-  #if($$settings{msa}){
-  #  pooledToAlignment($pooled,$settings);
-  #} else {
-  #  logmsg "The alignment was not requested; wrapping up";
-  #  return 0;
-  #}
 
   if($$settings{msa} || $$settings{trees}){
     logmsg "Launching set_processPooledVcf.pl";
@@ -686,8 +682,15 @@ sub compareTaxa{
     $sge->wrapItUp();
   } else {
     logmsg "The phylogeny was not requested; wrapping up";
-    return 1;
   }
+
+  # Diagnose the project
+  # Make sure this gets printed to stdout
+  logmsg "Running set_diagnose.pl";
+  my $diagnosis="$$settings{logdir}/diagnosis.txt";
+  $sge->pleaseExecute("set_diagnose.pl -p $project > $diagnosis 2>&1");
+  $sge->wrapItUp();
+  system("cat $diagnosis");
 
   return 1;
 }
