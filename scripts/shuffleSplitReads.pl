@@ -84,11 +84,14 @@ sub shuffleWorker{
   while(defined(my $tmp=$Q->dequeue)){
     my($basename,$reads)=@$tmp;
 
-    logmsg "Looking for $basename";
-    my $outfile="$outdir/$basename.fastq.gz";
-    next if(-e $outfile);
-
-    system("run_assembly_shuffleReads.pl $$reads{1} $$reads{2} | gzip -c > $outfile.tmp");
+    my $outfile="$outdir/".basename($basename).".fastq.gz";
+    logmsg "Looking for $basename*";
+    if(-e $outfile){
+      logmsg "Found $outfile; will not reshuffle";
+      next;
+    }
+    my $command="run_assembly_shuffleReads.pl $$reads{1} $$reads{2} | gzip -c > $outfile.tmp";
+    system($command);
     die "ERROR with run_assembly_shuffleReads.pl" if $?;
     system("mv -v $outfile.tmp $outfile");
   }
