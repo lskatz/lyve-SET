@@ -38,6 +38,12 @@ if [ "$OUT" == "" ] || [ "$IN" == "" ]; then
 fi
 
 # Create the basic matrix
+if [ ! -e "$IN.tbi" ]; then
+  logmsg "$IN.tbi not found -- running tabix."
+  tabix $IN
+fi
+
+# bcftools query
 t='\t'
 command="bcftools query -i '%TYPE=\"snp\"' -f '%CHROM$t%POS$t%REF$t[%TGT$t]\\n' --print-header $IN > $OUT.unrefined.tmp"
 logmsg $command;
