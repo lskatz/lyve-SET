@@ -20,10 +20,11 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help chunksize=i numchunks=i minlength=i));
+  GetOptions($settings,qw(help chunksize=i numchunks=i minlength=i overlapby=i));
   die usage() if($$settings{help});
   $$settings{minlength}||=1;
   $$settings{chunksize}||=0;
+  $$settings{overlapby}||=0;
   if(!$$settings{chunksize}){
     $$settings{numchunks}||=1;
   }
@@ -153,7 +154,7 @@ sub printChunks{
   my $chunksize=$$settings{chunksize};
   while(my($seqname,$length)=each(%$contigLength)){
     for(my $start=1;$start<$length;$start+=$chunksize){
-      my $end = $start + $chunksize - 1;
+      my $end = $start + $chunksize - 1 + $$settings{overlapby};
       $end=$length if($end > $length);
       print "$seqname:$start-$end\n";
     }
@@ -171,6 +172,7 @@ sub usage{
   --numchunks  1  If chunksize is not set, how many chunks should there be?
                   NOTE: Despite what is requested, there will be at least 
                   one chunk per contig.
+  --overlapby  0  How many bp each region should overlap by
   --minlength  1  The minimum number of base pairs allowed per chunk
   "
 }
