@@ -504,7 +504,7 @@ sub cleanReads{
     # 3. mv tmp/cleaned to ./file.fastq.gz
     if($$settings{read_cleaner} eq "cgp"){
       logmsg "Did not find $backup. Cleaning with CGP...";
-      $sge->pleaseExecute("run_assembly_trimClean.pl -i $file -o $tmp --auto --nosingletons --numcpus $$settings{numcpus} 2>&1 && mv -v $file $backup && mv -v $tmp $file",{numcpus=>$$settings{numcpus},jobname=>"trimClean$b"});
+      $sge->pleaseExecute("run_assembly_trimClean.pl -i $file -o $tmp --nosingletons --numcpus $$settings{numcpus} $$settings{read_cleaner_cgpxopts} 2>&1 && mv -v $file $backup && mv -v $tmp $file",{numcpus=>$$settings{numcpus},jobname=>"trimClean$b"});
     } elsif($$settings{read_cleaner} eq "bayeshammer"){
       logmsg "Did not find $backup. Cleaning with BayesHammer...";
       my $tmpdir=tempdir("$$settings{tmpdir}/bayeshammerXXXXXX",CLEANUP=>1);
