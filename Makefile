@@ -9,7 +9,6 @@ SHELL   := /bin/bash
 
 # Derived variables
 TMPDIR := $(PREFIX)/build
-TMPTARFILE=$(TMPDIR)/$(TARFILE)
 
 # Style variables
 T= "	"
@@ -26,36 +25,31 @@ help:
 all: install env clean
 
 install: install-prerequisites
-	@echo "Don't forget to set up update PATH and PERL5LIB to $(PREFIX)/scripts and $(PREFIX)/lib"
-	@echo "'make env' performs this step for you"
+	@echo "Don't forget to include $(PREFIX)/scripts in your PATH"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-samtools install-bcftools install-smalt install-snap install-raxml install-perlModules install-config install-snpEff install-stampy
+install-prerequisites: lib/vcftools_0.1.12b lib/cg-pipeline lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar lib/phast/phast.faa lib/samtools-1.2/samtools lib/bcftools-1.2/bcftools lib/smalt-0.7.6/bin/smalt lib/snap/snap-aligner lib/standard-RAxML-8.1.16/raxmlHPC install-perlModules install-config lib/snpEff.jar lib/stampy/stampy.py
 	@echo DONE installing prerequisites
 
-clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-perlModules clean-config clean-snpEff clean-stampy
-	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
+clean: clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-perlModules clean-config clean-snpEff clean-stampy
+	@echo "Remember to remove the Lyve-SET path from PATH"
 
-install-mkdir:
-	-mkdir $(PREFIX)/build $(PREFIX)/lib $(PREFIX)/scripts
+lib/vcftools_0.1.12b:
+	wget 'http://downloads.sourceforge.net/project/vcftools/vcftools_0.1.12b.tar.gz?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fvcftools%2Ffiles%2F&ts=1409260024&use_mirror=ufpr' -O $(TMPDIR)/vcftools_0.1.12b.tar.gz
+	cd $(TMPDIR) && \
+	tar zxvf vcftools_0.1.12b.tar.gz
+	mv $(TMPDIR)/vcftools_0.1.12b $(PREFIX)/lib/
+	cd $(PREFIX)/lib/vcftools_0.1.12b &&\
+    make --directory=$(PREFIX)/lib/vcftools_0.1.12b MAKEFLAGS=""
+	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/Vcf.pm $(PREFIX)/lib/
+	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/vcf-sort $(PREFIX)/scripts/
 
-clean-tmp:
-	rm -rfv $(TMPDIR)/*
+clean-vcftools:
+	rm -rvf $(PREFIX)/lib/vcftools_0.1.12b
+	rm -vf $(PREFIX)/scripts/vcf-sort
+	rm -vf $(PREFIX)/lib/Vcf.pm
 
-clean-symlinks:
-	find $(PREFIX)/scripts -maxdepth 1 -type l -exec rm -vf {} \;
-
-install-SGELK:
-	git clone https://github.com/lskatz/Schedule--SGELK.git $(TMPDIR)/Schedule
-	-mkdir -p $(PREFIX)/lib/Schedule
-	mv -v $(TMPDIR)/Schedule/SGELK.pm $(PREFIX)/lib/Schedule/
-	mv -v $(TMPDIR)/Schedule/README.md $(PREFIX)/lib/Schedule/
-	mv -v $(TMPDIR)/Schedule/.git $(PREFIX)/lib/Schedule/
-
-clean-SGELK:
-	rm -rfv $(PREFIX)/lib/Schedule
-
-install-CGP:
+lib/cg-pipeline:
 	# CGP scripts that are needed and that don't depend on CGP libraries
 	git clone https://github.com/lskatz/cg-pipeline $(PREFIX)/lib/cg-pipeline
 	ln -s $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_isFastqPE.pl $(PREFIX)/scripts/
@@ -69,41 +63,25 @@ clean-CGP:
 	rm -rvf $(PREFIX)/lib/cg-pipeline
 	rm -vf $(PREFIX)/scripts/run_assembly_*
 
-install-vcftools:
-	wget 'http://downloads.sourceforge.net/project/vcftools/vcftools_0.1.12b.tar.gz?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fvcftools%2Ffiles%2F&ts=1409260024&use_mirror=ufpr' -O $(TMPDIR)/vcftools_0.1.12b.tar.gz
-	cd $(TMPDIR) && \
-	tar zxvf vcftools_0.1.12b.tar.gz
-	mv $(TMPDIR)/vcftools_0.1.12b $(PREFIX)/lib/
-	cd $(PREFIX)/lib/vcftools_0.1.12b &&\
-    make --directory=$(PREFIX)/lib/vcftools_0.1.12b MAKEFLAGS=""
-	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/vcf-sort $(PREFIX)/scripts/
-	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/Vcf.pm $(PREFIX)/lib/
+lib/Schedule/SGELK.pm:
+	git clone https://github.com/lskatz/Schedule--SGELK.git $(TMPDIR)/Schedule
+	-mkdir -p $(PREFIX)/lib/Schedule
+	mv -v $(TMPDIR)/Schedule/SGELK.pm $(PREFIX)/lib/Schedule/
+	mv -v $(TMPDIR)/Schedule/README.md $(PREFIX)/lib/Schedule/
+	mv -v $(TMPDIR)/Schedule/.git $(PREFIX)/lib/Schedule/
 
-clean-vcftools:
-	rm -rvf $(PREFIX)/lib/vcftools_0.1.12b
-	rm -vf $(PREFIX)/scripts/vcf-sort
-	rm -vf $(PREFIX)/lib/Vcf.pm
+clean-SGELK:
+	rm -rfv $(PREFIX)/lib/Schedule
 
-install-varscan:
+lib/varscan.v2.3.7.jar:
 	wget 'http://downloads.sourceforge.net/project/varscan/VarScan.v2.3.7.jar' -O $(PREFIX)/lib/varscan.v2.3.7.jar
 
 clean-varscan:
 	rm -vf $(PREFIX)/lib/varscan.v2.3.7.jar
 
-install-snpEff:
-	wget http://sourceforge.net/projects/snpeff/files/snpEff_latest_core.zip -O $(PREFIX)/lib/snpEff_latest_core.zip
-	cd $(PREFIX)/lib && unzip -o snpEff_latest_core.zip
-	mv $(PREFIX)/lib/snpEff/snpEff.jar $(PREFIX)/lib/.
-	mv $(PREFIX)/lib/snpEff/snpEff.config $(PREFIX)/config/original/snpEff.conf
-	rm -rf $(PREFIX)/lib/snpEff_latest_core.zip
-	rm -rf $(PREFIX)/lib/snpEff
-
-clean-snpEff:
-	rm -rvf $(PREFIX)/lib/snpEff.jar
-
-install-phast: check-blast
+lib/phast/phast.faa: 
 	mkdir -p $(PREFIX)/lib/phast
-	wget http://phast.wishartlab.com/phage_finder/DB/prophage_virus.db -O $(PREFIX)/lib/phast/phast.faa
+	wget http://phast.wishartlab.com/phage_finder/DB/prophage_virus.db -O $(PREFIX)/$@
 	makeblastdb -in $(PREFIX)/lib/phast/phast.faa -dbtype prot
 
 clean-phast:
@@ -119,7 +97,7 @@ install-phispy:
 clean-phispy:
 	rm -rvf $(PREFIX)/lib/phispy
 
-install-samtools:
+lib/samtools-1.2/samtools:
 	wget 'https://github.com/samtools/samtools/releases/download/1.2/samtools-1.2.tar.bz2' -O $(TMPDIR)/samtools-1.2.tar.bz2
 	cd $(TMPDIR) && tar jxvf samtools-1.2.tar.bz2
 	mv $(TMPDIR)/samtools-1.2 $(PREFIX)/lib
@@ -132,9 +110,9 @@ install-samtools:
 
 clean-samtools:
 	rm -rvf $(PREFIX)/lib/samtools*
+	rm -f $(PREFIX)/scripts/bgzip $(PREFIX)/scripts/tabix $(PREFIX)/scripts/wgsim $(PREFIX)/scripts/samtools
 
-install-bcftools:
-	# bcftools-1.2.tar.bz2  htslib-1.2.1.tar.bz2  samtools-1.2.tar.bz2
+lib/bcftools-1.2/bcftools:
 	wget 'https://github.com/samtools/bcftools/releases/download/1.2/bcftools-1.2.tar.bz2' -O $(TMPDIR)/bcftools-1.2.tar.bz2
 	cd $(TMPDIR) && tar jxvf bcftools-1.2.tar.bz2
 	mv $(TMPDIR)/bcftools-1.2 $(PREFIX)/lib/bcftools-1.2
@@ -143,19 +121,25 @@ install-bcftools:
 	ln -sf $(PREFIX)/lib/bcftools-1.2/vcfutils.pl $(PREFIX)/scripts
 
 clean-bcftools:
-	rm -rfv $(PREFIX)/lib/bcftools-1.2/bcftools $(PREFIX)/lib/bcftools-1.2/vcfutils.pl $(PREFIX)/lib/bcftools*
+	rm -rfv $(PREFIX)/lib/bcftools*
+	rm -f   $(PREFIX)/lib/bcftools-1.2/bcftools $(PREFIX)/lib/bcftools-1.2/vcfutils.pl
 
-install-smalt:
+lib/smalt-0.7.6/bin/smalt:
 	wget --continue 'http://downloads.sourceforge.net/project/smalt/smalt-0.7.6-static.tar.gz' -O $(TMPDIR)/smalt-0.7.6-static.tar.gz
 	cd $(TMPDIR) && tar zxvf smalt-0.7.6-static.tar.gz
 	mv $(TMPDIR)/smalt-0.7.6 $(PREFIX)/lib/
 	cd $(PREFIX)/lib/smalt-0.7.6 && ./configure --prefix $(PREFIX)/lib/smalt-0.7.6 && make && make install
-	ln -sv $(PREFIX)/lib/smalt-0.7.6/bin/* $(PREFIX)/scripts/
+	for i in basqcol fetchseq mixreads readstats simqual simread smalt splitmates splitreads trunkreads; do \
+	  ln -svf $(PREFIX)/lib/smalt-0.7.6/bin/$$i $(PREFIX)/scripts/; \
+	done
 
 clean-smalt:
 	rm -rvf $(PREFIX)/lib/smalt*
+	for i in basqcol fetchseq mixreads readstats simqual simread smalt splitmates splitreads trunkreads; do \
+	  rm -fv $(PREFIX)/scripts/$$i; \
+	done
 
-install-snap:
+lib/snap/snap-aligner:
 	git clone https://github.com/amplab/snap.git $(PREFIX)/lib/snap
 	cd $(PREFIX)/lib/snap && git checkout v1.0beta.18 && make
 	cp -vn $(PREFIX)/lib/snap/snap-aligner  $(PREFIX)/scripts/snap
@@ -163,18 +147,10 @@ install-snap:
 	cp -vn $(PREFIX)/lib/snap/snap-aligner  $(PREFIX)/scripts/snapxl
 
 clean-snap:
-	rm -rvf $(PREFIX)/lib/snap $(PREFIX)/scripts/snap $(PREFIX)/scripts/snapxl
+	rm -rvf $(PREFIX)/lib/snap 
+	rm -f   $(PREFIX)/scripts/snap $(PREFIX)/scripts/snapxl
 
-install-stampy:
-	wget www.well.ox.ac.uk/bioinformatics/Software/Stampy-latest.tgz -O $(TMPDIR)/Stampy-latest.tgz
-	mkdir $(PREFIX)/lib/stampy && tar zxvf $(TMPDIR)/Stampy-latest.tgz -C $(PREFIX)/lib/stampy --strip-components 1
-	cd $(PREFIX)/lib/stampy && make CXXFLAGS='-Wno-deprecated -Wunused-but-set-variable'
-	ln -sv $(PREFIX)/lib/stampy/stampy.py $(PREFIX)/scripts
-
-clean-stampy:
-	rm -rvf $(PREFIX)/lib/stampy
-
-install-raxml:
+lib/standard-RAxML-8.1.16/raxmlHPC:
 	wget 'https://github.com/stamatak/standard-RAxML/archive/v8.1.16.tar.gz' -O $(TMPDIR)/raxml_v8.1.16.tar.gz
 	cd $(TMPDIR) && tar zxvf raxml_v8.1.16.tar.gz
 	mv $(TMPDIR)/standard-RAxML-8.1.16 $(PREFIX)/lib
@@ -183,27 +159,16 @@ install-raxml:
 
 clean-raxml:
 	rm -rvf $(PREFIX)/lib/standard-RAxML-8.1.16
+	rm -fv  $(PREFIX)/scripts/raxmlHPC*
 
-install-quake:
-	wget http://www.cbcb.umd.edu/software/quake/downloads/quake-0.3.5.tar.gz -O $(PREFIX)/build/quake-0.3.5.tar.gz
-	cd $(PREFIX)/build && tar zxvf quake-0.3.5.tar.gz
-	cd $(PREFIX)/build/Quake/src && make && cp -Lvn ../bin/* $(PREFIX)/scripts
-	rm -rfv $(PREFIX)/build/Quake/src
-
-clean-quake:
-	cd $(PREFIX)/scripts && rm -vf build_bithash count-kmers cov_model.py cov_model.r quake.py correct count-qmers cov_model_qmer.r kmer_hist.r
-
-install-edirect:
-	cd $(PREFIX)/build && perl -MNet::FTP -e '$$ftp = new Net::FTP("ftp.ncbi.nlm.nih.gov", Passive => 1); $$ftp->login; $$ftp->binary; $$ftp->get("/entrez/entrezdirect/edirect.zip");' && unzip -u -q edirect.zip && rm edirect.zip
-	cd $(PREFIX)/build/edirect && sh setup.sh
-	mv -v $(PREFIX)/build/edirect $(PREFIX)/lib
-
-clean-edirect:
-	rm -rvf $(PREFIX)/lib/edirect
-
+# There isn't an easy way for Make to detect whether these files have
+# been installed and so it shouldn't depend on a file existing and
+# should run no matter what. CPAN will know if the module will be
+# there.
+# TODO I should probably have an individual install command per 
+# module so that Make can do its job.
 install-perlModules:
 	@echo "Installing Perl modules using cpanminus"
-	#for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Descriptive Statistics::Basic Graph::Centrality::Pagerank String::Escape Statistics::LineFit; do
 	for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Basic Graph::Centrality::Pagerank String::Escape Statistics::LineFit; do \
 	  perl scripts/cpanm --self-contained -L $(PREFIX)/lib $$package; \
 		if [ $$? -gt 0 ]; then exit 1; fi; \
@@ -213,21 +178,41 @@ install-perlModules:
 clean-perlModules:
 	@echo "Perl modules were installed using CPAN which doesn't have an uninstalling mechanism"
 
-install-config:
-	cp -vn $(PREFIX)/config/original/*.conf $(PREFIX)/config/
+install-config: config/LyveSET.conf config/presets.conf
+
+config/%.conf:
+	b=`basename $@` && d=`dirname $@` &&\
+	  cp -v config/original/$$b config/$$b
 
 clean-config:
 	rm -v $(PREFIX)/config/*.conf
 
+lib/snpEff.jar:
+	wget http://sourceforge.net/projects/snpeff/files/snpEff_latest_core.zip -O $(PREFIX)/lib/snpEff_latest_core.zip
+	cd $(PREFIX)/lib && unzip -o snpEff_latest_core.zip
+	cp $(PREFIX)/lib/snpEff/snpEff.jar $(PREFIX)/lib/
+	cp $(PREFIX)/lib/snpEff/snpEff.config $(PREFIX)/config/snpEff.conf
+	rm -rf $(PREFIX)/lib/snpEff_latest_core.zip
+	rm -rf $(PREFIX)/lib/snpEff
+
+clean-snpEff:
+	rm -rvf $(PREFIX)/lib/snpEff.jar
+
+lib/stampy/stampy.py:
+	wget www.well.ox.ac.uk/bioinformatics/Software/Stampy-latest.tgz -O $(TMPDIR)/Stampy-latest.tgz
+	mkdir $(PREFIX)/lib/stampy && tar zxvf $(TMPDIR)/Stampy-latest.tgz -C $(PREFIX)/lib/stampy --strip-components 1
+	cd $(PREFIX)/lib/stampy && make CXXFLAGS='-Wno-deprecated -Wunused-but-set-variable'
+	ln -sv $(PREFIX)/lib/stampy/stampy.py $(PREFIX)/scripts
+
+clean-stampy:
+	rm -rvf $(PREFIX)/lib/stampy
+	rm $(PREFIX)/scripts/stampy.py
+
 env:
 	echo "#Lyve-SET" >> $(PROFILE)
 	echo "export PATH=\$$PATH:$(PREFIX)/scripts" >> $(PROFILE)
-	echo "export PERL5LIB=\$$PERL5LIB:$(PREFIX)/lib" >> $(PROFILE)
 
-test:
-	set_test.pl lambda lambda --numcpus $(NUMCPUS) 
-
-check: check-sys check-Lyve-SET-PATH check-CGP-assembly check-Lyve-SET check-PERL check-smalt check-freebayes check-raxml check-freebayes check-phyml check-blast
+check: check-sys check-Lyve-SET-PATH check-CGP-assembly check-Lyve-SET check-PERL check-smalt check-freebayes check-raxml check-freebayes check-blast
 	@echo --OK
 check-sys:
 	@F=$$(which cat) && echo "Found $$F"
@@ -239,8 +224,6 @@ check-freebayes:
 	@F=$$(which freebayes 2>/dev/null) && echo "Found freebayes at $$F"
 check-raxml:
 	@ RAXML=$$((which raxml || which raxmlHPC-PTHREADS) 2>/dev/null) && echo "Found raxml at $$RAXML"
-check-phyml:
-	@ PHYML=$$((which phyml || which phyml_linux_64 ) 2>/dev/null) && echo "Found phyml at $$PHYML"
 check-callsam:
 	@export PATH=$$PATH:$(PREFIX)/lib/callsam/bin && which callsam_MT.pl >/dev/null
 check-CGP-assembly:
