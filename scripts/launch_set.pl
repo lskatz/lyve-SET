@@ -386,6 +386,10 @@ sub indexReference{
     # Must specify the number of CPUs or else it greedily takes them all instead of what the user specifies
     system("snap index $ref $ref.snap -exact -large -bSpace -t$$settings{numcpus}");
     die if $?;
+  } elsif($$settings{mapper} eq 'stampy'){
+    return $ref if(-e "$ref.stidx" && -e "$ref.sthash");
+    system("stampy.py -G $ref $ref && stampy.py -g $ref -H $ref");
+    die if $?;
   }
   return $ref;
 }
