@@ -2,10 +2,13 @@ testdata/*/reference/*
 testdata/*/asm/*
 testdata/*/reads/*
 build/*
-lib/Schedule/*
+config/*.conf
 
+lib/Schedule/*
 lib/Vcf.pm
 lib/bcftools-1.1/
+lib/bcftools-1.2/
+lib/samtools-1.2/
 lib/cg-pipeline/
 lib/phast/
 lib/phispy/
@@ -14,8 +17,10 @@ lib/smalt-0.7.6/
 lib/snap/
 lib/standard-RAxML-8.1.16/
 lib/varscan.v2.3.7.jar
+lib/snpEff.jar
 lib/vcftools_0.1.12b/
 lib/lib
+
 scripts/basqcol
 scripts/bcftools
 scripts/bgzip
@@ -58,5 +63,4 @@ scripts/trunkreads
 scripts/vcf-sort
 scripts/vcfutils.pl
 scripts/wgsim
-config/LyveSET.conf
-config/presets.conf
+
