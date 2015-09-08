@@ -118,22 +118,30 @@ else
 	exit 1
 fi
 
-
+# Add onto xopts so that files can be overwritten 
+# and so that we don't worry whether XOPTS is an empty variable.
+XOPTS="$XOPTS --overwrite "; 
 # Map with stampy
-if [ -z "$XOPTS" ]; then  #stampy.py kills if XOPTS is empty
-	stampy.py -g "$REFERENCE" -h "$REFERENCE" -t "$CPUS" --substitutionrate=0.01 --minposterior=20 --sensitive --inputformat=fastq -f sam -o "$TMP"/"$OUT_PREFIX".sam --insertsize=300 --insertsd=250 -M "$STAMPY_READS"
-else
-	stampy.py -g "$REFERENCE" -h "$REFERENCE" -t "$CPUS" --substitutionrate=0.01 --minposterior=20 --sensitive --inputformat=fastq -f sam -o "$TMP"/"$OUT_PREFIX".sam --insertsize=300 --insertsd=250 -M "$STAMPY_READS" "$XOPTS"
-fi
+COMMAND="stampy.py -g $REFERENCE -h $REFERENCE -t $CPUS --substitutionrate=0.01 --minposterior=20 --sensitive --inputformat=fastq -f sam -o $TMP/$OUT_PREFIX.sam --insertsize=500 --insertsd=250 -M $STAMPY_READS $XOPTS"
+eval $COMMAND
+if [ $? -gt 0 ]; then 
+  echo "ERROR running command: $COMMAND";
+  exit 1; 
+fi;
+
 
 
 # Post-processing of mapped sequences
 if [ -s "$TMP"/"$OUT_PREFIX".sam ]; then
 	# Convert output to binary, sort according to reference position/coordinate, and index
 	samtools view -@ "$CPUS" -bSh "$TMP"/"$OUT_PREFIX".sam -o "$TMP"/"$OUT_PREFIX".unsorted.bam -T "$REFERENCE"
+  if [ $? -gt 0 ]; then exit 1; fi;
 	samtools sort -@ "$CPUS" "$TMP"/"$OUT_PREFIX".unsorted.bam -O bam -o "$TMP"/"$OUT_PREFIX".sorted.bam -T "$BAM"
+  if [ $? -gt 0 ]; then exit 1; fi;
 	mv -v "$TMP"/"$OUT_PREFIX".sorted.bam "$BAM"
+  if [ $? -gt 0 ]; then exit 1; fi;
 	samtools index -b "$BAM"
+  if [ $? -gt 0 ]; then exit 1; fi;
 
 	# Cleanup
 	rm -fv "$TMP"/"$OUT_PREFIX".sam "$TMP"/"$OUT_PREFIX".unsorted.bam "$TMP"/"$OUT_PREFIX".[12].fastq
