@@ -21,7 +21,7 @@ $0=fileparse $0;
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(tree=s pairwise=s outprefix=s help outputType=s bootstrap=i nameTrim=i)) or die $!;
+  GetOptions($settings,qw(tree=s pairwise=s outprefix=s help outputType=s bootstrap=i nameTrim=i midpointRoot)) or die $!;
   die usage($settings) if($$settings{help});
   $$settings{outputType}||="merged";
   $$settings{bootstrap}||=70;
@@ -40,7 +40,7 @@ sub main{
   my $pairwise=readPairwise($$settings{pairwise},$$settings{nameTrim},$settings);
   
   logmsg "Reading the tree and assigning names to high bootstrap nodes";
-  my ($treeArr, $labelHash, $allLeafArr) = readSigClades($$settings{tree},$$settings{bootstrap},$$settings{nameTrim},$settings);
+  my ($treeArr, $labelHash, $allLeafArr) = readSigClades($$settings{tree},$$settings{bootstrap},$$settings{nameTrim},$$settings{midpointRoot},$settings);
 
   logmsg "Reading high bootstrap nodes and outputing statistics";
   my ($pairwiseCladeStats, $singletonCladeStats, $singletonTaxaStats, $treeStats) = generateSigCladeStats($labelHash, $pairwise, $allLeafArr, $settings);
@@ -97,7 +97,7 @@ sub countAncNodes{
 # Returns : 	Newick tree relabeled with unique node labels
 #			Hash keyed to unique node labels pointing to lists of descendent leaves for each label
 sub readSigClades{
-  my($infile,$bootstrapthreshold,$nameTrim,$settings)=@_;
+  my($infile,$bootstrapthreshold,$nameTrim,$midpointRoot,$settings)=@_;
   my @bootTree;	# Tree with significant nodes labeled with letters
   my $i=0;
   my %labels = ();	# Descendent taxa leaf name lists keyed to each significant node's label
@@ -108,10 +108,12 @@ sub readSigClades{
   my $numAncestorNodes=countAncNodes($infile,$settings);
   logmsg "I estimate about $numAncestorNodes ancestor nodes (not leaves) that will be analyzed";
 
-  logmsg "Compiling leaf list for each high-confidence node";
   my $in=new Bio::TreeIO(-file=>$infile);
+  
   while(my $treeIn=$in->next_tree){
     my $labelLetter = 'A';
+    
+    logmsg "Compiling leaf list for each high-confidence node";
     for my $node($treeIn->get_nodes){
       next if($node->is_Leaf);
 
@@ -127,7 +129,7 @@ sub readSigClades{
       @d=sort{$a cmp $b} @d;
       my $numDesc=@d;
       
-      # The bootstrap is the boostrap if it exists, 
+      # The bootstrap is the bootstrap if it exists, 
       # 	or it is the node identifier because of Newick weirdness.
       my $bootstrap=$node->bootstrap || $node->id;
          $bootstrap=0 if(!$bootstrap);
@@ -143,6 +145,12 @@ sub readSigClades{
 	 my $labelName = $labelLetter;
       $node->bootstrap($labelName);
       $node->id($labelName);
+      
+      # If A node, the midpoint root at this node
+      if $labelName eq 'A' && $midpointRoot{
+	      logmsg "Rerooting tree at midpoint...";
+     	 $treeIn->reroot_at_midpoint($node, 'Root');
+      }
       
       # Insert descendent node list into label hash
       $labels{ $labelLetter } = \@d;
@@ -188,7 +196,8 @@ sub generateSigCladeStats{
 										medianAbsoluteDeviation($distances)));
 		}
 		
-		# 2. Between node leaves and all other leaves
+		# 2. Between node leaves and all other leaves (A vs notA, B vs notB)
+		#	And returns within group distances for those other leaves (within notA, etc)
 		my @nodeLeafCopy = @{$$labelHashRef{$node1}};
 		my @allLeafCopy = @$allLeafArrRef;
 		my %diff;
@@ -199,12 +208,19 @@ sub generateSigCladeStats{
 		@diff{ @allLeafCopy } = undef;
 		delete @diff{ @nodeLeafCopy };
 		my @diffLeaf = keys %diff;
-		my $distances = distancesBetweenNodes( $$labelHashRef{$node1}, \@diffLeaf, 
+		my $betweenDistances = distancesBetweenNodes( $$labelHashRef{$node1}, \@diffLeaf, 
 						   				$pairwiseRef, $settings );
 		push(@nodeSingletonDistances, sprintf("%s\t%s\t%d\t%d\t%d\t%d",
-										$node1, "Rest", median(@$distances),
-										min(@$distances), max(@$distances),
-										medianAbsoluteDeviation($distances)));				   				
+										$node1, "not".$node1, median(@$betweenDistances),
+										min(@$betweenDistances), max(@$betweenDistances),
+										medianAbsoluteDeviation($betweenDistances)));
+		
+		my $withinNotDistances = distancesBetweenNodes( \@diffLeaf, \@diffLeaf, 
+						   				$pairwiseRef, $settings );
+		push(@nodeSingletonDistances, sprintf("%s\t%s\t%d\t%d\t%d\t%d",
+										"not".$node1, "not".$node1, median(@$withinNotDistances),
+										min(@$withinNotDistances), max(@$withinNotDistances),
+										medianAbsoluteDeviation($withinNotDistances)));				   				
 	}
 	
 	# 3. For each leaf, we also calculate distances to all other leafs
@@ -366,6 +382,7 @@ sub usage{
   return $help if(!$$settings{help}); # return shorthand help
   $help.="
   OPTIONAL
+  -m --midpointRoot Reroot the tree at the midpoint.
   --outputType merged (default) The type of distance stats output you want. 
   	'merged' for one big file (prefix.merged.stats.tsv)
   	'split' for separate files for pairwise by node (prefix.pairwise.stats.tsv), 
