@@ -76,7 +76,7 @@ if [ $? -gt 0 ]; then
 fi
 
 echo "$script: Concatenating vcf output"
-bcftools concat $TEMPDIR/merged.*.vcf.gz > $TEMPDIR/concat.vcf
+bcftools concat $TEMPDIR/merged.*.vcf.gz | vcf-sort > $TEMPDIR/concat.vcf
 #bcftools concat --allow-overlaps --remove-duplicates $TEMPDIR/merged.*.vcf.gz > $TEMPDIR/concat.vcf
 if [ $? -gt 0 ]; then
   echo "$script: ERROR with bcftools concat"
@@ -104,7 +104,7 @@ for VCF in $TEMPDIR/concat.vcf $TEMPDIR/hqPos.vcf; do
   fi;
 
   echo "$script: Sorting $VCF and removing indels";
-  vcf-sort $VCF | bcftools annotate --include '%TYPE!="indel" && %FILTER!="isIndel"' > $VCF.tmp && mv $VCF.tmp $VCF;
+  bcftools annotate --include '%TYPE!="indel" && %FILTER!="isIndel"' < $VCF > $VCF.tmp && mv $VCF.tmp $VCF;
 
   echo "$script: compressing $VCF";
   bgzip $VCF
