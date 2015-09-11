@@ -601,8 +601,8 @@ sub variantCalls{
   # TODO make the variant callers output to bgzip and indexed files
   for my $bam(@bam){
     my $b=fileparse($bam,".sorted.bam");
-    if(-e "$vcfdir/$b.vcf" || -e "$vcfdir/$b.vcf.gz"){
-      logmsg "Found $vcfdir/$b.vcf. Skipping";
+    if(-e "$vcfdir/$b.vcf.gz.tbi"){
+      logmsg "Found $vcfdir/$b.vcf.gz. Skipping";
       next;
     }
     logmsg "Calling SNPs into $vcfdir/$b.vcf";
@@ -616,17 +616,15 @@ sub variantCalls{
       logmsg $varscanCommand;
       $sge->pleaseExecute($varscanCommand,{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
       # sort VCF
-      $sge->pleaseExecute("mv $vcfdir/$b.vcf $vcfdir/$b.vcf.tmp && vcf-sort < $vcfdir/$b.vcf.tmp > $vcfdir/$b.vcf && rm -v $vcfdir/$b.vcf.tmp",{jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1});
+      $sge->pleaseExecute("mv $vcfdir/$b.vcf $vcfdir/$b.vcf.tmp && 
+          vcf-sort < $vcfdir/$b.vcf.tmp > $vcfdir/$b.vcf && 
+          rm -v $vcfdir/$b.vcf.tmp",
+          {jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1}
+      );
       $jobname="sort$b"; # the thing that bgzip waits on to finish
-    #} elsif($$settings{snpcaller} eq 'freebayes'){
-    #  $jobname="freebayes$b";
-    #  $sge->pleaseExecute("$scriptsdir/launch_freebayes.sh $ref $bam $vcfdir/$b.vcf $$settings{min_alt_frac} $$settings{min_coverage}",{numcpus=>1,jobname=>$jobname});
     } else {
       die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
     }
-
-    # TODO move filtering here
-    # TODO can bcftools query take care of filtering instead?
 
     # bgzip and tabix indexing
     indexAndCompressVcf("$vcfdir/$b.vcf",$jobname,$settings);
@@ -692,7 +690,7 @@ sub compareTaxa{
   # Make sure this gets printed to stdout
   logmsg "Running set_diagnose.pl";
   my $diagnosis="$$settings{logdir}/diagnosis.txt";
-  $sge->pleaseExecute("set_diagnose.pl -p $project > $diagnosis 2>&1");
+  $sge->pleaseExecute("set_diagnose.pl -p $project > $diagnosis 2>&1",{jobname=>"set_diagnose",numcpus=>1});
   $sge->wrapItUp();
   system("cat $diagnosis");
 
