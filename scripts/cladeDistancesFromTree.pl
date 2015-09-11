@@ -147,7 +147,7 @@ sub readSigClades{
       $node->id($labelName);
       
       # If A node, the midpoint root at this node
-      if $labelName eq 'A' && $midpointRoot{
+      if($labelName eq 'A' && $midpointRoot){
 	      logmsg "Rerooting tree at midpoint...";
      	 $treeIn->reroot_at_midpoint($node, 'Root');
       }
