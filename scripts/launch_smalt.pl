@@ -110,13 +110,14 @@ sub mapReads{
   system("samtools sort $tmpOut $sPrefix 2>&1"); die "ERROR with 'samtools sort $tmpOut $sPrefix'" if $?;
   system("samtools index $sorted 2>&1"); die "ERROR with 'samtools index $sorted'" if $?;
 
-  system("set_samtools_depth.pl $sorted 2>&1");
-  die if $?;
+  # TODO see if I really need depths.  I can probably just remove the depth commands here.
+  #system("set_samtools_depth.pl $sorted 2>&1");
+  #die if $?;
 
   # cleanup
   system("mv -v $sorted $bam"); die if $?;
   system("mv -v $sorted.bai $bam.bai"); die if $?;
-  unlink("$sorted.depth.gz");
+  #unlink("$sorted.depth.gz");
   system("rm -v $tmpOut $tmpSamOut"); die if $?;
 
   return 1;
