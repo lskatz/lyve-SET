@@ -169,7 +169,7 @@ clean-raxml:
 # module so that Make can do its job.
 install-perlModules:
 	@echo "Installing Perl modules using cpanminus"
-	for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Basic Graph::Centrality::Pagerank String::Escape Statistics::LineFit; do \
+	for package in Bio::Perl Bio::FeatureIO Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Basic Graph::Centrality::Pagerank String::Escape Statistics::LineFit; do \
 	  perl scripts/cpanm --self-contained -L $(PREFIX)/lib $$package; \
 		if [ $$? -gt 0 ]; then exit 1; fi; \
 	done;
@@ -237,7 +237,13 @@ check-Lyve-SET:
 check-PERL:
 	@echo Checking for perl multithreading
 	@perl -Mthreads -e 1
-	@echo Checking for perl modules
+	@echo "Checking for perl modules"
+	@echo "Looking for Bio::Perl"
+	@perl -MBio::Perl -e 1
+	@echo "Looking for Bio::FeatureIO"
+	@perl -MBio::FeatureIO -e 1
+	@echo "Looking for Schedule::SGELK"
+	@perl -MSchedule::SGELK -e 1
 	@echo "Looking for File::Slurp"
 	@perl -I $(PREFIX)/lib -MFile::Slurp -e 1
 	@echo "Looking for String::Escape"
