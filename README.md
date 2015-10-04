@@ -106,7 +106,7 @@ The script `set_manage.pl` sets up the project directory and adds reads, and you
     # Shuffle your reads if they are not already.
     $ mkdir interleaved
     $ for f in *_R1.fastq.gz; do
-    >   b=$(basename $i _R1.fastq.gz)  # getting the basename of the file
+    >   b=$(basename $f _R1.fastq.gz)  # getting the basename of the file
     >   r=${b}_R2.fastq.gz             # Reverse reads filename
     >   run_assembly_shuffleReads.pl $f $r | gzip -c > interleaved/$b.fastq.gz
     > done;
