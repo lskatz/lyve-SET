@@ -56,9 +56,6 @@ sub main{
   $samplename=~s/\-$refname$//;
   $samplename=basename($samplename,@fastqExt,@fastaExt);
   $samplename=basename($samplename,@fastaExt);
-  # put the sample name into a file for varscan
-  system("echo $samplename > $$settings{tempdir}/$samplename.name"); die if $?;
-  #END{system("rm -f $$settings{tempdir}/$samplename");}
 
   my $vcf=varscan2($bam,$reference,$settings);
   #backfillVcfValues($vcf,$settings);
@@ -74,6 +71,11 @@ sub varscan2{
   return $pileup if(-e $pileup && -s $pileup > 0);
   logmsg "Creating a pileup $pileup";
 
+  # Make sure this whole operation is self-contained
+  my $tmpdir="$$settings{tempdir}/$samplename";
+  system("rm -rf $tmpdir");
+  mkdir($tmpdir);
+
   # Figure out any regions
   my $regions=`makeRegions.pl --numchunks $$settings{numcpus} $bam`;
 
@@ -87,47 +89,41 @@ sub varscan2{
 
   # Multithread a pileup so that each region gets piped into a file.
   # Then, these individual files can be combined at a later step.
-  my $command="echo \"$regions\" | xargs -P $$settings{numcpus} -n 1 -I {} bash -c '
-    echo \"MPileup on {}\" >&2; 
-    pileup=$$settings{tempdir}/$b.\$\$.mpileup;
-    vcf=$$settings{tempdir}/$b.\$\$.vcf;
-    samtools mpileup -f $reference $xopts --region \"{}\" $bam > \$pileup;
+  my $command=qq(echo "$regions" | xargs -P $$settings{numcpus} -n 1 -I {} bash -c '
+    echo "MPileup on {}"; 
+    pileup=$tmpdir/\$\$.mpileup;
+    vcf=$tmpdir/\$\$.vcf;
+
+    samtools mpileup -f $reference $xopts --region "{}" $bam > \$pileup;
     if [ \$? -gt 0 ]; then exit 1; fi;
     size=\$(wc -c < \$pileup);
-    if [ \"\$size\" -lt 1 ]; then
+    if [ "\$size" -lt 1 ]; then
       echo \$pileup is empty. I will not run varscan on it.
       rm -v \$pileup;
       exit 0;
     else
-      echo \$pileup is greater than 0 bytes.
+      echo \$pileup is greater than 0 bytes. I will run varscan on it.
     fi;
-    varscan.sh mpileup2cns \$pileup --vcf-sample-list $$settings{tempdir}/$samplename.name --min-coverage $$settings{coverage} --min-var-freq $$settings{altFreq} --output-vcf 1 --min-avg-qual 0 | \
+    varscan.sh mpileup2cns \$pileup --min-coverage $$settings{coverage} --min-var-freq $$settings{altFreq} --output-vcf 1 --min-avg-qual 0 | \\
+    sed "s/Sample1/$samplename/" | \\
     bgzip -c > \$vcf.gz.tmp && \
     mv -v \$vcf.gz.tmp \$vcf.gz && \
     tabix \$vcf.gz
-  ' >&2 ";
-  logmsg "Running mpileup:\n  $command";
+  ' >&2);
+  logmsg "Running mpileup and varscan:\n  $command";
   system($command);
   die "ERROR with xargs and samtools mpileup" if $?;
 
   # bcftools concat $TEMPDIR/merged.*.vcf.gz | vcf-sort > $TEMPDIR/concat.vcf
-  system("bcftools concat $$settings{tempdir}/$b.*.vcf.gz  > $$settings{tempdir}/$b.merged.vcf");
+  system("bcftools concat $tmpdir/*.vcf.gz  > $$settings{tempdir}/$b.merged.vcf");
   die if $?;
 
   # Make sure everything is cleaned up whenever the script ends
-  system("rm -f $$settings{tempdir}/$samplename.name $$settings{tempdir}/$b*.mpileup $$settings{tempdir}/$b*.vcf.gz* $$settings{tempdir}/$b.merged.vcf >&2");
+  END{system("rm -rf $tmpdir $$settings{tempdir}/$b.merged.vcf");}
 
   #backfillVcfValues("$$settings{tempdir}/merged.vcf",$settings);
 
   return "$$settings{tempdir}/$b.merged.vcf";
-
-  # Concatenate the output into a single file.
-  # Individual regions are already sorted, thanks to the way mpileup works.
-  #logmsg "Sorting mpileup results into a combined file";
-  #system("sort -k1,1 -k2,2n $$settings{tempdir}/$b.*.mpileup > $pileup && rm -f $$settings{tempdir}/$b.*.mpileup");
-  #die "ERROR with sorting mpileup results and then deleting the intermediate files" if $?;
-
-  #return $pileup;
 }
 
 sub backfillVcfValues{
