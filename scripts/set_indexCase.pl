@@ -13,7 +13,6 @@ use LyveSET qw/logmsg/;
 use lib "$FindBin::RealBin/../lib/lib/perl5";
 use Graph::Centrality::Pagerank;
 
-sub logmsg {local $0=basename $0;my $FH = *STDERR; print $FH "$0: ".(caller(1))[3].": @_\n";}
 exit main();
 
 sub main{
