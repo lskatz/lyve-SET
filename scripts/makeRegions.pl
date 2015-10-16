@@ -65,7 +65,7 @@ sub main{
 
 sub contigLengthsWorker{
   my($fileQ,$settings)=@_;
-  my $cLength;
+  my $cLength={};
   while(defined(my $infile=$fileQ->dequeue)){
     my $contigLength={};
     my($name,$path,$suffix)=fileparse($infile,@bamExt,@fastaExt,@vcfExt);
