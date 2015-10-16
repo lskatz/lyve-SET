@@ -41,21 +41,28 @@ fi
 SNPSOUT=$(dirname $OUT)/$(basename $OUT .vcf.gz)".snps.vcf.gz"
 
 if [ "$TEMPDIR" == "" ]; then
-  TEMPDIR=$(mktemp -d /tmp/mergeVcf.XXXXXX);
+  TEMPDIR=$(mktemp --directory /tmp/mergeVcf.XXXXXX);
 fi
 mkdir -pv "$TEMPDIR"; # just in case
 
+REGIONSFILE="$TEMPDIR/regions.txt";
+touch $REGIONSFILE; #make sure this file is accessible
+if [ $? -gt 0 ]; then echo "ERROR: could not access $REGIONSFILE"; exit 1; fi;
+
 # Run makeRegions.pl based on how many cpus there are 
 # and really parallelize this script!
-echo "$script: Dividing the genome into regions, making it easier to multithread"
-makeRegions.pl --numchunks $NUMCPUS $IN > $TEMPDIR/regions.txt
+echo "$script: Dividing the genome into regions, making it easier to multithread. Regions will be found in $REGIONSFILE"
+MAKEREGIONS="makeRegions.pl --numchunks $NUMCPUS --numcpus $NUMCPUS $IN > $REGIONSFILE"
+echo $MAKEREGIONS
+eval $MAKEREGIONS
 if [ $? -gt 0 ]; then 
   echo "$script: ERROR running makeRegions.pl!";
   rm -rvf $TEMPDIR;
   exit 1;
 fi
-REGION=$(cat $TEMPDIR/regions.txt);
+REGION=$(cat $REGIONSFILE);
 
+# IF makeRegions.pl didn't work or wasn't invoked:
 # Figure out regions names using the VCF index files.
 # Do not multithread xargs here because of race conditions and stdout.
 if [ "$REGION" == "" ]; then 
