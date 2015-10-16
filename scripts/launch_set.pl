@@ -404,10 +404,11 @@ sub mapReads{
   $sge->set("numcpus",$$settings{numcpus});
   my $tmpdir=$$settings{tmpdir};
   my $log=$$settings{logdir};
+  # TODO use LyveSET.pm fastq extensions for this step, to streamline
   my @file=(glob("$readsdir/*.fastq"),glob("$readsdir/*.fastq.gz"),glob("$readsdir/*.fq"),glob("$readsdir/*.fq.gz"));
 
   if(!@file){
-    logmsg "ERROR: no files were found in $readsdir/. However, in case you are continuing Lyve-SET after all the bam files have already been created and you just happened to delete all the input files, I will continue";
+    logmsg "ERROR: no files were found in $readsdir/. However, in case you are continuing Lyve-SET after all the bam files have already been created and you just happened to delete all the input files, I will skip read mapping and will continue";
     return 0;
   }
 
@@ -441,7 +442,9 @@ sub mapReads{
     } elsif($$settings{mapper} eq 'snap'){
       $sge->pleaseExecute("$scriptsdir/launch_snap.pl $snapxopts -ref $ref -f $fastq -b $bamPrefix.sorted.bam -tempdir $tmpdir --numcpus $$settings{numcpus} ",{jobname=>"snap$b"});
     } elsif($$settings{mapper} eq 'stampy'){
-      $sge->pleaseExecute("$scriptsdir/launch_stampy.sh $stampyxopts -r $ref -f $fastq -b $bamPrefix.sorted.bam -t $tmpdir --numcpus $$settings{numcpus} ",{jobname=>"stampy$b"});
+      # Make a tmpdir for stampy since each invocation needs its own space
+      my $stampydir=tempdir("$tmpdir/stampyXXXXXX",CLEANUP=>1);
+      $sge->pleaseExecute("$scriptsdir/launch_stampy.sh $stampyxopts -r $ref -f $fastq -b $bamPrefix.sorted.bam -t $stampydir --numcpus $$settings{numcpus} ",{jobname=>"stampy$b"});
     } else {
       die "ERROR: I do not understand the mapper $$settings{mapper}";
     }
