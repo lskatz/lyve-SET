@@ -8,6 +8,9 @@ use List::Util qw/sum/;
 use File::Basename qw/fileparse basename/;
 use Bio::Perl;
 
+use threads;
+use Thread::Queue;
+
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
 use LyveSET qw/logmsg @bamExt @fastaExt @vcfExt/;
@@ -20,7 +23,7 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help chunksize=i numchunks=i minlength=i overlapby=i));
+  GetOptions($settings,qw(help chunksize=i numchunks=i numcpus=i minlength=i overlapby=i));
   die usage() if($$settings{help});
   $$settings{minlength}||=1;
   $$settings{chunksize}||=0;
@@ -28,14 +31,44 @@ sub main{
   if(!$$settings{chunksize}){
     $$settings{numchunks}||=1;
   }
+  $$settings{numcpus}||=1;
 
   die "ERROR: need infile file!\n".usage() if(!@ARGV);
 
-  my $cLength;
+  # Start off multithreading
+  my $fileQ=Thread::Queue->new(@ARGV);
+  my @thr;
+  for my $i(0..$$settings{numcpus}-1){
+    $thr[$i]=threads->new(\&contigLengthsWorker,$fileQ,$settings);
+  }
+
   for my $infile(@ARGV){
     my $contigLength={};
     my($name,$path,$suffix)=fileparse($infile,@bamExt,@fastaExt,@vcfExt);
-    logmsg "Reading $infile with extension $suffix";
+    logmsg "Enqueuing $infile with extension $suffix";
+    $fileQ->enqueue($infile);
+  }
+  $fileQ->enqueue(undef) for(@thr);
+
+  # Combine contig length results from threads
+  my %cLength;
+  for(@thr){
+    my $tmp=$_->join;
+    %cLength=(%cLength,%$tmp);
+  }
+
+  # print combined results
+  printChunks(\%cLength,$settings);
+
+  return 0;
+}
+
+sub contigLengthsWorker{
+  my($fileQ,$settings)=@_;
+  my $cLength;
+  while(defined(my $infile=$fileQ->dequeue)){
+    my $contigLength={};
+    my($name,$path,$suffix)=fileparse($infile,@bamExt,@fastaExt,@vcfExt);
     if($suffix=~/$bamExtRegex/){
       $contigLength=bamLengths($infile,$settings);
     } elsif($suffix=~/$fastaExtRegex/){
@@ -43,18 +76,17 @@ sub main{
     } elsif($suffix=~/$vcfExtRegex/){
       $contigLength=vcfLengths($infile,$settings);
     } else {
-      die "ERROR: I do not understand extension $suffix";
+      die "ERROR: I do not understand extension $suffix from filename $infile";
     }
     
+    # Combine
     while(my($seqname,$length)=each(%$contigLength)){
       $$cLength{$seqname}=$length if(!defined($$cLength{$seqname}));
       $$cLength{$seqname}=$length if($$cLength{$seqname} < $length);
     }
+
   }
-
-  printChunks($cLength,$settings);
-
-  return 0;
+  return $cLength;
 }
 
 sub fastaLengths{
@@ -119,24 +151,31 @@ sub vcfLengths{
   my %max; # used for any of the next methods
 
   # See if bcftools can help find the length if the ref is not found
-  open(VCFGZ,"bcftools index -s $vcf | ") or warn "ERROR: could not open $vcf for reading with bcftools: $!";
-  while(<VCFGZ>){
+  my $bcftoolsIndex=`bcftools index -s '$vcf' 2>/dev/null`;
+  #logmsg "ERROR with command => bcftools index -s '$vcf'\n  $0 @ARGV" if $?;
+  for(split(/\n/,$bcftoolsIndex)){
     chomp;
     my($seqname,$start,$stop)=split /\t/;
     $max{$seqname}=$stop;
   }
   close VCFGZ;
-  return \%max if(keys(%max)>1);
+  return \%max if(keys(%max)>0);
+
+  #die "ERROR: could not determine contig lengths for $vcf using either the ##reference tag nor 'bcftools index -s'";
+
+  #die Dumper "ERROR",\%max;
 
   # If a reference is not found and bcftools didn't come through, 
-  # then just find the coordinates in the file itself (slow step)
+  # then just find the coordinates in the file itself (slow step).
+  # Uses a sort step such that the highest coordinate of every 
+  # contig is listed first for each contig.
   open(VCFGZ,"zcat $vcf | cut -f 1,2 | sort -k1,1 -k2,2nr |") or die "ERROR: could not open $vcf for reading: $!";
   while(<VCFGZ>){
     next if(/^#/);
     my($seqname,$pos)=split /\t/;
-    $max{$seqname}=$pos+0 if(!defined($max{$seqname}))
+    next if(defined($max{$seqname}));
+    $max{$seqname}=$pos+0;
   }
-  close VCFGZ;
   return \%max;
 }
 
