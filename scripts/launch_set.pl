@@ -391,7 +391,7 @@ sub indexReference{
     die if $?;
   } elsif($$settings{mapper} eq 'stampy'){
     return $ref if(-e "$ref.stidx" && -e "$ref.sthash");
-    system("stampy.py -G $ref $ref && stampy.py -g $ref -H $ref");
+    system("stampy.py --noparseNCBI -G $ref $ref && stampy.py --noparseNCBI -g $ref -H $ref");
     die if $?;
   }
   return $ref;
