@@ -158,7 +158,6 @@ sub vcfLengths{
     my($seqname,$start,$stop)=split /\t/;
     $max{$seqname}=$stop;
   }
-  close VCFGZ;
   return \%max if(keys(%max)>0);
 
   #die "ERROR: could not determine contig lengths for $vcf using either the ##reference tag nor 'bcftools index -s'";
@@ -167,15 +166,17 @@ sub vcfLengths{
 
   # If a reference is not found and bcftools didn't come through, 
   # then just find the coordinates in the file itself (slow step).
-  # Uses a sort step such that the highest coordinate of every 
-  # contig is listed first for each contig.
-  open(VCFGZ,"zcat $vcf | cut -f 1,2 | sort -k1,1 -k2,2nr |") or die "ERROR: could not open $vcf for reading: $!";
+  # Reverses the coordinates using tac such that each
+  # max pos is listed first for each contig.
+  #open(VCFGZ,"zcat $vcf | cut -f 1,2 | sort -k1,1 -k2,2nr |") or die "ERROR: could not open $vcf for reading: $!";
+  open(VCFGZ,"zcat $vcf | cut -f 1,2 | tac |") or die "ERROR: could not open $vcf for reading: $!";
   while(<VCFGZ>){
     next if(/^#/);
     my($seqname,$pos)=split /\t/;
     next if(defined($max{$seqname}));
     $max{$seqname}=$pos+0;
   }
+  close VCFGZ;
   return \%max;
 }
 
