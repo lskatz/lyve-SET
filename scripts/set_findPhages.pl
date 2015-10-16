@@ -49,7 +49,7 @@ sub phast{
 
   # longest gene in phast is 8573bp, and all regions produced should have 
   # at least that length just in case.
-  my $regions=`makeRegions.pl $fasta --numchunks $$settings{numcpus} --overlapby 8573`;
+  my $regions=`makeRegions.pl $fasta --numcpus $$settings{numcpus} --numchunks $$settings{numcpus} --overlapby 8573`;
   die "ERROR: problem with makeRegions.pl" if $?;
   my @regions=split(/\n/,$regions);
   logmsg "Regions are: ".join(", ",@regions);

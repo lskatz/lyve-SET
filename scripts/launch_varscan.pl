@@ -80,7 +80,7 @@ sub varscan2{
   mkdir($tmpdir);
 
   # Figure out any regions
-  my $regions=`makeRegions.pl --numchunks $$settings{numcpus} $bam`;
+  my $regions=`makeRegions.pl --numcpus $$settings{numcpus} --numchunks $$settings{numcpus} $bam`;
 
   # Figure out mpileup options
   my $xopts="";
