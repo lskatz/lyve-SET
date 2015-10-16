@@ -60,6 +60,9 @@ sub main{
   my $vcf=varscan2($bam,$reference,$settings);
   #backfillVcfValues($vcf,$settings);
   system("cat $vcf");
+  die "ERROR: missing tmp vcf file $vcf, or I could not read it" if $?;
+
+  system("rm -f $vcf");
 
   return 0;
 }
@@ -119,7 +122,7 @@ sub varscan2{
   die if $?;
 
   # Make sure everything is cleaned up whenever the script ends
-  END{system("rm -rf $tmpdir $$settings{tempdir}/$b.merged.vcf");}
+  system("rm -rf $tmpdir");
 
   #backfillVcfValues("$$settings{tempdir}/merged.vcf",$settings);
 
