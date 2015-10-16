@@ -80,7 +80,7 @@ done
 
 # Input file requirements and dependency check
 [[ -z "$IN_FASTQ" || -z "$REFERENCE" ]] && { usage; exit 1; }
-[[ "$IN_FASTQ" == *.gz ]] && gunzip -k "$TMP"/"$IN_FASTQ" && IN_FASTQ="$TMP"/"$IN_FASTQ"
+[[ "$IN_FASTQ" == *.gz ]] && gunzip "$TMP"/"$IN_FASTQ" && IN_FASTQ="$TMP"/"$IN_FASTQ"
 [[ ! -s "$REFERENCE.stidx" || ! -s "$REFERENCE.sthash" ]] && { echo 'ERROR: hash and/or index file not found'; exit 1; }
 command -v stampy.py >/dev/null 2>&1 || { echo 'ERROR: stampy.py not found' >&2; exit 1; }
 
