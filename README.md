@@ -22,6 +22,9 @@ Make Lyve-SET go quickly with `--fast`!  This option is shorthand for several ot
 
     set_test.pl listeria_monocytogenes --numcpus 8 --fast
 
+See: [examples.md](docs/EXAMPLES.md) for more details.  
+Also see: [testdata.md](docs/TESTDATA.md) for more details on making your own test data set.
+
 Usage
 -----
 To see the help for any script, run it without options or with `--help`.  For example, `set_test.pl -h`.  The following is the help for the main script, `launch_set.pl`:
@@ -74,27 +77,6 @@ To see the help for any script, run it without options or with `--help`.  For ex
     --numnodes     50                maximum number of nodes
     --numcpus      1                 number of cpus
     --qsubxopts    '-N lyve-set'     Extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
-
-
-Run a test dataset
-------------------
-
-See: [examples.md](docs/EXAMPLES.md) for more details.  
-Also see: [testdata.md](docs/TESTDATA.md) for more details on making your own test data set.
-
-The script `set_test.pl` will run an actual test on a given dataset
-
-    Runs a test dataset with Lyve-SET
-    Usage: set_test.pl dataset [project]
-    dataset names could be one of the following:
-      escherichia_coli, lambda, listeria_monocytogenes, salmonella_enterica_agona
-    NOTE: project will be the name of the dataset, if it is not given
-
-    --numcpus 1  How many cpus you want to use
-    --do-nothing To print the commands but do not run system calls
-
-`$ set_test.pl lambda  # will run the entire lambda phage dataset and produce meaningful results in ./lambda/msa/`
-
 
 Examples
 ------
