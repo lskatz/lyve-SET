@@ -31,13 +31,14 @@ install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClea
 	@echo DONE installing prerequisites
 
 scripts/vcf-sort:
-	wget 'http://downloads.sourceforge.net/project/vcftools/vcftools_0.1.12b.tar.gz?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fvcftools%2Ffiles%2F&ts=1409260024&use_mirror=ufpr' -O build/vcftools_0.1.12b.tar.gz
+	rm -rf lib/vcftools*
+	wget https://github.com/vcftools/vcftools/releases/download/v0.1.14/vcftools-0.1.14.tar.gz -O build/vcftools-0.1.14.tar.gz
 	cd build && \
-	tar zxvf vcftools_0.1.12b.tar.gz
-	mv build/vcftools_0.1.12b lib/
-	cd lib/vcftools_0.1.12b &&\
-    make --directory=lib/vcftools_0.1.12b MAKEFLAGS=""
-	ln -s lib/vcftools_0.1.12b/perl/vcf-sort scripts/
+	  tar zxvf vcftools-0.1.14.tar.gz
+	mv build/vcftools-0.1.14 lib/
+	cd lib/vcftools-0.1.14 && \
+	  ./configure --prefix=`pwd -P` && make MAKEFLAGS="" && make install
+	ln -s lib/vcftools-0.1.14/perl/vcf-sort $@
 
 lib/Vcf.pm: scripts/vcf-sort
 	ln -s lib/vcftools_0.1.12b/perl/Vcf.pm $@
