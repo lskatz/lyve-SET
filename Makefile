@@ -27,7 +27,7 @@ install: install-prerequisites
 	@echo "Don't forget to include scripts in your PATH"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar lib/phast/phast.faa scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules lib/snpEff.jar scripts/stampy.py
+install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar lib/phast/phast.faa scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py
 	@echo DONE installing prerequisites
 
 scripts/vcf-sort:
@@ -150,27 +150,41 @@ scripts/raxmlHPC-PTHREADS: scripts/raxmlHPC
 # there.
 # TODO I should probably have an individual install command per 
 # module so that Make can do its job.
-install-perlModules:
-	@echo "Installing Perl modules using cpanminus"
-	for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Basic Graph::Centrality::Pagerank String::Escape Statistics::LineFit; do \
-	  perl scripts/cpanm --self-contained -L lib $$package; \
-		if [ $$? -gt 0 ]; then exit 1; fi; \
-	done;
+install-perlModules: lib/lib/perl5/Config/Simple.pm lib/lib/perl5/File/Slurp.pm lib/lib/perl5/Math/Round.pm lib/lib/perl5/Number/Range.pm lib/lib/perl5/Statistics/Distributions.pm lib/lib/perl5/Statistics/Basic.pm lib/lib/perl5/Graph/Centrality/Pagerank.pm lib/lib/perl5/String/Escape.pm lib/lib/perl5/Statistics/LineFit.pm
 	@echo "Done with Perl modules"
+lib/lib/perl5/Config/Simple.pm:
+	perl scripts/cpanm --self-contained -L lib Config::Simple
+lib/lib/perl5/File/Slurp.pm:
+	perl scripts/cpanm --self-contained -L lib File::Slurp
+lib/lib/perl5/Math/Round.pm:
+	perl scripts/cpanm --self-contained -L lib Math::Round
+lib/lib/perl5/Number/Range.pm:
+	perl scripts/cpanm --self-contained -L lib Number::Range
+lib/lib/perl5/Statistics/Distributions.pm:
+	perl scripts/cpanm --self-contained -L lib Statistics::Distributions
+lib/lib/perl5/Statistics/Basic.pm:
+	perl scripts/cpanm --self-contained -L lib Statistics::Basic
+lib/lib/perl5/Graph/Centrality/Pagerank.pm:
+	perl scripts/cpanm --self-contained -L lib Graph::Centrality::Pagerank
+lib/lib/perl5/String/Escape.pm:
+	perl scripts/cpanm --self-contained -L lib String::Escape
+lib/lib/perl5/Statistics/LineFit.pm:
+	perl scripts/cpanm --self-contained -L lib Statistics::LineFit
 
 install-config: config/LyveSET.conf config/presets.conf
-
-config/%.conf:
-	b=`basename $@` && d=`dirname $@` &&\
-	  cp -v config/original/$$b $@
+config/LyveSET.conf:
+	cp config/original/LyveSET.conf $@
+config/presets.conf:
+	cp config/original/presets.conf $@
 
 lib/snpEff.jar:
+	rm -rf lib/snpEff* 
 	wget http://sourceforge.net/projects/snpeff/files/snpEff_latest_core.zip -O lib/snpEff_latest_core.zip
 	cd lib && unzip -o snpEff_latest_core.zip
-	cp lib/snpEff/snpEff.jar lib/
+	cp lib/snpEff/snpEff.jar $@
+	rm -f lib/snpEff_latest_core.zip
+config/snpEff.conf: lib/snpEff.jar
 	cp lib/snpEff/snpEff.config config/snpEff.conf
-	rm -rf lib/snpEff_latest_core.zip
-	rm -rf lib/snpEff
 
 scripts/stampy.py:
 	rm -rf build/Stampy* lib/stampy*
