@@ -41,7 +41,7 @@ scripts/vcf-sort:
 	ln -s ../lib/vcftools-0.1.14/bin/vcf-sort $@
 
 lib/Vcf.pm: scripts/vcf-sort
-	ln -s lib/vcftools_0.1.12b/perl/Vcf.pm $@
+	cp lib/vcftools-0.1.14/src/perl/Vcf.pm $@
 
 scripts/run_assembly_isFastqPE.pl: 
 	# CGP scripts that are needed and that don't depend on CGP libraries
