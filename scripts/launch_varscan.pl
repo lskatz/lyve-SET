@@ -12,10 +12,9 @@ use Bio::Perl;
 use Bio::FeatureIO;
 
 use FindBin;
-use lib "$FindBin::RealBin/../lib/vcftools_0.1.12b/perl";
-use Vcf;
 use lib "$FindBin::RealBin/../lib";
 use LyveSET qw/@fastaExt @fastqExt @bamExt/;
+use Vcf;
 
 my $samplename="SampleNameUnknown"; # to be changed later
 $0=fileparse $0;
