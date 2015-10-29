@@ -69,7 +69,7 @@ sub main{
   # Initialize settings by reading the global configuration
   # file, LyveSET.conf
   my $settings=readGlobalSettings(1);
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s qsub!)) or die $!;
 
   # What options change when --fast is used?
   if($$settings{fast}){
@@ -146,6 +146,11 @@ sub main{
   $$settings{workingdir}="$$settings{logdir}/SGELK";
   for (qw(workingdir numnodes numcpus keep qsubxopts queue)){
     $sge->set($_,$$settings{$_}) if($$settings{$_});
+  }
+  # Ensure there is no cluster scheduling, if requested
+  if(defined($$settings{qsub}) && !$$settings{qsub}){
+    $sge->set('scheduler',0);
+    $sge->set('qsub',undef);
   }
 
   # open the log file now that we know the logdir is there
@@ -803,7 +808,9 @@ sub usage{
     --tmpdir  $$settings{tmpdir} tmp/ Where to put temporary files
     --msadir  $$settings{msadir} multiple sequence alignment and tree files (final output)
     --logdir  $$settings{logdir} Where to put log files. Qsub commands are also stored here.
-    --asmdir  $$settings{asmdir} directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
+    --asmdir  $$settings{asmdir} directory of assemblies. Copy or symlink 
+                              the reference genome assembly to use it if it is not already
+                              in the raw reads directory
 
     PERFORM CERTAIN STEPS
     --mask-phages                    Search for and mask phages in the reference genome
@@ -812,21 +819,29 @@ sub usage{
     --nomatrix                       Do not create an hqSNP matrix
     --nomsa                          Do not make a multiple sequence alignment
     --notrees                        Do not make phylogenies
-    --singleend                      Treat everything like single-end. Useful for when you think there is a single-end/paired-end bias.
+    --singleend                      Treat everything like single-end. Useful for 
+                                     when you think there is a single-end/paired-end bias.
     OTHER SHORTCUTS
-    --fast                           Shorthand for --downsample --mapper snap --nomask-phages --nomask-cliffs --sample-sites
-    --presets \"\"                   See presets.conf for more information
-    --downsample                     Downsample all reads to 50x. Approximated according to the ref genome assembly
-    --sample-sites                   Randomly choose a genome and find SNPs in a quick and dirty way. Then on the SNP-calling stage, only interrogate those sites for SNPs for each genome (including the randomly-sampled genome).
+    --fast                           Shorthand for --downsample --mapper snap --nomask-phages 
+                                                   --nomask-cliffs --sample-sites
+    --presets \"\"                     See presets.conf for more information
+    --downsample                     Downsample all reads to 50x. Approximated according 
+                                     to the ref genome assembly
+    --sample-sites                   Randomly choose a genome and find SNPs in a quick 
+                                     and dirty way. Then on the SNP-calling stage, 
+                                     only interrogate those sites for SNPs for each 
+                                     genome (including the randomly-sampled genome).
     MODULES
-    --read_cleaner $$settings{read_cleaner}   Which read cleaner?  Choices: none, CGP, BayesHammer
+    --read_cleaner $$settings{read_cleaner}                  Which read cleaner?  Choices: none, CGP, BayesHammer
     --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap, stampy
     --snpcaller    $$settings{snpcaller}   Which SNP caller? Only choice: varscan
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue        $$settings{queue}             The default queue to use.
     --numnodes     $$settings{numnodes}                maximum number of nodes
     --numcpus      $$settings{numcpus}                 number of cpus
-    --qsubxopts    '-N lyve-set'     Extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
+    --qsubxopts    '-N lyve-set'     Extra options to pass to qsub. This is not 
+                                     sanitized; internal options might overwrite yours.
+    --noqsub                         Do not use the scheduler, even if it exists
   ";
   return $help;
 }
