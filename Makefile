@@ -38,7 +38,7 @@ scripts/vcf-sort:
 	mv build/vcftools-0.1.14 lib/
 	cd lib/vcftools-0.1.14 && \
 	  ./configure --prefix=`pwd -P` && make MAKEFLAGS="" && make install
-	ln -s lib/vcftools-0.1.14/perl/vcf-sort $@
+	ln -s ../lib/vcftools-0.1.14/bin/vcf-sort $@
 
 lib/Vcf.pm: scripts/vcf-sort
 	ln -s lib/vcftools_0.1.12b/perl/Vcf.pm $@
@@ -114,7 +114,7 @@ scripts/mixreads: scripts/smalt
 scripts/readstats: scripts/smalt
 	ln -s ../lib/smalt-0.7.6/bin/readstats $@
 scripts/simqual: scripts/smalt
-	ln -s ../lib/smalt-0.7.6/bin/bsimqual$@
+	ln -s ../lib/smalt-0.7.6/bin/bsimqual $@
 scripts/simread: scripts/smalt
 	ln -s ../lib/smalt-0.7.6/bin/simread $@
 scripts/splitmates: scripts/smalt
