@@ -148,8 +148,6 @@ scripts/raxmlHPC-PTHREADS: scripts/raxmlHPC
 # been installed and so it shouldn't depend on a file existing and
 # should run no matter what. CPAN will know if the module will be
 # there.
-# TODO I should probably have an individual install command per 
-# module so that Make can do its job.
 install-perlModules: lib/lib/perl5/Config/Simple.pm lib/lib/perl5/File/Slurp.pm lib/lib/perl5/Math/Round.pm lib/lib/perl5/Number/Range.pm lib/lib/perl5/Statistics/Distributions.pm lib/lib/perl5/Statistics/Basic.pm lib/lib/perl5/Graph/Centrality/Pagerank.pm lib/lib/perl5/String/Escape.pm lib/lib/perl5/Statistics/LineFit.pm
 	@echo "Done with Perl modules"
 lib/lib/perl5/Config/Simple.pm:
