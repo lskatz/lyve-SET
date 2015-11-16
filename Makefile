@@ -110,11 +110,11 @@ scripts/basqcol: scripts/smalt
 scripts/fetchseq: scripts/smalt
 	ln -s ../lib/smalt-0.7.6/bin/fetchseq $@
 scripts/mixreads: scripts/smalt
-	ln -s ../lib/smalt-0.7.6/bin/scripts/mixreads $@
+	ln -s ../lib/smalt-0.7.6/bin/mixreads $@
 scripts/readstats: scripts/smalt
 	ln -s ../lib/smalt-0.7.6/bin/readstats $@
 scripts/simqual: scripts/smalt
-	ln -s ../lib/smalt-0.7.6/bin/bsimqual $@
+	ln -s ../lib/smalt-0.7.6/bin/simqual $@
 scripts/simread: scripts/smalt
 	ln -s ../lib/smalt-0.7.6/bin/simread $@
 scripts/splitmates: scripts/smalt
