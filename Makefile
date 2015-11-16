@@ -27,7 +27,7 @@ install: install-prerequisites
 	@echo "Don't forget to include scripts in your PATH"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar lib/phast/phast.faa scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py
+install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar lib/vcflib lib/phast/phast.faa scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py
 	@echo DONE installing prerequisites
 
 scripts/vcf-sort:
@@ -60,13 +60,19 @@ scripts/run_assembly_metrics.pl: scripts/run_assembly_isFastqPE.pl
 
 lib/Schedule/SGELK.pm:
 	git clone https://github.com/lskatz/Schedule--SGELK.git build/Schedule
-	-mkdir -p lib/Schedule
+	mkdir -p lib/Schedule
 	mv -v build/Schedule/SGELK.pm lib/Schedule/
 	mv -v build/Schedule/README.md lib/Schedule/
 	mv -v build/Schedule/.git lib/Schedule/
 
 lib/varscan.v2.3.7.jar:
 	wget 'http://downloads.sourceforge.net/project/varscan/VarScan.v2.3.7.jar' -O $@
+
+lib/vcflib:
+	rm -rfv {build,lib}/vcflib && mkdir -p {build,lib}/vcflib
+	git clone https://github.com/ekg/vcflib.git build/vcflib
+	cd build/vcflib && make
+	mv -v build/vcflib lib/vcflib
 
 lib/phast/phast.faa: 
 	mkdir -p lib/phast

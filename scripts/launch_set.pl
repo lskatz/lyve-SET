@@ -629,8 +629,25 @@ sub variantCalls{
           rm -v $vcfdir/$b.vcf.tmp",
           {jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1}
       );
-      $jobname="sort$b"; # the thing that bgzip waits on to finish
-    } else {
+      $jobname="sort$b"; # the job that bgzip waits on to finish
+    } 
+    elsif($$settings{snpcaller} eq 'vcftools'){
+      $jobname="vcftools$b";
+      my $vcftoolsxopts="";
+      $vcftoolsxopts.="--region $regionsFile " if($regionsFile);
+      $vcftoolsxopts.="--exclude $bam.cliffs.bed " if(-e "$bam.cliffs.bed");
+      my $vcftoolsCommand="$scriptsdir/launch_vcftools.pl $bam --numcpus $$settings{numcpus} --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $vcftoolsxopts > $vcfdir/$b.vcf";
+      logmsg $vcftoolsCommand;
+      $sge->pleaseExecute($vcftoolsCommand,{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
+      # sort VCF
+      $sge->pleaseExecute("mv $vcfdir/$b.vcf $vcfdir/$b.vcf.tmp && 
+          vcf-sort < $vcfdir/$b.vcf.tmp > $vcfdir/$b.vcf && 
+          rm -v $vcfdir/$b.vcf.tmp",
+          {jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1}
+      );
+      $jobname="sort$b"; # the job that bgzip waits on to finish
+    }
+    else {
       die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
     }
 
@@ -834,7 +851,7 @@ sub usage{
     MODULES
     --read_cleaner $$settings{read_cleaner}                  Which read cleaner?  Choices: none, CGP, BayesHammer
     --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap, stampy
-    --snpcaller    $$settings{snpcaller}   Which SNP caller? Only choice: varscan
+    --snpcaller    $$settings{snpcaller}   Which SNP caller? Only choice: varscan, vcftools
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue        $$settings{queue}             The default queue to use.
     --numnodes     $$settings{numnodes}                maximum number of nodes
