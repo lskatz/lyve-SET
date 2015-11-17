@@ -72,7 +72,7 @@ for ((i=1; i <= nopts; i++)); do
 			shift 2
 			;;
 		-r | --reference)
-			REF="--out $2"
+			REF="$2"
 			echo "    Genome reference: $2"
 			shift 2
 			;;
@@ -126,7 +126,7 @@ fi
 if [[ -n "$MPILEUP" ]]; then
 	b=$(basename "$MPILEUP" .sorted.bam)
 	samtools faidx "$REF"
-	samtools mpileup -Q 0 -d 1000 -suvf "$REF" "$MPILEUP" | bgzip -c > "$b".vcf.gz
+	samtools mpileup -d 1000 -suvf "$REF" "$MPILEUP" | bgzip -c > "$b".vcf.gz
 	tabix "$b".vcf.gz
 	VCF="$b".vcf.gz
 fi
@@ -135,8 +135,6 @@ fi
 
 # run vcftools
 B=$(basename "$VCF" | sed -r 's/\.(vcf|vcf\.gz)$//1')
-echo "B= $B"
-echo "OUTPREF= $OUTPREF"
 COMMAND="$(echo $VCFFMT $VCF $OUTPREF $COVERAGE $FLANK $MINQ $REGION $EXCLUDE \
     --min-alleles 2 --max-alleles 2 --remove-indels --remove-filtered-all $XOPTS --recode --recode-INFO-all \
     | sed 's/ \{1,\}/ /g')" #cleanup spaces

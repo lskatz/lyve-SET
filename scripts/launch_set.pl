@@ -636,7 +636,7 @@ sub variantCalls{
       my $vcftoolsxopts="";
       $vcftoolsxopts.="--region $regionsFile " if($regionsFile);
       $vcftoolsxopts.="--exclude $bam.cliffs.bed " if(-e "$bam.cliffs.bed");
-      my $vcftoolsCommand="$scriptsdir/launch_vcftools.pl $bam --numcpus $$settings{numcpus} --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $vcftoolsxopts > $vcfdir/$b.vcf";
+      my $vcftoolsCommand="$scriptsdir/launch_vcftools.sh -m $bam --numcpus $$settings{numcpus} --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $vcftoolsxopts > $vcfdir/$b.vcf";
       logmsg $vcftoolsCommand;
       $sge->pleaseExecute($vcftoolsCommand,{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
       # sort VCF
