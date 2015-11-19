@@ -592,7 +592,7 @@ sub variantCalls{
     }
     if(!-e $regionsFile){
       system("rm -fv $regionsFile.*.tmp");
-      my $command="samtools view -H $initBam | grep \"\@SQ\" | sed 's/^.*SN://g' | cut -f 1 | xargs -I {} -n 1 -P $$settings{numcpus} sh -c \"samtools mpileup -uf $ref -r '{}' $initBam | bcftools call -cv | grep -v '^#' | cut -f 1,2 > $regionsFile.'{}'.tmp \" ";
+      my $command="samtools view -H $initBam | grep \"\@SQ\" | sed 's/^.*SN://g' | cut -f 1 | xargs -I {} -n 1 -P $$settings{numcpus} sh -c \"samtools mpileup -suf $ref -r '{}' $initBam | bcftools call -c | grep -v '^#' | cut -f 1,2 > $regionsFile.'{}'.tmp \" ";
       $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"snpPositionDiscovery"});
       $sge->wrapItUp();
 

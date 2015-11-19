@@ -110,11 +110,6 @@ done
 command -v vcftools >/dev/null 2>&1 || { echo 'ERROR: vcftools binary not found' >&2; exit 1; }
 command -v vcffilter >/dev/null 2>&1 || { echo 'ERROR: vcffilter binary not found' >&2; exit 1; }
 
-if [[ -z "$OUTPREF" ]]; then
-	B=$(basename "$VCF" | sed -r 's/\.(vcf|vcf\.gz)$//1')
-	OUTPREF="--out ${TMP}/${B}"
-fi
-
 # Manage tmp dir
 if [ ! -d "$TMP" ]; then
 	mkdir -p "$TMP"
@@ -127,10 +122,15 @@ fi
 if [[ -n "$MPILEUP" ]]; then
 	b=$(basename "$MPILEUP" .sorted.bam)
 	samtools faidx "$REF"
-	samtools view -H "$MPILEUP" | grep "\@SQ" | sed 's/^.*SN://g' | cut -f 1 | xargs -I {} -n 1 -P "$NUMCPUS" sh -c "samtools mpileup -d 1000 -suvf $REF -r '{}' $MPILEUP > $TMP/$b.vcf 2> /dev/null"
+	samtools view -H "$MPILEUP" | grep "\@SQ" | sed 's/^.*SN://g' | cut -f 1 | xargs -I {} -n 1 -P "$NUMCPUS" sh -c "samtools mpileup -d 1000 -suvf $REF -r '{}' $MPILEUP 1> $TMP/$b.vcf 2> /dev/null"
 	#samtools mpileup -d 1000 -suvf "$REF" "$MPILEUP" 2> /dev/null > "$TMP"/"$b".vcf
-	tabix "$TMP"/"$b".vcf &> /dev/null
+	#tabix "$TMP"/"$b".vcf.gz &> /dev/null
 	VCF="$TMP"/"$b".vcf
+fi
+
+if [[ -z "$OUTPREF" ]]; then
+	B=$(basename "$VCF" | sed -r 's/\.(vcf|vcf\.gz)$//1')
+	OUTPREF="--out ${TMP}/${B}"
 fi
 
 [[ "$VCF" == *.gz ]] && VCFFMT='--gzvcf' #enables compressed or uncompressed
@@ -138,11 +138,16 @@ fi
 # run vcftools
 B=$(basename "$VCF" | sed -r 's/\.(vcf|vcf\.gz)$//1')
 COMMAND="$(echo $VCFFMT $VCF $OUTPREF $COVERAGE $FLANK $MINQ $REGION $EXCLUDE \
-    --min-alleles 2 --max-alleles 2 --remove-indels --remove-filtered-all $XOPTS --recode --recode-INFO-all \
+    --remove-indels --remove-filtered-all $XOPTS --recode --recode-INFO-all \
     | sed 's/ \{1,\}/ /g')" #cleanup spaces
+echo 'mpileup complete'
 vcftools "$COMMAND" &> /dev/null
-rm -v "$TMP"/"$B".log
-vcffilter -g "GT = 1/1" "$TMP"/"$B".recode.vcf | vcffixup - | vcffilter -f "AC > 0" | bgzip -c > "$TMP"/"$B".vcf.gz
-rm -v "$TMP"/"$B".recode.vcf
+echo 'vcftools complete'
+#rm -v "$TMP"/"$B".log
+vcffilter -g "GT = 1/1" "$TMP"/"$B".recode.vcf | vcffixup - | vcffilter -f "AC > 0" | bgzip -f > "$TMP"/"$B".vcf.gz
+echo 'vcffilter complete'
+tabix -f "$TMP"/"$B".vcf.gz #&> /dev/null
+echo 'tabix complete'
+#rm -v "$TMP"/"$B".recode.vcf
 #to-do: filter for at least 1 read on both -f "ADF > 0 & ADR > 0" doesn't seem to work
 
