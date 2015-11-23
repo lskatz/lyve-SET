@@ -96,6 +96,9 @@ sub varscan2{
     pileup=$tmpdir/\$\$.mpileup;
     vcf=$tmpdir/\$\$.vcf;
 
+    # Avoid disk I/O problems.
+    sleep \$((\$RANDOM % $$settings{numcpus}))
+
     samtools mpileup -f $reference $xopts --region "{}" $bam > \$pileup;
     if [ \$? -gt 0 ]; then exit 1; fi;
     size=\$(wc -c < \$pileup);

@@ -111,7 +111,7 @@ for VCF in $TEMPDIR/concat.vcf $TEMPDIR/hqPos.vcf; do
   fi;
 
   echo "$script: Sorting $VCF and removing indels";
-  bcftools annotate --include '%TYPE!="indel" && %FILTER!="isIndel"' < $VCF > $VCF.tmp && mv $VCF.tmp $VCF;
+  bcftools annotate --include '%TYPE!="indel"' < $VCF > $VCF.tmp && mv $VCF.tmp $VCF;
 
   echo "$script: compressing $VCF";
   bgzip $VCF
