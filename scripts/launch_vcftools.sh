@@ -23,7 +23,7 @@ function usage() {
 # defaults
 ALTFREQ='--non-ref-af 0.75'
 COVERAGE='--minDP 10'
-#MINQ='--minQ 30'
+MINQ='--minQ 30'
 TMP=tmp
 VCFFMT='--vcf'
 
@@ -86,11 +86,11 @@ for ((i=1; i <= nopts; i++)); do
 			echo "    VCF file: $2"
 			shift 2
 			;;
-		# -q | --minQ)
-		# 	MINQ="--minQ $2"
-		# 	echo "    Minimum average Phred score: $2"
-		# 	shift 2
-		# 	;;
+		-q | --minQ)
+			MINQ="--minQ $2"
+			echo "    Minimum average Phred score: $2"
+			shift 2
+			;;
 		-x | --xopts)
 			XOPTS="$2"
 			echo "    extra options passed to vcftools: $2"
@@ -122,10 +122,11 @@ fi
 if [[ -n "$MPILEUP" ]]; then
 	b=$(basename "$MPILEUP" .sorted.bam)
 	samtools faidx "$REF"
-	samtools view -H "$MPILEUP" | grep "\@SQ" | sed 's/^.*SN://g' | cut -f 1 | xargs -I {} -n 1 -P "$NUMCPUS" sh -c "samtools mpileup -d 1000 -suvf $REF -r '{}' $MPILEUP 1> $TMP/$b.vcf 2> /dev/null"
-	#samtools mpileup -d 1000 -suvf "$REF" "$MPILEUP" 2> /dev/null > "$TMP"/"$b".vcf
+	#samtools view -H "$MPILEUP" | grep "\@SQ" | sed 's/^.*SN://g' | cut -f 1 | xargs -I {} -n 1 -P "$NUMCPUS" sh -c "samtools mpileup -d 1000 -suvf $REF -r '{}' $MPILEUP 1> $TMP/$b.vcf 2> /dev/null" 
+	samtools mpileup -d 1000 -suvf "$REF" "$MPILEUP" 2> /dev/null | bcftools call -c > "$TMP"/"$b".vcf
 	#tabix "$TMP"/"$b".vcf.gz &> /dev/null
 	VCF="$TMP"/"$b".vcf
+	echo 'mpileup conversion into VCF completed'
 fi
 
 if [[ -z "$OUTPREF" ]]; then
@@ -140,14 +141,13 @@ B=$(basename "$VCF" | sed -r 's/\.(vcf|vcf\.gz)$//1')
 COMMAND="$(echo $VCFFMT $VCF $OUTPREF $COVERAGE $FLANK $MINQ $REGION $EXCLUDE \
     --remove-indels --remove-filtered-all $XOPTS --recode --recode-INFO-all \
     | sed 's/ \{1,\}/ /g')" #cleanup spaces
-echo 'mpileup complete'
-vcftools "$COMMAND" &> /dev/null
-echo 'vcftools complete'
-#rm -v "$TMP"/"$B".log
-vcffilter -g "GT = 1/1" "$TMP"/"$B".recode.vcf | vcffixup - | vcffilter -f "AC > 0" | bgzip -f > "$TMP"/"$B".vcf.gz
-echo 'vcffilter complete'
+vcftools $COMMAND 2> /dev/null
+echo 'vcftools completed'
+[[ -n "$MPILEUP" ]] && rm -v "$TMP"/"$B".vcf
+vcffilter -g 'GT = 1/1' "$TMP"/"$B".recode.vcf | vcffixup - | vcffilter -f 'AC > 0' | vcfsort - | bgzip -cf > "$TMP"/"$B".vcf.gz
+echo 'vcffilter completed'
+rm -v "$TMP"/"$B".recode.vcf
 tabix -f "$TMP"/"$B".vcf.gz #&> /dev/null
-echo 'tabix complete'
-#rm -v "$TMP"/"$B".recode.vcf
+echo 'tabix completed'
 #to-do: filter for at least 1 read on both -f "ADF > 0 & ADR > 0" doesn't seem to work
 

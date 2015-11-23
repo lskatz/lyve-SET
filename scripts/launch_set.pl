@@ -630,7 +630,10 @@ sub variantCalls{
           {jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1}
       );
       $jobname="sort$b"; # the job that bgzip waits on to finish
-    } 
+    # bgzip and tabix indexing
+    indexAndCompressVcf("$vcfdir/$b.vcf",$jobname,$settings);
+    }
+
     elsif($$settings{snpcaller} eq 'vcftools'){
       $jobname="vcftools$b";
       my $vcftoolsxopts="";
@@ -639,29 +642,23 @@ sub variantCalls{
       my $vcftoolsCommand="$scriptsdir/launch_vcftools.sh -m $bam --numcpus $$settings{numcpus} --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $vcftoolsxopts";
       logmsg $vcftoolsCommand;
       $sge->pleaseExecute($vcftoolsCommand,{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
-      $sge->pleaseExecute("mv $$settings{tmpdir}/$b.vcf.gz $vcfdir/$b.vcf.gz",
-        {jobname=>"cat2vcf$b",qsubxopts=>"",numcpus=>1}
+      $sge->pleaseExecute("mv -fv $$settings{tmpdir}/$b.vcf.gz $vcfdir/$b.vcf.gz &&
+        mv -fv $$settings{tmpdir}/$b.vcf.gz.tbi $vcfdir/$b.vcf.gz.tbi",
+        {jobname=>"moveVCF$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1}
         );
-      # sort VCF
-      $sge->pleaseExecute("mv $vcfdir/$b.vcf $vcfdir/$b.vcf.tmp && 
-          vcf-sort < $vcfdir/$b.vcf.tmp > $vcfdir/$b.vcf && 
-          rm -v $vcfdir/$b.vcf.tmp",
-          {jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1}
-      );
-      $jobname="sort$b"; # the job that bgzip waits on to finish
+      $jobname="moveVCF$b"; # the job that waits on to finish
     }
+
     else {
       die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
     }
-
-    # bgzip and tabix indexing
-    indexAndCompressVcf("$vcfdir/$b.vcf",$jobname,$settings);
-
   } # END bam while loop
+
   logmsg "All variant-calling jobs have been submitted. Waiting on them to finish";
   $sge->wrapItUp();
   return 1;
 }
+
 
 sub annotateVariants{
   my($richseq,$vcfdir,$settings)=@_;
