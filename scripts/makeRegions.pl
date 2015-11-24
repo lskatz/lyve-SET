@@ -135,13 +135,17 @@ sub vcfLengths{
   my $fasta;
   open(VCFGZ,"zgrep '^##reference' $vcf | ") or die "ERROR: could not open $vcf for reading: $!";
   while(<VCFGZ>){
-    if(/^##reference=(.+)/){
+    # VCFtools v0.1.14 filtering appends to fileformat=VCFv4.2 '##reference=file:///reference-path'
+    if(/^##reference=file:(.+)/){
       $fasta=$1;
-      last if(-e $fasta);
-
-      logmsg "Found reference genome $fasta in the vcf file but it does not exist where I expect it";
-      $fasta="";
     }
+    # VarScan v2.3 filtering appends to fileformat=VCFv4.1 '##reference=/reference-path'
+    elsif(/^##reference=(.+)/){
+      $fasta=$1;
+    }
+    last if(-e $fasta);
+    logmsg "Found reference genome $fasta in the vcf file but it does not exist where I expect it";
+    $fasta="";
   }
   close VCFGZ;
   if($fasta){
