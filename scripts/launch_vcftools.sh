@@ -4,16 +4,17 @@
 set -e
 function usage() { 
 	echo "
+	$0: takes an mpileup+ref or vcf file and uses VCFtools and other VCFlib binaries to produce a vcf file with hqSNPs
 	Usage: `basename $0` [-m file.mpileup && -r ref.fasta] || [-v file.vcf[.gz]]
 		--tempdir     ./tmp/  A temporary directory to store files
-		--coverage        10  Min coverage
+		--coverage         4  Min coverage
 		--allowedFlanking  0  Neighboring bases to filter between SNPs
 		--altfreq       0.75  Min consensus agreement [%] for a SNP
 		--minQ            30  Minimum average Phred value for a SNP
 		--region    file.bed  File of positions to include (default without bed file: read all positions)
 		--exclude   file.bed  File of positions to mask    (conflicts with --region; default: no site exclusions)
 
-		--xopts '' [optional] Extra options to pass to vcftools
+		--xopts '' [optional] Extra options to pass to VCFtools
 		
 	Paths can be absolute or relative.
 	"
@@ -22,7 +23,7 @@ function usage() {
 
 # defaults
 ALTFREQ='--non-ref-af 0.75'
-COVERAGE='--minDP 10'
+COVERAGE='--minDP 4'
 MINQ='--minQ 30'
 TMP=tmp
 VCFFMT='--vcf'
@@ -61,7 +62,7 @@ for ((i=1; i <= nopts; i++)); do
 			echo "    Input mpileup file: $2"
 			shift 2
 			;;
-		-n | --numcpus)  # vcftools not threaded
+		-n | --numcpus)  # VCFtools not threaded
 			NUMCPUS="$2"
 			echo "    CPUs requested: $2"
 			shift 2
@@ -93,7 +94,7 @@ for ((i=1; i <= nopts; i++)); do
 			;;
 		-x | --xopts)
 			XOPTS="$2"
-			echo "    extra options passed to vcftools: $2"
+			echo "    extra options passed to VCFtools: $2"
 			shift 2
 			;;
 		-h | --help)
@@ -106,9 +107,15 @@ done
 
 # Input file and dependency checks
 [[ -z "$VCF" ]] && [[ -z "$MPILEUP" ]] && { usage; exit 1; }
+[[ -n "$MPILEUP" ]] && [[ -z "$REF" ]] && { echo 'ERROR: mpileup requires reference genome (-r) input as well'; usage; exit 1; }
+[[ -n "$REF" ]] && [[ -z "$MPILEUP" ]] && { echo 'ERROR: reference genome requires mpileup (-m) input as well'; usage; exit 1; }
 [[ -n "$REGION" ]] && [[ -n "$EXCLUDE" ]] && { echo 'ERROR: conflicting opts --exclude --region'; usage; exit 1; }
-command -v vcftools >/dev/null 2>&1 || { echo 'ERROR: vcftools binary not found' >&2; exit 1; }
 command -v vcffilter >/dev/null 2>&1 || { echo 'ERROR: vcffilter binary not found' >&2; exit 1; }
+command -v vcffixup >/dev/null 2>&1 || { echo 'ERROR: vcffixup binary not found' >&2; exit 1; }
+command -v vcfsort >/dev/null 2>&1 || { echo 'ERROR: vcfsort script not found' >&2; exit 1; }
+command -v vcftools >/dev/null 2>&1 || { echo 'ERROR: vcftools binary not found' >&2; exit 1; }
+command -v bgzip >/dev/null 2>&1 || { echo 'ERROR: bgzip binary not found' >&2; exit 1; }
+command -v tabix >/dev/null 2>&1 || { echo 'ERROR: tabix binary not found' >&2; exit 1; }
 
 # Manage tmp dir
 if [ ! -d "$TMP" ]; then
@@ -118,13 +125,14 @@ else
 	echo "WARNING: temp dir $TMP already exists and conflicting files will be overwritten"
 fi
 
-# convert mpileup to vcf
+# convert mpileup to vcf when mpileup file given and vcf not given
 if [[ -n "$MPILEUP" ]]; then
+	command -v bcftools >/dev/null 2>&1 || { echo 'ERROR: bcftools binary not found' >&2; exit 1; }
+	command -v samtools >/dev/null 2>&1 || { echo 'ERROR: samtools binary not found' >&2; exit 1; }
 	b=$(basename "$MPILEUP" .sorted.bam)
 	samtools faidx "$REF"
 	#samtools view -H "$MPILEUP" | grep "\@SQ" | sed 's/^.*SN://g' | cut -f 1 | xargs -I {} -n 1 -P "$NUMCPUS" sh -c "samtools mpileup -d 1000 -suvf $REF -r '{}' $MPILEUP 1> $TMP/$b.vcf 2> /dev/null" 
 	samtools mpileup -d 1000 -suvf "$REF" "$MPILEUP" 2> /dev/null | bcftools call -c > "$TMP"/"$b".vcf
-	#tabix "$TMP"/"$b".vcf.gz &> /dev/null
 	VCF="$TMP"/"$b".vcf
 	echo 'mpileup conversion into VCF completed'
 fi
@@ -136,18 +144,28 @@ fi
 
 [[ "$VCF" == *.gz ]] && VCFFMT='--gzvcf' #enables compressed or uncompressed
 
-# run vcftools
+# run VCFtools
 B=$(basename "$VCF" | sed -r 's/\.(vcf|vcf\.gz)$//1')
 COMMAND="$(echo $VCFFMT $VCF $OUTPREF $COVERAGE $FLANK $MINQ $REGION $EXCLUDE \
     --remove-indels --remove-filtered-all $XOPTS --recode --recode-INFO-all \
     | sed 's/ \{1,\}/ /g')" #cleanup spaces
 vcftools $COMMAND 2> /dev/null
-echo 'vcftools completed'
+echo 'VCFtools completed'
 [[ -n "$MPILEUP" ]] && rm -v "$TMP"/"$B".vcf
-vcffilter -g 'GT = 1/1' "$TMP"/"$B".recode.vcf | vcffixup - | vcffilter -f 'AC > 0' | vcfsort - | bgzip -cf > "$TMP"/"$B".vcf.gz
+#discard PL field due to inconsisent lines which breaks downstream mergeVcf.sh (that invokes bcftools merge); some lines='GT:PL	1/1:255,63,0', others='GT:PL	1/1:0,105:94:99:255,255,0'
+vcffilter -g 'GT = 1/1' "$TMP"/"$B".recode.vcf | vcffixup - | vcffilter -f 'AC > 0' | vcfsort - | bcftools annotate -x PL,FORMAT - > "$TMP"/"$B".vcf 
 echo 'vcffilter completed'
-rm -v "$TMP"/"$B".recode.vcf
+
+if grep -Pq '^#CHROM[A-Z\t]+sm$' "$TMP"/"$B".vcf; then
+	#clean up sampleID in VCF file
+	b=$(basename "$B" .fastq-reference)
+	sed -i "/^#CHROM[A-Z\t]+sm$/s/sm/$b/1" "$TMP"/"$B".vcf
+	echo "changed sample ID inside VCF to reflect input filename: $b"
+fi
+
+bgzip -cf "$TMP"/"$B".vcf > "$TMP"/"$B".vcf.gz
+rm -v "$TMP"/"$B".recode.vcf "$TMP"/"$B".vcf
 tabix -f "$TMP"/"$B".vcf.gz #&> /dev/null
-echo 'tabix completed'
-#to-do: filter for at least 1 read on both -f "ADF > 0 & ADR > 0" doesn't seem to work
+echo 'bgzip compression and tabix indexing completed'
+#to-do: filter for at least 1 read on both -f "ADF > 0 & ADR > 0" doesn't work
 

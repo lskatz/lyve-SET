@@ -851,7 +851,7 @@ sub usage{
     MODULES
     --read_cleaner $$settings{read_cleaner}                  Which read cleaner?  Choices: none, CGP, BayesHammer
     --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap, stampy
-    --snpcaller    $$settings{snpcaller}   Which SNP caller? Only choice: varscan, vcftools
+    --snpcaller    $$settings{snpcaller}   Which SNP caller? Choices: varscan, vcftools
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue        $$settings{queue}             The default queue to use.
     --numnodes     $$settings{numnodes}                maximum number of nodes
