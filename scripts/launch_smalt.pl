@@ -19,7 +19,7 @@ sub main{
   $$settings{numcpus}||=1;
   $$settings{tempdir}||="tmp";
   $$settings{pairedend}||=0;
-  $$settings{minPercentIdentity}||=95;
+  $$settings{minPercentIdentity}||=80;
   $$settings{minPercentIdentity}=sprintf("%0.2f",$$settings{minPercentIdentity}/100);
 
   # smalt extra options
@@ -152,7 +152,7 @@ sub usage{
   --numcpus 1 number of cpus to use
   -s '' Extra smalt map options (not validated). Default: $$settings{smaltxopts} 
   --pairedend <0|1|2> For 'auto', single-end, or paired-end respectively. Default: auto (0).
-  --minPercentIdentity 95  The percent identity between a read and its match before it can be mapped
+  --minPercentIdentity 80  The percent identity between a read and its match before it can be mapped
   "
 }
 
