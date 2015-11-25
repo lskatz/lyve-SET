@@ -159,7 +159,7 @@ echo 'vcffilter completed'
 if grep -Pq '^#CHROM[A-Z\t]+sm$' "$TMP"/"$B".vcf; then
 	#clean up sampleID in VCF file
 	b=$(basename "$B" .fastq-reference)
-	sed -i "/^#CHROM[A-Z\t]+sm$/s/sm/$b/1" "$TMP"/"$B".vcf
+	sed -r -i "/^#CHROM[A-Z[[:space:]]+sm$/s/sm/$b/1" "$TMP"/"$B".vcf
 	echo "changed sample ID inside VCF to reflect input filename: $b"
 fi
 
