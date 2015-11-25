@@ -8,13 +8,13 @@ use Bio::TreeIO;
 use Getopt::Long;
 use File::Basename;
 use List::Util qw/min max sum/;
-use Math::Round qw/nearest/;
 
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 use LyveSET qw/logmsg/;
 use lib "$FindBin::Bin/../lib/perl5";
 use Statistics::Descriptive;
+use Math::Round qw/nearest/;
 
 $0=fileparse $0;
 sub logmsg{print STDERR (caller(1))[3].": @_\n";}

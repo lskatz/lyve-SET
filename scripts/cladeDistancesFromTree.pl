@@ -9,10 +9,10 @@ use Getopt::Long;
 use File::Basename;
 use List::Util qw/min max sum/;
 use FindBin;
-use Math::Round qw/nearest/;
 
 use lib "$FindBin::RealBin/../lib";
 use lib "$FindBin::RealBin/../lib/lib/perl5";
+use Math::Round qw/nearest/;
 use Statistics::Descriptive;
 use Statistics::Basic qw(median);
 use LyveSET qw(logmsg);
