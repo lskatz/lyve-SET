@@ -10,12 +10,13 @@ use File::Spec;
 use Cwd qw/realpath/;
 use File::Basename qw/basename/;
 use File::Copy qw/copy move/;
-use File::Slurp qw/read_file/;
 use File::Temp qw/ tempfile tempdir /;
 use Bio::Perl;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
+use lib "$FindBin::RealBin/../lib/lib/perl5";
+use File::Slurp qw/read_file/;
 $ENV{PATH}="$ENV{PATH}:$FindBin::RealBin/../lib/edirect";
 
 # get project test data
