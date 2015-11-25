@@ -16,8 +16,9 @@ use lib "$FindBin::RealBin/../lib";
 use LyveSET qw/@fastaExt @fastqExt @bamExt/;
 #use Vcf;
 
-$ENV{BCFTOOLS_PLUGINS}||="/apps/x86_64/bcftools/bcftools-1.2/plugins";
-$ENV{LD_LIBRARY_PATH}=$ENV{LD_LIBRARY_PATH}.":/apps/x86_64/bcftools/bcftools-1.2/htslib-1.2.1";
+$ENV{PATH}="$FindBin::RealBin:$ENV{PATH}";
+$ENV{BCFTOOLS_PLUGINS}="$FindBin::RealBin/../lib/bcftools-1.2/plugins";
+$ENV{LD_LIBRARY_PATH}=$ENV{LD_LIBRARY_PATH}.":$FindBin::RealBin/../lib/bcftools-1.2/htslib-1.2.1";
 use constant reportEvery => 1000000;
 
 $0=fileparse $0;
@@ -56,9 +57,10 @@ sub bcftoolsFixes{
   my($compressedVcf,$settings)=@_;
   my $v="$$settings{tempdir}/filledInAnAcRef.vcf";
   logmsg "Filling in AN and AC, and also missing REF in the vcf";
-
+  
+  #system("LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$FindBin::RealBin/../lib/bcftools-1.2/htslib-1.2.1 bcftools plugin fill-AN-AC $compressedVcf | bcftools plugin missing2ref > $v");
   system("bcftools plugin fill-AN-AC $compressedVcf | bcftools plugin missing2ref > $v");
-  die "ERROR: could not run bcftools on $compressedVcf:\n `bcftools plugin -lv`:\n".`bcftools plugin -lv` if $?;
+  die "ERROR: could not run bcftools plugins on $compressedVcf. This is what plugins are available:\n `bcftools plugin -lv 2>&1`:\n".`bcftools plugin -lv 2>&1` if $?;
 
   return $v;
 }
