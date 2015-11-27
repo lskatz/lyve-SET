@@ -145,7 +145,9 @@ fi
 [[ "$VCF" == *.gz ]] && VCFFMT='--gzvcf' #enables compressed or uncompressed
 
 # run VCFtools
-B=$(basename "$VCF" | sed -r 's/\.(vcf|vcf\.gz)$//1')
+file=${VCF##*/}
+B=${file%%.*}
+echo "$B" > "$TMP"/sampleID
 COMMAND="$(echo $VCFFMT $VCF $OUTPREF $COVERAGE $FLANK $MINQ $REGION $EXCLUDE \
     --remove-indels --remove-filtered-all $XOPTS --recode --recode-INFO-all \
     | sed 's/ \{1,\}/ /g')" #cleanup spaces
@@ -153,7 +155,7 @@ vcftools $COMMAND 2> /dev/null
 echo 'VCFtools completed'
 [[ -n "$MPILEUP" ]] && rm -v "$TMP"/"$B".vcf
 #discard PL field due to inconsisent lines which breaks downstream mergeVcf.sh (that invokes bcftools merge); some lines='GT:PL	1/1:255,63,0', others='GT:PL	1/1:0,105:94:99:255,255,0'
-vcffilter -g 'GT = 1/1' "$TMP"/"$B".recode.vcf | vcffixup - | vcffilter -f 'AC > 0' | vcfsort - | bcftools annotate -x PL,FORMAT - > "$TMP"/"$B".vcf 
+vcffilter -g 'GT = 1/1' "$TMP"/"$B".recode.vcf | vcffixup - | vcffilter -f 'AC > 0' | vcfsort - | bcftools annotate -x PL,FORMAT - | bcftools reheader -s "$TMP"/sampleID - > "$TMP"/"$B".vcf 
 echo 'vcffilter completed'
 
 if grep -Pq '^#CHROM[A-Z\t]+sm$' "$TMP"/"$B".vcf; then
@@ -164,7 +166,7 @@ if grep -Pq '^#CHROM[A-Z\t]+sm$' "$TMP"/"$B".vcf; then
 fi
 
 bgzip -cf "$TMP"/"$B".vcf > "$TMP"/"$B".vcf.gz
-rm -v "$TMP"/"$B".recode.vcf "$TMP"/"$B".vcf
+rm -v "$TMP"/"$B".recode.vcf "$TMP"/"$B".vcf "$TMP"/sampleID
 tabix -f "$TMP"/"$B".vcf.gz #&> /dev/null
 echo 'bgzip compression and tabix indexing completed'
 #to-do: filter for at least 1 read on both -f "ADF > 0 & ADR > 0" doesn't work
