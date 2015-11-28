@@ -634,6 +634,8 @@ sub variantCalls{
       die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
     }
 
+    # TODO set_fixVcf.pl - should it go into indexAndCompressVcf() ?
+
     # bgzip and tabix indexing
     indexAndCompressVcf("$vcfdir/$b.vcf",$jobname,$settings);
 
