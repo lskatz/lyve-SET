@@ -663,7 +663,8 @@ sub indexAndCompressVcf{
   my $j={};
   eval{
     $j=$sge->pleaseExecute("
-      vcf-sort < '$vcf' > '$vcf.sorted.tmp' && mv '$vcf.sorted.tmp' '$vcf' && \
+      set_fixVcf.pl '$vcf' > $vcf.reevaluated && mv '$vcf.reevaluated' '$vcf' && \
+      vcf-sort < '$vcf' > '$vcf.sorted.tmp'   && mv '$vcf.sorted.tmp'  '$vcf' && \
       bgzip -f '$vcf' && \
       tabix '$vcf.gz'
     ",{qsubxopts=>"-hold_jid $holdjid",jobname=>"sortAndCompress",numcpus=>1});
