@@ -25,6 +25,7 @@ install: install-prerequisites
 	@perl -v | grep -i version
 	@perl -Mthreads -e 1
 	@java -version | grep version
+	@python -V
 	@echo "Don't forget to include scripts in your PATH"
 	@echo "DONE: installation of Lyve-SET complete."
 
