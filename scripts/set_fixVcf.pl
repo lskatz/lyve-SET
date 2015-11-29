@@ -32,6 +32,7 @@ sub main{
   GetOptions($settings,qw(help tempdir=s numcpus=i min_coverage=i min_alt_frac=s)) or die $!;
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("$0XXXXXX",TMPDIR=>1,CLEANUP=>1);
+  mkdir $$settings{tempdir};
   $$settings{min_coverage}||=0;
   $$settings{min_alt_frac}||=0;
   die "ERROR: min_alt_frac must be between 0 and 1, inclusive" if($$settings{min_alt_frac} < 0 || $$settings{min_alt_frac} > 1);
@@ -53,11 +54,11 @@ sub fixVcf{
   
   logmsg "Fixing the VCF";
   my $uncompressed=addStandardTags($vcf,$settings);
+  #my $richVcf=addFilterTag($uncompressed,$settings);
   my $reevaluated=reevaluateSites($uncompressed,$settings);
-  my $richVcf=addFeatureTags($reevaluated,$settings);
   logmsg "Done fixing it up!";
 
-  return $richVcf;
+  return $reevaluated;
 }
 
 sub addStandardTags{
@@ -87,9 +88,9 @@ sub reevaluateSites{
   my $vcfObj=Vcf->new(file=>$vcf);
   open(OUTVCF,">",$v) or die "ERROR: could not open vcf file $v for writing: $!";
   
-  $vcfObj->add_header_line({key=>'FILTER', ID=>"FAIL", Description=>"This site did not pass QC"});
-  # Done with headers; parse them
-  $vcfObj->parse_header();
+  $vcfObj->parse_header(); # I might need to parse headers, first thing...?
+  $vcfObj->add_header_line({key=>'FILTER', ID=>"FAIL", Description=>"This site did not pass QC"}) if(!@{ $vcfObj->get_header_line(key=>'FILTER',ID=>'FAIL') });
+  $vcfObj->add_header_line({key=>'FORMAT', ID=>'FT', Number=>1, Type=>'String', Description=>"Genotype filters using the same codes as the FILTER data element"}) if(!@{ $vcfObj->get_header_line(key=>'FORMAT',ID=>'FT') });
 
   # start printing
   print OUTVCF $vcfObj->format_header();
@@ -108,6 +109,17 @@ sub reevaluateSites{
       $_=substr($_,0,1);
     }
 
+    # Some format tag modification
+    while(my($samplename,$gtypesHash)=each(%{$$x{gtypes}})){
+      # Convert alleles to haploid
+      $$x{gtypes}{$samplename}{GT}=substr($$x{gtypes}{$samplename}{GT},0,1);
+      # Convert FILTER to FT tag
+      if(!$$gtypesHash{FT} || $$gtypesHash{FT} eq '.'){
+        $$x{gtypes}{$samplename}{FT}=join(";",@{$$x{FILTER}});
+        push(@{ $$x{FORMAT} }, 'FT');
+      }
+    }
+
     #######################
     ## MASKING
     while(my($samplename,$gtypesHash)=each(%{$$x{gtypes}})){
@@ -118,7 +130,7 @@ sub reevaluateSites{
       # Mask low frequency
       if($FREQ < $altFreq && $FREQ > $inverseAltFreq){
         for(0 .. $numAlts-1){
-          $$x{FILTER}[$_]='FAIL';
+          $$x{gtypes}{$samplename}{FT}='FAIL';
         }
       }
       # Mask for low coverage.
@@ -128,7 +140,7 @@ sub reevaluateSites{
       $$x{gtypes}{$samplename}{DP}||=$$x{gtypes}{$samplename}{SDP} || $$x{gtypes}{$samplename}{ADP} || 0;
       if($$x{gtypes}{$samplename}{DP} < $$settings{min_coverage}){
         for(0 .. $numAlts-1){
-          $$x{FILTER}[$_]='FAIL';
+          $$x{gtypes}{$samplename}{FT}='FAIL';
         }
       }
     }
@@ -138,79 +150,6 @@ sub reevaluateSites{
     print OUTVCF $vcfObj->format_line($x);
   }
   close OUTVCF;
-
-  return $v;
-}
-
-# add FT tag
-sub addFeatureTags{
-  my($vcf,$settings)=@_;
-  my $v="$$settings{tempdir}/addedFt.vcf";
-
-  logmsg "Adding feature tags that are missing";
-
-  my $numSites=0;
-  my $hasFtTag=0; # Whether the input file already has the Ft tag in the header or whether it has already been added to the output
-  open(VCFIN,$vcf) or die "ERROR: could not read $vcf: $!";
-  open(VCFOUT,">", $v) or die "ERROR: could not write to $v: $!";
-  while(<VCFIN>){
-    if(/^##/){
-      $hasFtTag=1 if(/FORMAT=<ID=FT/);
-      print VCFOUT $_;
-      next;
-    }
-    elsif(/^#CHROM/){
-      # Print extra headers and then the column labels last
-      print VCFOUT '##FORMAT=<ID=FT,Number=1,Type=String,Description="Genotype filters using the same codes as the FILTER data element">'."\n" if(!$hasFtTag);
-      print VCFOUT $_;
-      next;
-    }
-
-    if(++$numSites % reportEvery == 0){
-      logmsg "Looked at $numSites sites";
-    }
-
-    # Read the Vcf line
-    my($CHROM,$POS,$ID,$REF,$ALT,$QUAL,$FILTER,$INFO,$FORMAT,@SAMPLE)=split(/\t/);
-    chomp(@SAMPLE);
-
-    # Does it already have the FT tag? If not, then add it
-    my(@FORMAT)=split(/:/,$FORMAT);
-    my $hasFtValue=0;
-       $hasFtValue=1 if(grep(/^FT$/,@FORMAT));
-    if(!$hasFtValue){
-      push(@FORMAT,'FT');
-    }
-    $FORMAT=join(':',@FORMAT);
-
-    # Look at each sample to see if the FT tag has a value
-    # or if other tags have values.
-    my $numSamples=@SAMPLE;
-    for(my $i=0; $i<$numSamples; $i++){
-      my %sampleInfo;
-      @sampleInfo{@FORMAT}=split(/:/,$SAMPLE[$i]);
-
-      # Fill in any specific undefined values with what I want
-      $sampleInfo{'FT'}=$FILTER if(!defined($sampleInfo{FT}));
-
-      # Fill in the rest of the undefined values
-      while(my($key,$value)=each(%sampleInfo)){
-        $sampleInfo{$key}='.' if(!defined($sampleInfo{$key}));
-      }
-
-      # join the line back together in the proper order
-      $SAMPLE[$i]='';
-      for my $f(@FORMAT){
-        $SAMPLE[$i].="$sampleInfo{$f}:";
-      }
-      $SAMPLE[$i]=~s/(:\.)*:$//; # remove last semicolon and also any blank values just hanging out at the end of the line
-    }
-
-    my $modifiedLine=join("\t",$CHROM,$POS,$ID,$REF,$ALT,$QUAL,$FILTER,$INFO,$FORMAT,@SAMPLE);
-    print VCFOUT "$modifiedLine\n";
-  }
-  close VCFOUT;
-  close VCFIN;
 
   return $v;
 }
