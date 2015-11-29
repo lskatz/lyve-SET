@@ -24,6 +24,7 @@ install: install-prerequisites
 	@blastp -version
 	@perl -v | grep -i version
 	@perl -Mthreads -e 1
+	@java -version | grep version
 	@echo "Don't forget to include scripts in your PATH"
 	@echo "DONE: installation of Lyve-SET complete."
 
