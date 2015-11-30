@@ -634,8 +634,6 @@ sub variantCalls{
       die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
     }
 
-    # TODO set_fixVcf.pl - should it go into indexAndCompressVcf() ?
-
     # bgzip and tabix indexing
     indexAndCompressVcf("$vcfdir/$b.vcf",$jobname,$settings);
 
@@ -663,7 +661,7 @@ sub indexAndCompressVcf{
   my $j={};
   eval{
     $j=$sge->pleaseExecute("
-      set_fixVcf.pl '$vcf' > $vcf.reevaluated && mv '$vcf.reevaluated' '$vcf' && \
+      set_fixVcf.pl --min_alt_frac $$settings{min_alt_frac} --min_coverage $$settings{min_coverage} '$vcf' > $vcf.reevaluated && mv '$vcf.reevaluated' '$vcf' && \
       vcf-sort < '$vcf' > '$vcf.sorted.tmp'   && mv '$vcf.sorted.tmp'  '$vcf' && \
       bgzip -f '$vcf' && \
       tabix '$vcf.gz'
