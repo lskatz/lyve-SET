@@ -146,8 +146,8 @@ fi
 
 # run VCFtools
 file=${VCF##*/}
-B=${file%%.*}
-echo "$B" > "$TMP"/sampleID
+b=${file%%.*}
+echo "$b" > "$TMP"/sampleID
 COMMAND="$(echo $VCFFMT $VCF $OUTPREF $COVERAGE $FLANK $MINQ $REGION $EXCLUDE \
     --remove-indels --remove-filtered-all $XOPTS --recode --recode-INFO-all \
     | sed 's/ \{1,\}/ /g')" #cleanup spaces
