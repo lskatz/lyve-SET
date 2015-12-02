@@ -11,6 +11,7 @@ Quickie Installation
 Requirements
 ------------
 * **Perl, multithreaded**
+* **Java**
 * **BLAST+**
 * **GIT**, **SVN** (for installation and updating)
 

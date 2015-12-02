@@ -24,10 +24,12 @@ install: install-prerequisites
 	@blastp -version
 	@perl -v | grep -i version
 	@perl -Mthreads -e 1
+	@java -version | grep version
+	@python -V
 	@echo "Don't forget to include scripts in your PATH"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar lib/vcflib lib/phast/phast.faa scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py
+install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar lib/vcflib lib/phast/phast.faa scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py scripts/snap lib/datasets/scripts/downloadDataset.pl
 	@echo DONE installing prerequisites
 
 scripts/vcf-sort:
@@ -38,7 +40,7 @@ scripts/vcf-sort:
 	mv build/vcftools-0.1.14 lib/
 	cd lib/vcftools-0.1.14 && \
 	  ./configure --prefix=`pwd -P` && make MAKEFLAGS="" && make install
-	ln -s ../lib/vcftools-0.1.14/bin/vcf-sort $@
+	ln -sf ../lib/vcftools-0.1.14/bin/vcf-sort $@
 
 lib/Vcf.pm: scripts/vcf-sort
 	cp lib/vcftools-0.1.14/src/perl/Vcf.pm $@
@@ -46,17 +48,17 @@ lib/Vcf.pm: scripts/vcf-sort
 scripts/run_assembly_isFastqPE.pl: 
 	# CGP scripts that are needed and that don't depend on CGP libraries
 	git clone https://github.com/lskatz/cg-pipeline lib/cg-pipeline
-	ln -s ../lib/cg-pipeline/scripts/run_assembly_isFastqPE.pl $@
+	ln -sf ../lib/cg-pipeline/scripts/run_assembly_isFastqPE.pl $@
 scripts/run_assembly_trimClean.pl: scripts/run_assembly_isFastqPE.pl
-	ln -s ../lib/cg-pipeline/scripts/run_assembly_trimClean.pl $@
+	ln -sf ../lib/cg-pipeline/scripts/run_assembly_trimClean.pl $@
 scripts/run_assembly_shuffleReads.pl: scripts/run_assembly_isFastqPE.pl
-	ln -s ../lib/cg-pipeline/scripts/run_assembly_shuffleReads.pl $@
+	ln -sf ../lib/cg-pipeline/scripts/run_assembly_shuffleReads.pl $@
 scripts/run_assembly_removeDuplicateReads.pl: scripts/run_assembly_isFastqPE.pl
-	ln -s ../lib/cg-pipeline/scripts/run_assembly_removeDuplicateReads.pl $@
+	ln -sf ../lib/cg-pipeline/scripts/run_assembly_removeDuplicateReads.pl $@
 scripts/run_assembly_readMetrics.pl: scripts/run_assembly_isFastqPE.pl
-	ln -s ../lib/cg-pipeline/scripts/run_assembly_readMetrics.pl $@
+	ln -sf ../lib/cg-pipeline/scripts/run_assembly_readMetrics.pl $@
 scripts/run_assembly_metrics.pl: scripts/run_assembly_isFastqPE.pl
-	ln -s ../lib/cg-pipeline/scripts/run_assembly_metrics.pl $@
+	ln -sf ../lib/cg-pipeline/scripts/run_assembly_metrics.pl $@
 
 lib/Schedule/SGELK.pm:
 	git clone https://github.com/lskatz/Schedule--SGELK.git build/Schedule
@@ -86,13 +88,13 @@ scripts/samtools:
 	mv build/samtools-1.2 lib
 	cd lib/samtools-1.2 && make DFLAGS="-D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -D_CURSES_LIB=0" LIBCURSES="" 
 	cd lib/samtools-1.2/htslib-1.2.1 && make
-	ln -s ../lib/samtools-1.2/samtools $@
+	ln -sf ../lib/samtools-1.2/samtools $@
 scripts/wgsim: scripts/samtools
-	ln -s ../lib/samtools-1.2/misc/wgsim $@
+	ln -sf ../lib/samtools-1.2/misc/wgsim $@
 scripts/bgzip: scripts/samtools
-	ln -s ../lib/samtools-1.2/htslib-1.2.1/bgzip $@
+	ln -sf ../lib/samtools-1.2/htslib-1.2.1/bgzip $@
 scripts/tabix: scripts/samtools
-	ln -s ../lib/samtools-1.2/htslib-1.2.1/tabix $@
+	ln -sf ../lib/samtools-1.2/htslib-1.2.1/tabix $@
 
 scripts/bcftools:
 	rm -rf build/bcftools* lib/bcftools*
@@ -100,7 +102,7 @@ scripts/bcftools:
 	cd build && tar jxvf bcftools-1.2.tar.bz2
 	mv build/bcftools-1.2 lib/bcftools-1.2
 	cd lib/bcftools-1.2 && make
-	ln -s ../lib/bcftools-1.2/bcftools $@
+	ln -sf ../lib/bcftools-1.2/bcftools $@
 scripts/vcfutils.pl: scripts/bcftools
 	cp lib/bcftools-1.2/vcfutils.pl $@
 
@@ -110,25 +112,25 @@ scripts/smalt:
 	cd build && tar zxvf smalt-0.7.6-static.tar.gz
 	mv build/smalt-0.7.6 lib/
 	cd lib/smalt-0.7.6 && ./configure --prefix `pwd -P` && make && make install
-	ln -s ../lib/smalt-0.7.6/bin/smalt $@
+	ln -sf ../lib/smalt-0.7.6/bin/smalt $@
 scripts/basqcol: scripts/smalt
-	ln -s ../lib/smalt-0.7.6/bin/basqcol $@
+	ln -sf ../lib/smalt-0.7.6/bin/basqcol $@
 scripts/fetchseq: scripts/smalt
-	ln -s ../lib/smalt-0.7.6/bin/fetchseq $@
+	ln -sf ../lib/smalt-0.7.6/bin/fetchseq $@
 scripts/mixreads: scripts/smalt
-	ln -s ../lib/smalt-0.7.6/bin/mixreads $@
+	ln -sf ../lib/smalt-0.7.6/bin/mixreads $@
 scripts/readstats: scripts/smalt
-	ln -s ../lib/smalt-0.7.6/bin/readstats $@
+	ln -sf ../lib/smalt-0.7.6/bin/readstats $@
 scripts/simqual: scripts/smalt
-	ln -s ../lib/smalt-0.7.6/bin/simqual $@
+	ln -sf ../lib/smalt-0.7.6/bin/simqual $@
 scripts/simread: scripts/smalt
-	ln -s ../lib/smalt-0.7.6/bin/simread $@
+	ln -sf ../lib/smalt-0.7.6/bin/simread $@
 scripts/splitmates: scripts/smalt
-	ln -s ../lib/smalt-0.7.6/bin/splitmates $@
+	ln -sf ../lib/smalt-0.7.6/bin/splitmates $@
 scripts/splitreads: scripts/smalt
-	ln -s ../lib/smalt-0.7.6/bin/splitreads $@
+	ln -sf ../lib/smalt-0.7.6/bin/splitreads $@
 scripts/trunkreads: scripts/smalt
-	ln -s ../lib/smalt-0.7.6/bin/trunkreads $@
+	ln -sf ../lib/smalt-0.7.6/bin/trunkreads $@
 
 scripts/snap:
 	rm -rf build/snap* lib/snap*
@@ -145,10 +147,10 @@ scripts/raxmlHPC:
 	cd build && tar zxvf raxml_v8.1.16.tar.gz
 	mv build/standard-RAxML-8.1.16 lib
 	cd lib/standard-RAxML-8.1.16 && make -f Makefile.gcc
-	ln -s ../lib/standard-RAxML-8.1.16/raxmlHPC $@
+	ln -sf ../lib/standard-RAxML-8.1.16/raxmlHPC $@
 scripts/raxmlHPC-PTHREADS: scripts/raxmlHPC
 	cd lib/standard-RAxML-8.1.16 && make -f Makefile.PTHREADS.gcc
-	ln -s ../lib/standard-RAxML-8.1.16/raxmlHPC-PTHREADS $@
+	ln -sf ../lib/standard-RAxML-8.1.16/raxmlHPC-PTHREADS $@
 
 # There isn't an easy way for Make to detect whether these files have
 # been installed and so it shouldn't depend on a file existing and
@@ -195,5 +197,8 @@ scripts/stampy.py:
 	wget www.well.ox.ac.uk/bioinformatics/Software/Stampy-latest.tgz -O build/Stampy-latest.tgz
 	mkdir lib/stampy && tar zxvf build/Stampy-latest.tgz -C lib/stampy --strip-components 1
 	cd lib/stampy && make CXXFLAGS='-Wno-deprecated -Wunused-but-set-variable'
-	ln -s ../lib/stampy/stampy.py $@
+	ln -sf ../lib/stampy/stampy.py $@
 
+lib/datasets/scripts/downloadDataset.pl:
+	rm -rf lib/datasets
+	git clone https://github.com/WGS-standards-and-analysis/datasets.git lib/datasets
