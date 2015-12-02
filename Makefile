@@ -29,7 +29,7 @@ install: install-prerequisites
 	@echo "Don't forget to include scripts in your PATH"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar lib/vcflib lib/phast/phast.faa scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py scripts/snap lib/datasets/scripts/downloadDataset.pl
+install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar lib/vcflib lib/phast/phast.faa scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py scripts/snap scripts/snapxl lib/datasets/scripts/downloadDataset.pl
 	@echo DONE installing prerequisites
 
 scripts/vcf-sort:
@@ -62,7 +62,7 @@ scripts/run_assembly_metrics.pl: scripts/run_assembly_isFastqPE.pl
 
 lib/Schedule/SGELK.pm:
 	git clone https://github.com/lskatz/Schedule--SGELK.git build/Schedule
-	mkdir -p lib/Schedule
+	-mkdir -p lib/Schedule
 	mv -v build/Schedule/SGELK.pm lib/Schedule/
 	mv -v build/Schedule/README.md lib/Schedule/
 	mv -v build/Schedule/.git lib/Schedule/
@@ -118,7 +118,7 @@ scripts/basqcol: scripts/smalt
 scripts/fetchseq: scripts/smalt
 	ln -sf ../lib/smalt-0.7.6/bin/fetchseq $@
 scripts/mixreads: scripts/smalt
-	ln -sf ../lib/smalt-0.7.6/bin/mixreads $@
+	ln -sf ../lib/smalt-0.7.6/bin/scripts/mixreads $@
 scripts/readstats: scripts/smalt
 	ln -sf ../lib/smalt-0.7.6/bin/readstats $@
 scripts/simqual: scripts/smalt
@@ -202,3 +202,4 @@ scripts/stampy.py:
 lib/datasets/scripts/downloadDataset.pl:
 	rm -rf lib/datasets
 	git clone https://github.com/WGS-standards-and-analysis/datasets.git lib/datasets
+

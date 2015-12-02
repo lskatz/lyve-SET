@@ -19,6 +19,7 @@ use Thread::Queue;
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
 use LyveSET qw/logmsg/;
+$ENV{PATH}="$FindBin::RealBin:$ENV{PATH}";
 
 exit main();
 
