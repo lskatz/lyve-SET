@@ -629,9 +629,7 @@ sub variantCalls{
           rm -v $vcfdir/$b.vcf.tmp",
           {jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1}
       );
-<<<<<<< HEAD
       $jobname="sort$b"; # the job that bgzip waits on to finish
-=======
       $jobname="sort$b"; # the thing that bgzip waits on to finish
     } else {
       die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
@@ -639,7 +637,6 @@ sub variantCalls{
 
     # TODO set_fixVcf.pl - should it go into indexAndCompressVcf() ?
 
->>>>>>> upstream/master
     # bgzip and tabix indexing
     indexAndCompressVcf("$vcfdir/$b.vcf",$jobname,$settings);
     }
@@ -689,13 +686,8 @@ sub indexAndCompressVcf{
   eval{
     $j=$sge->pleaseExecute("
       set_fixVcf.pl '$vcf' > $vcf.reevaluated && mv '$vcf.reevaluated' '$vcf' && \
-      vcf-sort < '$vcf' > '$vcf.sorted.tmp'   && mv '$vcf.sorted.tmp'  '$vcf' && \
-<<<<<<< HEAD
       vcf-sort < '$vcf' > '$vcf.sorted.tmp' && mv '$vcf.sorted.tmp' '$vcf' && \
-=======
->>>>>>> upstream/master
-      bgzip -f '$vcf' && \
-      tabix '$vcf.gz'
+      bgzip -f '$vcf' && tabix '$vcf.gz'
     ",{qsubxopts=>"-hold_jid $holdjid",jobname=>"sortAndCompress",numcpus=>1});
   };
   if($@){
