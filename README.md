@@ -70,13 +70,14 @@ To see the help for any script, run it without options or with `--help`.  For ex
     --downsample                     Downsample all reads to 50x. Approximated according to the ref genome assembly
     --sample-sites                   Randomly choose a genome and find SNPs in a quick and dirty way. Then on the SNP-calling stage, only interrogate those sites for SNPs for each genome (including the randomly-sampled genome).
     MODULES
-    --read_cleaner    Which read cleaner?  Choices: none, CGP, BayesHammer
-    --mapper       smalt             Which mapper? Choices: smalt, snap, stampy
+    --read_cleaner  none              Which read cleaner?  Choices: none, CGP, BayesHammer
+    --mapper        smalt             Which mapper? Choices: smalt, snap, stampy
+    --snpcaller     varscan           Which variant filterer? Choice: varscan, vcftools
     SCHEDULER AND MULTITHREADING OPTIONS
-    --queue        all.q             The default queue to use.
-    --numnodes     50                maximum number of nodes
-    --numcpus      1                 number of cpus
-    --qsubxopts    '-N lyve-set'     Extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
+    --queue         all.q             The default queue to use.
+    --numnodes      50                maximum number of nodes
+    --numcpus       1                 number of cpus
+    --qsubxopts     '-N lyve-set'     Extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
 
 Examples
 ------
@@ -84,7 +85,7 @@ Examples
 See: [examples.md](docs/EXAMPLES.md) for more details.
 
 The script `set_manage.pl` sets up the project directory and adds reads, and you should use the following syntax. Note that paired end reads should be in interleaved format. Scripts that interleave reads include `run_assembly_shuffleReads.pl` in the CG-Pipeline package (included with `make install`) and also `shuffleSequences_fastq.pl` in the Velvet package.
-    
+
     # Shuffle your reads if they are not shuffled already.
     $ shuffleSplitReads.pl some/directory/*.fastq.gz -o interleaved # interleaved directory will be created for you
     # Create the project directory `setTest`
@@ -99,7 +100,7 @@ The script `set_manage.pl` sets up the project directory and adds reads, and you
     # Specify your reference genome
     $ set_manage.pl setTest --change-reference file3.fasta
 
-    
+
 Run Lyve-SET with as few options as possible
 
     $ launch_set.pl setProj
@@ -107,7 +108,7 @@ Run Lyve-SET with as few options as possible
 More complex
 
     $ launch_set.pl setProj --queue all.q --numnodes 20 --numcpus 16 --noclean --notrees
-    
+
 Output files
 ------------
 Most output files that you will want to see are under project/msa.  However for more details please see [docs/output.md](docs/OUTPUT.md).
@@ -115,14 +116,14 @@ Most output files that you will want to see are under project/msa.  However for 
 Getting help
 ------------
 * Check out the [FAQ](docs/FAQ.md) first to see if your question has already been asked
-* Join the [Google Group](https://groups.google.com/forum/#!forum/lyve-set) at https://groups.google.com/forum/#!forum/lyve-set 
+* Join the [Google Group](https://groups.google.com/forum/#!forum/lyve-set) at https://groups.google.com/forum/#!forum/lyve-set
 * [Tips and tricks](docs/TIPS.md)
 
 Citing lyve-SET
 -----
 To cite lyve-SET, please reference this site and cite the Haiti Anniversary paper. Lyve-SET also makes use of the tools shown above in the prerequisites.  If you feel like your study relied heavily on any of those tools, please don't forget to cite them!
-    
+
     https://github.com/lskatz/lyve-SET
-    Katz LS, Petkau A, Beaulaurier J, Tyler S, Antonova ES, Turnsek MA, Guo Y, Wang S, Paxinos EE, Orata F, Gladney LM, Stroika S, Folster JP, Rowe L, Freeman MM, Knox N, Frace M, Boncy J, Graham M, Hammer BK, Boucher Y, Bashir A, Hanage WP, Van Domselaar G, Tarr CL. 
-    2013. Evolutionary dynamics of Vibrio cholerae O1 following a single-source introduction to Haiti. 
+    Katz LS, Petkau A, Beaulaurier J, Tyler S, Antonova ES, Turnsek MA, Guo Y, Wang S, Paxinos EE, Orata F, Gladney LM, Stroika S, Folster JP, Rowe L, Freeman MM, Knox N, Frace M, Boncy J, Graham M, Hammer BK, Boucher Y, Bashir A, Hanage WP, Van Domselaar G, Tarr CL.
+    2013. Evolutionary dynamics of Vibrio cholerae O1 following a single-source introduction to Haiti.
     MBio 4(4):e00398-13. doi:10.1128/mBio.00398-13.
