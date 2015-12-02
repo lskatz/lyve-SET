@@ -630,7 +630,6 @@ sub variantCalls{
           {jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1}
       );
       $jobname="sort$b"; # the job that bgzip waits on to finish
-      $jobname="sort$b"; # the thing that bgzip waits on to finish
     } else {
       die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
     }
