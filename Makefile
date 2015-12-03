@@ -29,7 +29,7 @@ install: install-prerequisites
 	@echo "Don't forget to include scripts in your PATH"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: scripts/vcftools lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar lib/vcflib lib/phast/phast.faa scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py scripts/bowtie2 scripts/bwa lib/datasets/scripts/downloadDataset.pl
+install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar lib/vcflib lib/phast/phast.faa scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py scripts/bowtie2 scripts/bwa lib/datasets/scripts/downloadDataset.pl
 	@echo DONE installing prerequisites
 
 lib/vcflib:
@@ -40,7 +40,7 @@ lib/vcflib:
 	ln -sf "$(PWD)"/lib/vcflib/bin/vcffilter "$(PWD)"/scripts/vcffilter
 	ln -sf "$(PWD)"/lib/vcflib/bin/vcffixup "$(PWD)"/scripts/vcffixup
 
-scripts/vcftools:
+scripts/vcf-sort:
 	rm -rf lib/vcftools*
 	wget https://github.com/vcftools/vcftools/releases/download/v0.1.14/vcftools-0.1.14.tar.gz -O build/vcftools-0.1.14.tar.gz
 	cd build && \
@@ -48,10 +48,10 @@ scripts/vcftools:
 	mv build/vcftools-0.1.14 lib/
 	cd lib/vcftools-0.1.14 && \
 	  ./configure --prefix=`pwd -P` && make MAKEFLAGS="" && make install
-	ln -sf ../lib/vcftools-0.1.14/bin/vcftools $@
-	ln -sf ../lib/vcftools-0.1.14/bin/vcf-sort scripts/vcf-sort
+	ln -sf ../lib/vcftools-0.1.14/bin/vcftools scripts/vcftools
+	ln -sf ../lib/vcftools-0.1.14/bin/vcf-sort $@
 
-lib/Vcf.pm: scripts/vcftools
+lib/Vcf.pm: scripts/vcf-sort
 	cp lib/vcftools-0.1.14/src/perl/Vcf.pm $@
 
 scripts/run_assembly_isFastqPE.pl: 
