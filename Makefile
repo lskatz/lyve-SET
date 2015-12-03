@@ -29,10 +29,18 @@ install: install-prerequisites
 	@echo "Don't forget to include scripts in your PATH"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar lib/vcflib lib/phast/phast.faa scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py scripts/snap scripts/snapxl lib/datasets/scripts/downloadDataset.pl
+install-prerequisites: scripts/vcftools lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar lib/vcflib lib/phast/phast.faa scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py scripts/bowtie2 scripts/bwa lib/datasets/scripts/downloadDataset.pl
 	@echo DONE installing prerequisites
 
-scripts/vcf-sort:
+lib/vcflib:
+	rm -rf {build,lib}/vcflib
+	git clone --recursive https://github.com/ekg/vcflib.git build/vcflib
+	cd build/vcflib && make
+	mv -v build/vcflib lib
+	ln -sf "$(PWD)"/lib/vcflib/bin/vcffilter "$(PWD)"/scripts/vcffilter
+	ln -sf "$(PWD)"/lib/vcflib/bin/vcffixup "$(PWD)"/scripts/vcffixup
+
+scripts/vcftools:
 	rm -rf lib/vcftools*
 	wget https://github.com/vcftools/vcftools/releases/download/v0.1.14/vcftools-0.1.14.tar.gz -O build/vcftools-0.1.14.tar.gz
 	cd build && \
@@ -40,9 +48,10 @@ scripts/vcf-sort:
 	mv build/vcftools-0.1.14 lib/
 	cd lib/vcftools-0.1.14 && \
 	  ./configure --prefix=`pwd -P` && make MAKEFLAGS="" && make install
-	ln -sf ../lib/vcftools-0.1.14/bin/vcf-sort $@
+	ln -sf ../lib/vcftools-0.1.14/bin/vcftools $@
+	ln -sf ../lib/vcftools-0.1.14/bin/vcf-sort scripts/vcf-sort
 
-lib/Vcf.pm: scripts/vcf-sort
+lib/Vcf.pm: scripts/vcftools
 	cp lib/vcftools-0.1.14/src/perl/Vcf.pm $@
 
 scripts/run_assembly_isFastqPE.pl: 
@@ -62,19 +71,13 @@ scripts/run_assembly_metrics.pl: scripts/run_assembly_isFastqPE.pl
 
 lib/Schedule/SGELK.pm:
 	git clone https://github.com/lskatz/Schedule--SGELK.git build/Schedule
-	-mkdir -p lib/Schedule
+	mkdir -p lib/Schedule
 	mv -v build/Schedule/SGELK.pm lib/Schedule/
 	mv -v build/Schedule/README.md lib/Schedule/
 	mv -v build/Schedule/.git lib/Schedule/
 
 lib/varscan.v2.3.7.jar:
 	wget 'http://downloads.sourceforge.net/project/varscan/VarScan.v2.3.7.jar' -O $@
-
-lib/vcflib:
-	rm -rfv {build,lib}/vcflib && mkdir -p {build,lib}/vcflib
-	git clone https://github.com/ekg/vcflib.git build/vcflib
-	cd build/vcflib && make
-	mv -v build/vcflib lib/vcflib
 
 lib/phast/phast.faa: 
 	mkdir -p lib/phast
@@ -118,7 +121,7 @@ scripts/basqcol: scripts/smalt
 scripts/fetchseq: scripts/smalt
 	ln -sf ../lib/smalt-0.7.6/bin/fetchseq $@
 scripts/mixreads: scripts/smalt
-	ln -sf ../lib/smalt-0.7.6/bin/scripts/mixreads $@
+	ln -sf ../lib/smalt-0.7.6/bin/mixreads $@
 scripts/readstats: scripts/smalt
 	ln -sf ../lib/smalt-0.7.6/bin/readstats $@
 scripts/simqual: scripts/smalt
@@ -199,7 +202,27 @@ scripts/stampy.py:
 	cd lib/stampy && make CXXFLAGS='-Wno-deprecated -Wunused-but-set-variable'
 	ln -sf ../lib/stampy/stampy.py $@
 
+scripts/bowtie2:
+	rm -rf {build,lib}/bowtie2*
+	wget 'https://github.com/BenLangmead/bowtie2/archive/v2.2.6.tar.gz' -O build/bowtie2.2.6.tar.gz
+	cd build && tar zxvf bowtie2.2.6.tar.gz
+	mv build/bowtie2-2.2.6 lib
+	cd lib/bowtie2-2.2.6 && make
+	ln -sf ../lib/bowtie2-2.2.6/bowtie2 $@
+	ln -sf ../lib/bowtie2-2.2.6/bowtie2-build $@-build
+	ln -sf ../lib/bowtie2-2.2.6/bowtie2-build-s $@-build-s
+	ln -sf ../lib/bowtie2-2.2.6/bowtie2-build-l $@-build-l
+	ln -sf ../lib/bowtie2-2.2.6/bowtie2-align-s $@-align-s
+	ln -sf ../lib/bowtie2-2.2.6/bowtie2-align-l $@-align-l
+
+scripts/bwa:
+	rm -rf {build,lib}/bwa*
+	wget 'https://downloads.sourceforge.net/project/bio-bwa/bwa-0.7.12.tar.bz2' -O build/bwa-0.7.12.tar.bz2
+	cd build && tar jxvf bwa-0.7.12.tar.bz2
+	mv build/bwa-0.7.12 lib
+	cd lib/bwa-0.7.12 && make
+	ln -sf ../lib/bwa-0.7.12/bwa $@
+
 lib/datasets/scripts/downloadDataset.pl:
 	rm -rf lib/datasets
 	git clone https://github.com/WGS-standards-and-analysis/datasets.git lib/datasets
-
