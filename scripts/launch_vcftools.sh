@@ -141,7 +141,7 @@ fi
 if [[ -n "$MPILEUP" ]]; then
 	command -v bcftools >/dev/null 2>&1 || { echo 'ERROR: bcftools binary not found' >&2; exit 1; }
 	command -v samtools >/dev/null 2>&1 || { echo 'ERROR: samtools binary not found' >&2; exit 1; }
-	b=$(basename "$MPILEUP" .sorted.bam)
+	b=$(basename "$MPILEUP" | sed -r 's/\.(bam|sorted\.bam|mpileup)$//1')
 	samtools faidx "$REF"
 	#samtools view -H "$MPILEUP" | grep "\@SQ" | sed 's/^.*SN://g' | cut -f 1 | xargs -I {} -n 1 -P "$NUMCPUS" sh -c "samtools mpileup -d 1000 -suvf $REF -r '{}' $MPILEUP 1> $TMP/$b.vcf 2> /dev/null" 
 	samtools mpileup -d 1000 -suvf "$REF" "$MPILEUP" 2> /dev/null | bcftools call -c > "$TMP"/"$b".vcf
@@ -150,13 +150,8 @@ if [[ -n "$MPILEUP" ]]; then
 fi
 
 if [[ -z "$OUTPREF" ]]; then
-	if [[ -n "$VCF" ]]; then
-		B=$(basename "$VCF" | sed -r 's/\.(vcf|vcf\.gz)$//1')
-		OUTPREF="--out ${TMP}/${B}"
-	else
-		B=$(basename "$MPILEUP" | sed -r 's/\.(bam|sorted\.bam|mpileup)$//1')
-		OUTPREF="--out ${TMP}/${B}"
-	fi
+	B=$(basename "$VCF" | sed -r 's/\.(vcf|vcf\.gz)$//1')
+	OUTPREF="--out ${TMP}/${B}"
 fi
 
 [[ "$VCF" == *.gz ]] && VCFFMT='--gzvcf' #enables compressed or uncompressed
@@ -172,7 +167,7 @@ vcftools $COMMAND 2> /dev/null
 echo 'VCFtools completed'
 [[ -n "$MPILEUP" ]] && rm -v "$TMP"/"$B".vcf
 #discard PL field due to inconsisent lines which breaks downstream mergeVcf.sh (that invokes bcftools merge); some lines='GT:PL	1/1:255,63,0', others='GT:PL	1/1:0,105:94:99:255,255,0'
-vcffilter -g 'GT = 1/1' "$TMP"/"$B".recode.vcf | vcffixup - | vcffilter -f 'AC > 0' | vcf-sort -c | bcftools annotate -x PL,FORMAT - | bcftools reheader -s "$TMP"/sampleID - > "$TMP"/"$B".vcf 
+vcffilter -g 'GT = 1/1' "$TMP"/"$B".recode.vcf | vcffixup - | vcffilter -f 'AC > 0' | vcf-sort | bcftools annotate -x PL,FORMAT - | bcftools reheader -s "$TMP"/sampleID - > "$TMP"/"$B".vcf 
 echo 'vcffilter completed'
 
 if grep -Pq '^#CHROM[A-Z\t]+sm$' "$TMP"/"$B".vcf; then
@@ -184,7 +179,7 @@ fi
 
 bgzip -cf "$TMP"/"$B".vcf > "$TMP"/"$B".vcf.gz
 rm -v "$TMP"/"$B".recode.vcf "$TMP"/"$B".vcf "$TMP"/sampleID
-[[ -z "$DIFF" ]] && { rm -v "$TMP"/"$U".difference.bed }
+[[ -n "$DIFF" ]] && rm -v "$TMP"/"$U".difference.bed
 tabix -f "$TMP"/"$B".vcf.gz #&> /dev/null
 echo 'bgzip compression and tabix indexing completed'
 #to-do: filter for at least 1 read on both -f "ADF > 0 & ADR > 0" doesn't work
