@@ -109,13 +109,24 @@ done
 [[ -z "$VCF" ]] && [[ -z "$MPILEUP" ]] && { usage; exit 1; }
 [[ -n "$MPILEUP" ]] && [[ -z "$REF" ]] && { echo 'ERROR: mpileup requires reference genome (-r) input as well'; usage; exit 1; }
 [[ -n "$REF" ]] && [[ -z "$MPILEUP" ]] && { echo 'ERROR: reference genome requires mpileup (-m) input as well'; usage; exit 1; }
-[[ -n "$REGION" ]] && [[ -n "$EXCLUDE" ]] && { echo 'ERROR: conflicting opts --exclude --region'; usage; exit 1; }
 command -v vcffilter >/dev/null 2>&1 || { echo 'ERROR: vcffilter binary not found' >&2; exit 1; }
 command -v vcffixup >/dev/null 2>&1 || { echo 'ERROR: vcffixup binary not found' >&2; exit 1; }
-command -v vcfsort >/dev/null 2>&1 || { echo 'ERROR: vcfsort script not found' >&2; exit 1; }
+command -v vcf-sort >/dev/null 2>&1 || { echo 'ERROR: vcf-sort script not found' >&2; exit 1; }
 command -v vcftools >/dev/null 2>&1 || { echo 'ERROR: vcftools binary not found' >&2; exit 1; }
 command -v bgzip >/dev/null 2>&1 || { echo 'ERROR: bgzip binary not found' >&2; exit 1; }
 command -v tabix >/dev/null 2>&1 || { echo 'ERROR: tabix binary not found' >&2; exit 1; }
+
+# Special exception when both '--region' and '--exclude' are requested
+if [[ -n "$REGION" ]] && [[ -n "$EXCLUDE" ]]; then
+	MINUEND=$(echo "$REGION" | sed 's/^--region //g')
+	SUBTRAHEND=$(echo "$EXCLUDE" | sed 's/^--exclude-bed //g')
+	U=$(echo "$EXCLUDE" | sed -r 's/(\.bed$|^--exclude-bed )//g')
+	#substract the two conflicting opts --exclude --region' for vcftools
+	bedtools subtract -a "$MINUEND" -b "$SUBTRAHEND" > "$TMP"/"$U".difference.bed
+	DIFF="--bed $TMP/$U.difference.bed"
+	REGION=''
+	EXCLUDE=''
+fi
 
 # Manage tmp dir
 if [ ! -d "$TMP" ]; then
@@ -138,8 +149,13 @@ if [[ -n "$MPILEUP" ]]; then
 fi
 
 if [[ -z "$OUTPREF" ]]; then
-	B=$(basename "$VCF" | sed -r 's/\.(vcf|vcf\.gz)$//1')
-	OUTPREF="--out ${TMP}/${B}"
+	if [[ -n "$VCF" ]]
+		B=$(basename "$VCF" | sed -r 's/\.(vcf|vcf\.gz)$//1')
+		OUTPREF="--out ${TMP}/${B}"
+	else
+		B=$(basename "$MPILEUP" | sed -r 's/\.(bam|sorted\.bam|mpileup)$//1')
+		OUTPREF="--out ${TMP}/${B}"
+	fi
 fi
 
 [[ "$VCF" == *.gz ]] && VCFFMT='--gzvcf' #enables compressed or uncompressed
@@ -148,14 +164,14 @@ fi
 file=${VCF##*/}
 b=${file%%.*}
 echo "$b" > "$TMP"/sampleID
-COMMAND="$(echo $VCFFMT $VCF $OUTPREF $COVERAGE $FLANK $MINQ $REGION $EXCLUDE \
+COMMAND="$(echo $VCFFMT $VCF $OUTPREF $COVERAGE $FLANK $MINQ $REGION $EXCLUDE $DIFF \
     --remove-indels --remove-filtered-all $XOPTS --recode --recode-INFO-all \
     | sed 's/ \{1,\}/ /g')" #cleanup spaces
 vcftools $COMMAND 2> /dev/null
 echo 'VCFtools completed'
 [[ -n "$MPILEUP" ]] && rm -v "$TMP"/"$B".vcf
 #discard PL field due to inconsisent lines which breaks downstream mergeVcf.sh (that invokes bcftools merge); some lines='GT:PL	1/1:255,63,0', others='GT:PL	1/1:0,105:94:99:255,255,0'
-vcffilter -g 'GT = 1/1' "$TMP"/"$B".recode.vcf | vcffixup - | vcffilter -f 'AC > 0' | vcfsort - | bcftools annotate -x PL,FORMAT - | bcftools reheader -s "$TMP"/sampleID - > "$TMP"/"$B".vcf 
+vcffilter -g 'GT = 1/1' "$TMP"/"$B".recode.vcf | vcffixup - | vcffilter -f 'AC > 0' | vcf-sort -c | bcftools annotate -x PL,FORMAT - | bcftools reheader -s "$TMP"/sampleID - > "$TMP"/"$B".vcf 
 echo 'vcffilter completed'
 
 if grep -Pq '^#CHROM[A-Z\t]+sm$' "$TMP"/"$B".vcf; then
@@ -167,6 +183,7 @@ fi
 
 bgzip -cf "$TMP"/"$B".vcf > "$TMP"/"$B".vcf.gz
 rm -v "$TMP"/"$B".recode.vcf "$TMP"/"$B".vcf "$TMP"/sampleID
+[[ -z "$DIFF" ]] && { rm -v "$TMP"/"$U".difference.bed }
 tabix -f "$TMP"/"$B".vcf.gz #&> /dev/null
 echo 'bgzip compression and tabix indexing completed'
 #to-do: filter for at least 1 read on both -f "ADF > 0 & ADR > 0" doesn't work
