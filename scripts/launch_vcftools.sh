@@ -122,6 +122,7 @@ if [[ -n "$REGION" ]] && [[ -n "$EXCLUDE" ]]; then
 	SUBTRAHEND=$(echo "$EXCLUDE" | sed 's/^--exclude-bed //g')
 	U=$(echo "$EXCLUDE" | sed -r 's/(\.bed$|^--exclude-bed )//g')
 	#substract the two conflicting opts --exclude --region' for vcftools
+	command -v bedtools >/dev/null 2>&1 || { echo 'ERROR: bedtools binary not found' >&2; exit 1; }
 	bedtools subtract -a "$MINUEND" -b "$SUBTRAHEND" > "$TMP"/"$U".difference.bed
 	DIFF="--bed $TMP/$U.difference.bed"
 	REGION=''
@@ -149,7 +150,7 @@ if [[ -n "$MPILEUP" ]]; then
 fi
 
 if [[ -z "$OUTPREF" ]]; then
-	if [[ -n "$VCF" ]]
+	if [[ -n "$VCF" ]]; then
 		B=$(basename "$VCF" | sed -r 's/\.(vcf|vcf\.gz)$//1')
 		OUTPREF="--out ${TMP}/${B}"
 	else
