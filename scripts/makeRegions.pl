@@ -136,7 +136,7 @@ sub vcfLengths{
   open(VCFGZ,"zgrep '^##reference' $vcf | ") or die "ERROR: could not open $vcf for reading: $!";
   while(<VCFGZ>){
     # VCFtools v0.1.14 filtering appends to fileformat=VCFv4.2 '##reference=file:///reference-path'
-    if(/^##reference=file:(.+)/){
+    if(/^##reference=file:\/\/(.+)/){
       $fasta=$1;
     }
     # VarScan v2.3 filtering appends to fileformat=VCFv4.1 '##reference=/reference-path'
