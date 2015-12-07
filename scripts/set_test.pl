@@ -32,7 +32,6 @@ sub main{
   die usage() if(!@ARGV || $$settings{help});
   die "ERROR: need a dataset name\n".usage() if(!$dataset);
   $project||=$dataset;
-  #push(@setArgv,qw(--rename-taxa s/\\\\\\..*//)); # doesn't seem to put in the backslashes into the final processMsa command yet
 
   # Put all 'fast' options here
   if($$settings{fast}){
@@ -98,7 +97,7 @@ sub command{
 
 sub usage{
   "Runs a test dataset with Lyve-SET
-  Usage: $0 dataset project
+  Usage: $0 dataset project [-- --launch_set.pl options ...]
   dataset names could be one of the following:\n    ".join(", ",@dataname)."
   NOTE: project is the output directory for Lyve-SET
 

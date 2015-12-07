@@ -228,3 +228,7 @@ scripts/bwa:
 lib/datasets/scripts/downloadDataset.pl:
 	rm -rf lib/datasets
 	git clone https://github.com/WGS-standards-and-analysis/datasets.git lib/datasets
+	#for i in lib/datasets/datasets; do \
+	#  bash lib/datasets/scripts/xlsxToTsv.sh $$i > $$i.tsv; \
+	#done;
+
