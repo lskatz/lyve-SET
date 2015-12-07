@@ -29,16 +29,18 @@ install: install-prerequisites
 	@echo "Don't forget to include scripts in your PATH"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar lib/vcflib lib/phast/phast.faa scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py scripts/bowtie2 scripts/bwa lib/datasets/scripts/downloadDataset.pl
+install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar scripts/vcffixup lib/phast/phast.faa scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py scripts/bowtie2 scripts/bwa lib/datasets/scripts/downloadDataset.pl
 	@echo DONE installing prerequisites
 
-lib/vcflib:
+scripts/vcffilter:
 	rm -rf {build,lib}/vcflib
 	git clone --recursive https://github.com/ekg/vcflib.git build/vcflib
-	cd build/vcflib && make
-	mv -v build/vcflib lib
-	ln -sf "$(PWD)"/lib/vcflib/bin/vcffilter "$(PWD)"/scripts/vcffilter
-	ln -sf "$(PWD)"/lib/vcflib/bin/vcffixup "$(PWD)"/scripts/vcffixup
+	make -C build/vcflib
+	mv -v build/vcflib lib/vcflib
+	ln -sf ../lib/vcflib/bin/vcffilter $@
+
+scripts/vcffixup: scripts/vcffilter
+	ln -sf ../lib/vcflib/bin/vcffixup $@
 
 scripts/vcf-sort:
 	rm -rf lib/vcftools*
