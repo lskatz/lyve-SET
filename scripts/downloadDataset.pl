@@ -13,8 +13,8 @@ use File::Basename qw/fileparse dirname basename/;
 use File::Temp qw/tempdir tmpfile/;
 use Bio::Perl;
 
-local $0=basename $0;
-sub logmsg{print STDERR "$0: @_\n";}
+use lib "$FindBin::RealBin/../lib";
+use LyveSET qw/logmsg/;
 
 exit main();
 
@@ -242,6 +242,7 @@ sub sha256sum{
 }
 
 sub usage{
+  local $0=basename $0;
   "Reads a standard dataset spreadsheet and downloads its data
   Usage: $0 -o outdir spreadsheet.dataset.tsv
   PARAM        DEFAULT  DESCRIPTION
