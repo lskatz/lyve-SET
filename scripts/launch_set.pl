@@ -592,7 +592,7 @@ sub variantCalls{
     }
     if(!-e $regionsFile){
       system("rm -fv $regionsFile.*.tmp");
-      my $command="samtools view -H $initBam | grep \"\@SQ\" | sed 's/^.*SN://g' | cut -f 1 | xargs -I {} -n 1 -P $$settings{numcpus} sh -c \"samtools mpileup -uf $ref -r '{}' $initBam | bcftools call -cv | grep -v '^#' | cut -f 1,2 > $regionsFile.'{}'.tmp \" ";
+      my $command="samtools view -H $initBam | grep \"\@SQ\" | sed 's/^.*SN://g' | cut -f 1 | xargs -I {} -n 1 -P $$settings{numcpus} sh -c \"samtools mpileup -suf $ref -r '{}' $initBam | bcftools call -c | grep -v '^#' | cut -f 1,2 > $regionsFile.'{}'.tmp \" ";
       $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"snpPositionDiscovery"});
       $sge->wrapItUp();
 
@@ -629,8 +629,25 @@ sub variantCalls{
           rm -v $vcfdir/$b.vcf.tmp",
           {jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1}
       );
-      $jobname="sort$b"; # the thing that bgzip waits on to finish
-    } else {
+      $jobname="sort$b"; # the job that bgzip waits on to finish
+    } 
+
+    elsif($$settings{snpcaller} eq 'vcftools'){
+      $jobname="vcftools$b";
+      my $vcftoolsxopts="";
+      $vcftoolsxopts.="--region $regionsFile " if($regionsFile);
+      $vcftoolsxopts.="--exclude $bam.cliffs.bed " if(-e "$bam.cliffs.bed");
+      my $vcftoolsCommand="$scriptsdir/launch_vcftools.sh -m $bam --numcpus $$settings{numcpus} --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $vcftoolsxopts";
+      logmsg $vcftoolsCommand;
+      $sge->pleaseExecute($vcftoolsCommand,{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
+      $sge->pleaseExecute("mv -fv $$settings{tmpdir}/$b.vcf.gz $vcfdir/$b.vcf.gz &&
+        mv -fv $$settings{tmpdir}/$b.vcf.gz.tbi $vcfdir/$b.vcf.gz.tbi",
+        {jobname=>"moveVCF$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1}
+        );
+      $jobname="moveVCF$b"; # the job that waits on to finish
+    }
+
+    else {
       die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
     }
 
@@ -638,10 +655,12 @@ sub variantCalls{
     indexAndCompressVcf("$vcfdir/$b.vcf",$jobname,$settings);
 
   } # END bam while loop
+
   logmsg "All variant-calling jobs have been submitted. Waiting on them to finish";
   $sge->wrapItUp();
   return 1;
 }
+
 
 sub annotateVariants{
   my($richseq,$vcfdir,$settings)=@_;
@@ -662,9 +681,8 @@ sub indexAndCompressVcf{
   eval{
     $j=$sge->pleaseExecute("
       set_fixVcf.pl --min_alt_frac $$settings{min_alt_frac} --min_coverage $$settings{min_coverage} '$vcf' > $vcf.reevaluated && mv '$vcf.reevaluated' '$vcf' && \
-      vcf-sort < '$vcf' > '$vcf.sorted.tmp'   && mv '$vcf.sorted.tmp'  '$vcf' && \
-      bgzip -f '$vcf' && \
-      tabix '$vcf.gz'
+      vcf-sort < '$vcf' > '$vcf.sorted.tmp' && mv '$vcf.sorted.tmp'  '$vcf' && \
+      bgzip -f '$vcf' && tabix '$vcf.gz'
     ",{qsubxopts=>"-hold_jid $holdjid",jobname=>"sortAndCompress",numcpus=>1});
   };
   if($@){
@@ -835,7 +853,7 @@ sub usage{
     MODULES
     --read_cleaner $$settings{read_cleaner}                  Which read cleaner?  Choices: none, CGP, BayesHammer
     --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap, stampy
-    --snpcaller    $$settings{snpcaller}   Which SNP caller? Only choice: varscan
+    --snpcaller    $$settings{snpcaller}   Which SNP caller? Choices: varscan, vcftools
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue        $$settings{queue}             The default queue to use.
     --numnodes     $$settings{numnodes}                maximum number of nodes
