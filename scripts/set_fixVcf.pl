@@ -29,9 +29,11 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help tempdir=s numcpus=i min_coverage=i min_alt_frac=s)) or die $!;
+  GetOptions($settings,qw(help tempdir=s numcpus=i min_coverage=i min_alt_frac=s type=s)) or die $!;
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("$0XXXXXX",TMPDIR=>1,CLEANUP=>1);
+  $$settings{type}||='single';
+    $$settings{type}=lc($$settings{type});
   mkdir $$settings{tempdir};
   $$settings{min_coverage}||=0;
   $$settings{min_alt_frac}||=0;
@@ -80,6 +82,7 @@ sub addStandardTags{
 sub reevaluateSites{
   my($vcf,$settings)=@_;
   my $v="$$settings{tempdir}/reevaluated.vcf";
+  my $type=$$settings{type};
   logmsg "Reevaluating sites on whether they pass thresholds";
 
   my $altFreq=$$settings{min_alt_frac};
@@ -89,6 +92,8 @@ sub reevaluateSites{
   open(OUTVCF,">",$v) or die "ERROR: could not open vcf file $v for writing: $!";
   
   $vcfObj->parse_header(); # I might need to parse headers, first thing...?
+  my (@samples) = $vcfObj->get_samples(); # have to parse headers before getting samples
+  my $numSamples=scalar(@samples);
   $vcfObj->add_header_line({key=>'FILTER', ID=>"FAIL", Description=>"This site did not pass QC"}) if(!@{ $vcfObj->get_header_line(key=>'FILTER',ID=>'FAIL') });
   $vcfObj->add_header_line({key=>'FORMAT', ID=>'FT', Number=>1, Type=>'String', Description=>"Genotype filters using the same codes as the FILTER data element"}) if(!@{ $vcfObj->get_header_line(key=>'FORMAT',ID=>'FT') });
 
@@ -107,6 +112,9 @@ sub reevaluateSites{
     # Convert to haploid
     for($$x{REF}, @{$$x{ALT}}){
       $_=substr($_,0,1);
+    }
+    if($type eq 'single'){
+      $$x{FILTER}=['PASS']; # only FT will explain whether a site passes
     }
 
     # Some format tag modification
@@ -136,8 +144,8 @@ sub reevaluateSites{
       # Mask for low coverage.
       # Figure out what the depth is using some common depth definitions.
       $$x{gtypes}{$samplename}{DP}||="";
-      $$x{gtypes}{$samplename}{DP}=0 if($$x{gtypes}{$samplename}{DP} eq '.');
       $$x{gtypes}{$samplename}{DP}||=$$x{gtypes}{$samplename}{SDP} || $$x{gtypes}{$samplename}{ADP} || 0;
+      $$x{gtypes}{$samplename}{DP}=0 if($$x{gtypes}{$samplename}{DP} eq '.');
       if($$x{gtypes}{$samplename}{DP} < $$settings{min_coverage}){
         for(0 .. $numAlts-1){
           $$x{gtypes}{$samplename}{FT}='FAIL';
@@ -147,6 +155,21 @@ sub reevaluateSites{
     # END MASKING
     ########################
 
+    # Reevaluate whether this whole site passes.
+    if($type eq 'multi'){
+      # Count how many samples fail at this site.
+      my $numFail=0;
+      while(my($samplename,$gtypesHash)=each(%{$$x{gtypes}})){
+        $numFail++ if($$gtypesHash{FT} ne 'PASS');
+      }
+      # If they all fail, then the site fails.
+      if($numFail>=$numSamples){
+        $$x{FILTER}=['FAIL'];
+        $$x{ALT}=['N'];
+      }
+    }
+
+    # Done! Print the modified line.
     print OUTVCF $vcfObj->format_line($x);
   }
   close OUTVCF;
@@ -156,10 +179,14 @@ sub reevaluateSites{
 
 sub usage{
   "Fixes a given VCF by adding, removing, or editing fields. This script
-  will also reevaluate sites on whether they have passed filters.
+  will also reevaluate sites on whether they have passed filters using the FT tag.
+  However, the FILTER field will simply be set to 'PASS'.
   Usage: $0 file.vcf.gz > fixed.vcf
-  --numcpus 1
+  --numcpus      1
   --min_coverage 0
   --min_alt_frac 0
+  --type         single  Can be single (default) or multi. For multivcfs, reevaluates
+                         whether an entire site passes and fills in FILTER.
   "
 }
+
