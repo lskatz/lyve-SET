@@ -26,7 +26,7 @@ sub main{
   my $settings={importasm=>1};
   GetOptions($settings,qw(help do-nothing numcpus=i numnodes=i importasm! fast)) or die "$!\n  Please remember, if you are trying to use an option for launch_set.pl, use the '--' flag first. See the usage statement for more details.";
   $$settings{numcpus}||=1;
-  $$settings{numnodes}||=20;
+  $$settings{numnodes}||=50;
 
   my ($dataset,$project,@setArgv)=@ARGV;
   die usage() if(!@ARGV || $$settings{help});
