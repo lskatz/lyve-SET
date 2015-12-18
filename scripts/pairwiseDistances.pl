@@ -13,7 +13,7 @@ sub logmsg{$|++;print STDERR "@_\n";$|--;}
 exit(main());
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help numcpus=i estimate samplingFrequency=s));
+  GetOptions($settings,qw(help numcpus=i estimate samplingFrequency=s header));
   die usage() if($$settings{help});
   $$settings{numcpus}||=1;
   $$settings{samplingFrequency}||=0.25;
@@ -36,15 +36,15 @@ sub main{
   logmsg "Loaded $numSeq sequences for comparison";
 
   # find all distances
-  my $printQueue=Thread::Queue->new;
+  my $printQueue=Thread::Queue->new();
+     $printQueue->enqueue(join("\t",qw(GENOME1 GENOME2 PDIST ALN_LENGTH FREQ))."\n") if($$settings{header});
   my $printer=threads->new(\&printer,$printQueue,$settings);
   my $pwQueue=Thread::Queue->new;
   my @thr;
   $thr[$_]=threads->new(\&pairwiseDistanceWorker,\%seq,$pwQueue,$printQueue,$settings) for(0..$$settings{numcpus});
   my @dist;
-  # TODO loop based on the seqid
+  # Loop based on the seqid
   for(my $i=0;$i<$numSeq;$i++){
-    #my $seq1=$seq{$seqid[$i]};
     logmsg "Distances for $seqid[$i]";
     $pwQueue->enqueue($i);
   }
@@ -76,9 +76,9 @@ sub pairwiseDistanceWorker{
     my $seq1=$$seqHash{$seqid[$i]};
     for(my $j=$i+1;$j<$numSeqs;$j++){
       my $seq2=$$seqHash{$seqid[$j]};
-      my $dist=pairwiseDistance($seq1,$seq2,$settings);
+      my ($dist,$alnLength,$freq)=pairwiseDistance($seq1,$seq2,$settings);
       my($s1,$s2)=sort {$a cmp $b} ($seqid[$i],$seqid[$j]); # to have the pairwise in some order
-      $printQueue->enqueue(join("\t",$s1,$s2,$dist)."\n");
+      $printQueue->enqueue(join("\t",$s1,$s2,$dist,$alnLength,$freq)."\n");
     }
   }
   return 1;
@@ -89,14 +89,23 @@ sub pairwiseDistance{
   #$seq1=lc($seq1); $seq2=lc($seq2); # I added this when reading the sequences
   my $length=length($seq1);
   my $pdist=0;
+  my $denominator=0;
   for(my $i=0;$i<$length;$i++){
     next if($$settings{estimate} && rand() >$$settings{samplingFrequency});
     my $nt1=substr($seq1,$i,1);
     my $nt2=substr($seq2,$i,1);
-    next if($nt1=~/[^atcg]/ || $nt2=~/[^atcg]/ || $nt1 eq $nt2);
+
+    # Don't make any kind of counts if this isn't an unambiguous nucleotide
+    next if($nt1=~/[^atcg]/ || $nt2=~/[^atcg]/);
+    $denominator++;
+
+    # Make a count if these are unambiguous and different.
+    next if($nt1 eq $nt2);
     $pdist++;
   }
   $pdist=int($pdist / $$settings{samplingFrequency}) if($$settings{estimate});
+
+  return ($pdist,$denominator,sprintf("%0.7f",($pdist/$denominator))) if(wantarray);
   return $pdist;
 }
 sub printer{
@@ -110,8 +119,11 @@ sub printer{
 sub usage{
   "Finds pairwise distances of entries in an alignment file
   Usage: $0 alignment.fasta > pairwise.tsv
-  -n numcpus (Default: 1)
-  -e Estimate the number of pairwise distances using random sampling. 1/4 of all pairwise bases will be analyzed instead of 100%.
-  -s 0.25 (to be used with -e) The frequency at which to analyze positions for pairwise differences
+  --header          Display a header for the columns        
+  --numcpus   1
+  -e                Estimate the number of pairwise distances using random sampling. 
+                    1/4 of all pairwise bases will be analyzed instead of 100%.
+  -s          0.25  (to be used with -e) The frequency at which to analyze 
+                    positions for pairwise differences
   "
 }
