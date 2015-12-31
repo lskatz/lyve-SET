@@ -44,6 +44,7 @@ if [ "$TEMPDIR" == "" ]; then
   TEMPDIR=$(mktemp --directory /tmp/mergeVcf.XXXXXX);
 fi
 mkdir -pv "$TEMPDIR"; # just in case
+export TEMPDIR;
 
 REGIONSFILE="$TEMPDIR/regions.txt";
 touch $REGIONSFILE; #make sure this file is accessible
