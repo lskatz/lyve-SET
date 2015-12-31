@@ -70,7 +70,8 @@ sub phast{
     my($start,$stop)=split(/\-/,$coordinates);
       $stop||=$start;
 
-    my $file="$tempdir/$i.fna";
+    # The file name will have the start coordinate as its name
+    my $file="$tempdir/$start.fna";
     open(SEQOUT,">",$file) or die "ERROR: could not write seq to temp file $file: $!";
     print SEQOUT ">".$contig."\n".$seq{$contig}->subseq($start,$stop)."\n";
     close SEQOUT;
@@ -78,33 +79,46 @@ sub phast{
   }
   my $threadsPerBlast=int($$settings{numcpus}/$i);
   $threadsPerBlast=1 if($threadsPerBlast<1);
-    
+
   # Better parallelization: one fasta entry per cpu.
   # Split the query into multiple files and then figure out
   # how many cpus per blast job we need.
 
   # Perform blast on these split files.
   logmsg "Created blast input query files under $tempdir/*.fna";
-  system("ls $tempdir/*.fna | xargs -I {} -P $$settings{numcpus} -n 1 blastx -query {} -db $db -evalue 0.05 -outfmt 6 -num_threads $threadsPerBlast -out {}.bls");
+  my $xargsCommand=qq(ls $tempdir/*.fna | xargs -P $$settings{numcpus} -n 1 sh -c '
+    offset=\$(basename \$0 .fna); # Find the coordinate offset from the filename
+    blastx -query \$0 -db $db -evalue 0.05 -outfmt 6 -num_threads $threadsPerBlast |\\
+    perl -lane \"
+      \\\$F[6]+=\$offset; # query coordinate offset
+      \\\$F[7]+=\$offset; # query coordinate offset
+      print join(\\\"\\\t\\\",\@F); # lots of backslashes because of language-inception
+    \" > \$0.bls
+  ');
+  #die $xargsCommand;
+  system($xargsCommand);
   die "ERROR with blastx: $!" if $?;
   #my $allResults=`blastx -query '$fasta' -db $db -evalue 0.05 -outfmt 6 -num_threads $$settings{numcpus}`;
-  my $allResults=`cat $tempdir/*.fna.bls`;
+  my @allResults=`cat $tempdir/*.fna.bls`;
   die "ERROR with cat on $tempdir/*.fna.bls" if($?);
-  die "No results were returned by blastx" if(!$allResults);
+  warn "No results were returned by blastx" if(!@allResults);
 
   my $flanking=$$settings{flanking}; #bp
   logmsg "Parsing results with a soft flanking distance of $flanking";
-  my(%range);
-  for my $result(split(/\n/,$allResults)){
+  my(%range, %seenRange);
+  for my $result(@allResults){
     $result=~s/^\s+|\s+$//g; # trim
-    my ($contig,$hit,$identity,$length,$gaps,$mismatches,$sstart,$send,$qstart,$qend,$e,$score)=split /\t/, $result;
+    my ($contig,$hit,$identity,$length,$gaps,$mismatches,$qstart,$qend,$sstart,$send,$e,$score)=split /\t/, $result;
     next if($score < 50 || $length < 20);
-    
+    # Don't bother the Range object if this is a range we've already seen.
+    # This will speed things up since Number::Range is slow, and 
+    # it will happen because each genome region can hit multiple phages.
+    next if($seenRange{$contig}{$qstart}{$qend}++);
+
     # Make sure there is a range object for this contig.
-    # Come up with 
     $range{$contig}||=Number::Range->new;
-    my $lo=min($sstart,$send);
-    my $hi=max($sstart,$send);
+    my $lo=min($qstart,$qend);
+    my $hi=max($qstart,$qend);
 
     # Add some coordinates between close hits based on
     # the flanking distance. Start from high to low
@@ -133,13 +147,15 @@ sub phast{
     $range{$contig}->addrange($loSoftFlank..$hiSoftFlank);
   }
 
+  logmsg "Finished adding coordinate ranges. Now creating a bed format";
+
   # Translate the ranges found in the Range objects into 
   # an array of [contig,start,stop]
   my @range;
   while(my($contig,$rangeObj)=each(%range)){
-    my $rangeStr=$rangeObj->range;
-    while($rangeStr=~/(\d+)\.\.(\d+),?/g){
-      push(@range,[$contig,$1,$2]);
+    my @rangeList=$rangeObj->rangeList;
+    for(@rangeList){
+      push(@range,[$contig,@$_]);
     }
   }
 
@@ -150,7 +166,7 @@ sub usage{
   "Finds phages in a fasta file using phast
   Usage: $0 file.fasta
   --numcpus  1
-  --tempdir  tmp/
+  --tempdir  /tmp
   --flanking 0    Give 'soft' edges to ranges. If blast hits are this many
                   nt away from another blast hit, then join the ranges and
                   include any intermediate positions. If ranges cannot be
