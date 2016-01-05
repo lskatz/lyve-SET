@@ -729,7 +729,7 @@ sub compareTaxa{
 
   if($$settings{msa} || $$settings{trees}){
     logmsg "Launching set_processPooledVcf.pl";
-    my $command="set_processPooledVcf.pl $pooled --prefix $$settings{msadir}/out --numcpus $$settings{numcpus}";
+    my $command="set_processPooledVcf.pl $pooled --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} 2>&1 | tee --append $$settings{logdir}/launch_set.log";
     logmsg "Processing the pooled VCF\n  $command";
     $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"set_processPooledVcf.pl"});
     $sge->wrapItUp();
@@ -740,10 +740,9 @@ sub compareTaxa{
   # Diagnose the project
   # Make sure this gets printed to stdout
   logmsg "Running set_diagnose.pl";
-  my $diagnosis="$$settings{logdir}/diagnosis.txt";
-  $sge->pleaseExecute("set_diagnose.pl -p $project > $diagnosis 2>&1",{jobname=>"set_diagnose",numcpus=>1});
+  #my $diagnosis="$$settings{logdir}/diagnosis.txt";
+  $sge->pleaseExecute("set_diagnose.pl -p $project 2>&1 | tee --append $$settings{logdir}/launch_set.log",{jobname=>"set_diagnose",numcpus=>1});
   $sge->wrapItUp();
-  system("cat $diagnosis");
 
   return 1;
 }
@@ -768,16 +767,6 @@ sub variantsToMatrix{
   my $infile="'".join("' '",@infile)."'";
   my $inVcf="'".join("' '",@vcf)."'";
 
-  # Find the distance that we'd expect SNP-linkage, so that they can be filtered out
-  #if($$settings{allowedFlanking} eq 'auto'){
-  #  my $allowedFlanking=`snpDistribution.pl @vcf`;
-  #  die if $?;
-  #  chomp($allowedFlanking);
-  #
-  #  # let's make it a little bit more strict actually.
-  #  $$settings{allowedFlanking}=$allowedFlanking*3;
-  #}
-
   # mergevcf deletes its tmpdir and so we need to make a new one
   my $tmpdir=tempdir("$$settings{tmpdir}/mergevcfXXXXXX",CLEANUP=>0);
 
@@ -789,24 +778,6 @@ sub variantsToMatrix{
   $sge->wrapItUp();
 
   return $pooled;
-}
-
-sub pooledToAlignment{
-  my($pooled,$settings)=@_;
-  $$settings{allowedFlanking}||=0;
-  my $outMsa="$$settings{msadir}/out.aln.fas";
-  if(-e $outMsa){
-    logmsg "Found $outMsa and so I will not remake it";
-    return $outMsa;
-  }
-
-  # Make in order: bcftools matrix; filtered matrix; fasta alignment
-  $sge->pleaseExecute("pooledToMatrix.sh -o $$settings{msadir}/out.bcftoolsquery.tsv $$settings{msadir}/out.pooled.vcf.gz",{jobname=>"pooledToMatrix",numcpus=>1});
-  $sge->pleaseExecute("filterMatrix.pl --allowed $$settings{allowedFlanking} --tempdir $$settings{tmpdir} $$settings{msadir}/out.bcftoolsquery.tsv > $$settings{msadir}/out.filteredbcftoolsquery.tsv",{jobname=>"filterMatrix",numcpus=>1,qsubxopts=>"-hold_jid pooledToMatrix"});
-  $sge->pleaseExecute("matrixToAlignment.pl $$settings{msadir}/out.filteredbcftoolsquery.tsv > $$settings{msadir}/out.aln.fas",{jobname=>"matrixToAlignment",numcpus=>1,qsubxopts=>"-hold_jid filterMatrix"});
-  $sge->wrapItUp();
-
-  return $outMsa;
 }
 
 sub usage{
@@ -890,4 +861,3 @@ sub usage{
   ";
   return $help;
 }
-
