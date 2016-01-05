@@ -81,10 +81,15 @@ lib/Schedule/SGELK.pm:
 lib/varscan.v2.3.7.jar:
 	wget 'http://downloads.sourceforge.net/project/varscan/VarScan.v2.3.7.jar' -O $@
 
-lib/phast/phast.faa: 
+lib/phast/phast.faa:
 	mkdir -p lib/phast
-	wget http://phast.wishartlab.com/phage_finder/DB/prophage_virus.db -O $@
-	makeblastdb -in lib/phast/phast.faa -dbtype prot
+	wget http://phast.wishartlab.com/phage_finder/DB/prophage_virus.db -O $@.tmp
+	# Remove redundant sequences in a naive but dependency-less way.
+	# Ideally, I'd want to use cd-hit, but I don't want to introduce
+	# another dependency.
+	perl -MBio::Perl -e 'my %seen=(); $$in=Bio::SeqIO->new(-file=>"$@.tmp",-format=>"fasta"); $$out=Bio::SeqIO->new(-file=>">$@"); while($$seq=$$in->next_seq){next if($$seen{$$seq->seq}++); $$out->write_seq($$seq);}'
+	rm $@.tmp
+	makeblastdb -in $@ -dbtype prot
 
 scripts/samtools:
 	rm -rf build/samtools-1.2* lib/samtools-1.2
