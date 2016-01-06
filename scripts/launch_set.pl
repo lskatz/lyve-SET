@@ -853,8 +853,8 @@ sub usage{
 
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue        $$settings{queue}           default queue to use
-    --numnodes     $$settings{numnodes}              maximum number of nodes
-    --numcpus      $$settings{numcpus}               number of cpus
+    --numnodes     $$settings{numnodes}              maximum number of computer nodes on the scheduler
+    --numcpus      $$settings{numcpus}               number of cpus per node
     --qsubxopts    '-N lyve-set'   Extra options to pass to qsub. This is not 
                                    sanitized; internal options might overwrite yours.
     --noqsub                       Do not use the scheduler, even if it exists
