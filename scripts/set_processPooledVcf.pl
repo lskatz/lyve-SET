@@ -19,6 +19,7 @@ use Thread::Queue;
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
 use LyveSET qw/logmsg/;
+$ENV{PATH}="$FindBin::RealBin:$ENV{PATH}";
 
 exit main();
 
@@ -26,11 +27,12 @@ sub main{
   local $0=basename $0;
   my $settings={};
 
-  GetOptions($settings,qw(help prefix=s numcpus=i tempdir=s));
+  GetOptions($settings,qw(help prefix=s numcpus=i tempdir=s allowed|allowedFlanking=i));
   $$settings{prefix}||="./out";
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("XXXXXX",TMPDIR=>1,CLEANUP=>1);
-  
+  $$settings{allowed}||=0;
+
   my($VCF)=@ARGV;
   die usage() if(!$VCF || $$settings{help});
 
@@ -40,14 +42,16 @@ sub main{
   system("pooledToMatrix.sh -o $$settings{prefix}.snpmatrix.tsv $VCF");
   die "ERROR with pooledToMatrix" if $?;
 
-  system("filterMatrix.pl --noinvariant-loose < $snpMatrix > $filteredMatrix");
+  system("filterMatrix.pl --allowedFlanking $$settings{allowed} --noinvariant-loose < $snpMatrix > $filteredMatrix");
   die if $?;
 
   my $unfilteredAlignment="$$settings{prefix}.aln.fasta";
   my $filteredAlignment="$$settings{prefix}.informative.fasta";
+  logmsg "Making an alignment from the larger SNP matrix";
   system("matrixToAlignment.pl < $snpMatrix > $unfilteredAlignment");
   die if $?;
 
+  logmsg "Making an alignment from the smaller variants-only matrix";
   system("matrixToAlignment.pl < $filteredMatrix > $filteredAlignment");
   die if $?;
 
@@ -56,28 +60,36 @@ sub main{
   system("pairwiseDistances.pl --numcpus $$settings{numcpus} < $filteredAlignment | sort -k3,3n | tee $pairwise | pairwiseTo2d.pl > $pairwiseMatrix");
   die if $?;
 
-        # Process a resulting VCF: make an MSA; remove uninformative sites; find pairwise distances;
-        # find Fst; make a tree; calculate the eigenvector
+  my $numSamples=`grep -c ">" $filteredAlignment` + 0;
+  die "ERROR: could not count the number of samples in $filteredAlignment" if $?;
+
+  # Process a resulting VCF: make an MSA; remove uninformative sites; find pairwise distances;
+  # find Fst; make a tree; calculate the eigenvector
   my $indexCase="$$settings{prefix}.eigen.tsv";
   system("set_indexCase.pl $pairwise | sort -k2,2n > $indexCase");
   die "ERROR with set_indexCase.pl" if $?;
 
   # TODO Fst
 
-  # RAxML puts everything into the CWD and so we have to work around that.
-  system("cp $filteredAlignment $$settings{tempdir}/; cd $$settings{tempdir}; launch_raxml.sh -n $$settings{numcpus} $filteredAlignment suffix");
-  die "ERROR with launch_raxml.sh" if $?;
-  for (qw(RAxML_bestTree RAxML_bipartitionsBranchLabels RAxML_bipartitions RAxML_bootstrap RAxML_info)){
-    system("mv -v $$settings{tempdir}/$_.suffix $$settings{prefix}.$_");
-    die "ERROR: could not move $$settings{tempdir}/$_.suffix: $!" if $?;
+  # Can work with trees if there are enough samples
+  if($numSamples >= 4){
+    # RAxML puts everything into the CWD and so we have to work around that.
+    system("cp $filteredAlignment $$settings{tempdir}/; cd $$settings{tempdir}; launch_raxml.sh -n $$settings{numcpus} $filteredAlignment suffix");
+    die "ERROR with launch_raxml.sh" if $?;
+    for (qw(RAxML_bestTree RAxML_bipartitionsBranchLabels RAxML_bipartitions RAxML_bootstrap RAxML_info)){
+      system("mv -v $$settings{tempdir}/$_.suffix $$settings{prefix}.$_");
+      die "ERROR: could not move $$settings{tempdir}/$_.suffix: $!" if $?;
+    }
+
+    # TODO: reroot the tree
+    #rerootLongestBranch("$$settings{prefix}.RAxML_bipartitions",$settings);
+
+    # Get combined distance statistics on the tree
+    system("cladeDistancesFromTree.pl -t $$settings{prefix}.RAxML_bipartitions -p $$settings{prefix}.pairwise.tsv --outprefix $$settings{prefix}");
+    die "ERROR with cladeDistancesFromTree.pl" if $?;
+  } else {
+    logmsg "WARNING: only $numSamples samples are in the alignment; skipping tree-building.";
   }
-
-  # TODO: reroot the tree
-  #rerootLongestBranch("$$settings{prefix}.RAxML_bipartitions",$settings);
-
-  # Get combined distance statistics on the tree
-  system("cladeDistancesFromTree.pl -t $$settings{prefix}.RAxML_bipartitions -p $$settings{prefix}.pairwise.tsv --outprefix $$settings{prefix}");
-  die "ERROR with cladeDistancesFromTree.pl" if $?;
 
   return 0;
 }
@@ -112,7 +124,8 @@ sub usage{
   local $0=basename $0;
   "Process a pooled VCF and get useful information
   Usage: $0 file.vcf.gz
-  --prefix  ./out     Output file prefix. Default: current working directory
-  --numcpus 1         Number of threads to use
+  --prefix          ./out  Output file prefix. Default: current working directory
+  --numcpus         1      Number of threads to use
+  --allowedFlanking 0      How far apart each SNP has to be (see: filterMatrix.pl)
   "
 }
