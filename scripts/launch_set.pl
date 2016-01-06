@@ -69,7 +69,7 @@ sub main{
   # Initialize settings by reading the global configuration
   # file, LyveSET.conf
   my $settings=readGlobalSettings(1);
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s qsub!)) or die $!;
 
   # What options change when --fast is used?
   if($$settings{fast}){
@@ -146,6 +146,11 @@ sub main{
   $$settings{workingdir}="$$settings{logdir}/SGELK";
   for (qw(workingdir numnodes numcpus keep qsubxopts queue)){
     $sge->set($_,$$settings{$_}) if($$settings{$_});
+  }
+  # Ensure there is no cluster scheduling, if requested
+  if(defined($$settings{qsub}) && !$$settings{qsub}){
+    $sge->set('scheduler',0);
+    $sge->set('qsub',undef);
   }
 
   # open the log file now that we know the logdir is there
@@ -262,7 +267,7 @@ sub simulateReads{
       next;
     }
     my $numReads=$approximateGenomeSize * 100 / ($readLength*2);
-    
+
     # Four successive jobs that depend on each other:
     #   1. Simulate into paired ends
     #   2. Shuffle
@@ -283,7 +288,7 @@ sub maskReference{
   my $maskDir="$$settings{refdir}/maskedRegions";
   mkdir($maskDir) if(!-d $maskDir);
   logmsg "Finding regions to mask, and recording them in $maskDir/*";
-  
+
   # Mark phage locations if they haven't already been marked
   my $phageRegions="$maskDir/phages.bed";
   if($$settings{'mask-phages'} && !-e $phageRegions){
@@ -308,7 +313,7 @@ sub maskReference{
   while(my $seq=$in->next_seq){
     $seqLength{$seq->id}=$seq->length;
   }
-  
+
   # Find out what the masked regions are in each bed file
   # and find a union of all masked regions, ie, a unique set of points.
   my %maskedRange  = ();
@@ -394,6 +399,16 @@ sub indexReference{
     system("stampy.py --noparseNCBI -G $ref $ref && stampy.py --noparseNCBI -g $ref -H $ref");
     die if $?;
   }
+  elsif($$settings{mapper} eq 'bowtie2'){
+    return $ref if(-e "$ref.{1,2,3,4}.bt2" && -e "$ref.rev.{1,2}.bt2");
+    system("bowtie2-build -q -f $ref $ref");
+    die if $?;
+  }
+  elsif($$settings{mapper} eq 'bwa'){
+    return $ref if(-e "$ref.{amb,ann,bwt,pac,sa}");
+    system("bwa index $ref");
+    die if $?;
+  }
   return $ref;
 }
 
@@ -418,10 +433,13 @@ sub mapReads{
   my $snapxopts="";
   my $smaltxopts="";
   my $stampyxopts="";
+  my $bowtie2xopts="";
+  my $bwaxopts="";
   if($$settings{singleend}){
     $smaltxopts.="--pairedend 1";
     $snapxopts.= "--pairedend 1";
     $stampyxopts.= "--pairedend 1";
+    $bwaxopts.= "--pairedend 1";
   }
 
   my (@bam,@job);
@@ -445,7 +463,16 @@ sub mapReads{
       # Make a tmpdir for stampy since each invocation needs its own space
       my $stampydir=tempdir("$tmpdir/stampyXXXXXX",CLEANUP=>1);
       $sge->pleaseExecute("$scriptsdir/launch_stampy.sh $stampyxopts -r $ref -f $fastq -b $bamPrefix.sorted.bam -t $stampydir --numcpus $$settings{numcpus} ",{jobname=>"stampy$b"});
-    } else {
+    } 
+    elsif($$settings{mapper} eq 'bowtie2'){
+      my $bowtie2dir=tempdir("$tmpdir/bowtie2XXXXXX",CLEANUP=>1);
+      $sge->pleaseExecute("$scriptsdir/launch_bowtie2.sh $bowtie2xopts -r $ref -f $fastq -b $bamPrefix.sorted.bam -t $bowtie2dir --numcpus $$settings{numcpus} ",{jobname=>"bowtie2$b"});
+    }
+    elsif($$settings{mapper} eq 'bwa'){
+      my $bwadir=tempdir("$tmpdir/bwaXXXXXX",CLEANUP=>1);
+      $sge->pleaseExecute("$scriptsdir/launch_bwa.sh $bwaxopts -r $ref -f $fastq -b $bamPrefix.sorted.bam -t $bwadir --numcpus $$settings{numcpus} ",{jobname=>"bwa$b"});
+    }
+    else {
       die "ERROR: I do not understand the mapper $$settings{mapper}";
     }
   }
@@ -554,7 +581,7 @@ sub variantCalls{
       }
     }
     $sge->wrapItUp();
-    
+
     # Figure out the most distant using sums of points.
     my %distance;
     open(SORTALLGENOMEDIST,"sort -k3,3n -k1,1 -k2,2 $$settings{tmpdir}/genomeDist*.tmp | ") or die "ERROR: could not open  $$settings{tmpdir}/genomeDist*.tmp: $!";
@@ -565,7 +592,7 @@ sub variantCalls{
       $distance{$bam2}+=$d;
     }
     close SORTALLGENOMEDIST;
-    
+
     # The most distant genome is the one with the lowest jaccard distance overall.
     my $initBam=$bam[0];
     my $minScore=$distance{$initBam};
@@ -587,7 +614,7 @@ sub variantCalls{
     }
     if(!-e $regionsFile){
       system("rm -fv $regionsFile.*.tmp");
-      my $command="samtools view -H $initBam | grep \"\@SQ\" | sed 's/^.*SN://g' | cut -f 1 | xargs -I {} -n 1 -P $$settings{numcpus} sh -c \"samtools mpileup -uf $ref -r '{}' $initBam | bcftools call -cv | grep -v '^#' | cut -f 1,2 > $regionsFile.'{}'.tmp \" ";
+      my $command="samtools view -H $initBam | grep \"\@SQ\" | sed 's/^.*SN://g' | cut -f 1 | xargs -I {} -n 1 -P $$settings{numcpus} sh -c \"samtools mpileup -suf $ref -r '{}' $initBam | bcftools call -c | grep -v '^#' | cut -f 1,2 > $regionsFile.'{}'.tmp \" ";
       $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"snpPositionDiscovery"});
       $sge->wrapItUp();
 
@@ -614,7 +641,7 @@ sub variantCalls{
       $jobname="varscan$b";
       my $varscanxopts="";
       $varscanxopts.="--region $regionsFile " if($regionsFile);
-      $varscanxopts.="--exclude $bam.cliffs.bed " if(-e "$bam.cliffs.bed");
+      $varscanxopts.="--exclude $bam.cliffs.bed " if(-s "$bam.cliffs.bed");
       my $varscanCommand="$scriptsdir/launch_varscan.pl $bam --numcpus $$settings{numcpus} --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $varscanxopts > $vcfdir/$b.vcf";
       logmsg $varscanCommand;
       $sge->pleaseExecute($varscanCommand,{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
@@ -624,8 +651,24 @@ sub variantCalls{
           rm -v $vcfdir/$b.vcf.tmp",
           {jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1}
       );
-      $jobname="sort$b"; # the thing that bgzip waits on to finish
-    } else {
+      $jobname="sort$b"; # the job that bgzip waits on to finish
+
+    }elsif($$settings{snpcaller} eq 'vcftools'){
+      $jobname="vcftools$b";
+      my $vcftoolsxopts="";
+      $vcftoolsxopts.="--region $$settings{refdir}/unmaskedRegions.bed" if(-s "$$settings{refdir}/unmaskedRegions.bed");
+      $vcftoolsxopts.="--exclude $bam.cliffs.bed " if(-s "$bam.cliffs.bed");
+      my $vcftoolsCommand="$scriptsdir/launch_vcftools.sh -m $bam --numcpus $$settings{numcpus} --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $vcftoolsxopts";
+      logmsg $vcftoolsCommand;
+      $sge->pleaseExecute($vcftoolsCommand,{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
+      $sge->pleaseExecute("mv -fv $$settings{tmpdir}/$b.vcf.gz $vcfdir/$b.vcf.gz &&
+        mv -fv $$settings{tmpdir}/$b.vcf.gz.tbi $vcfdir/$b.vcf.gz.tbi",
+        {jobname=>"moveVCF$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1}
+        );
+      $jobname="moveVCF$b"; # the job that waits on to finish
+    }
+
+    else {
       die "ERROR: I do not understand snpcaller $$settings{snpcaller}";
     }
 
@@ -633,10 +676,15 @@ sub variantCalls{
     indexAndCompressVcf("$vcfdir/$b.vcf",$jobname,$settings);
 
   } # END bam while loop
+
   logmsg "All variant-calling jobs have been submitted. Waiting on them to finish";
   $sge->wrapItUp();
+
+  # TODO set_fixVcf.pl - should it go into indexAndCompressVcf() ?
+
   return 1;
 }
+
 
 sub annotateVariants{
   my($richseq,$vcfdir,$settings)=@_;
@@ -656,9 +704,8 @@ sub indexAndCompressVcf{
   my $j={};
   eval{
     $j=$sge->pleaseExecute("
-      vcf-sort < '$vcf' > '$vcf.sorted.tmp' && mv '$vcf.sorted.tmp' '$vcf' && \
-      bgzip -f '$vcf' && \
-      tabix '$vcf.gz'
+      vcf-sort < '$vcf' > '$vcf.sorted.tmp' && mv '$vcf.sorted.tmp'  '$vcf' && \
+      bgzip -f '$vcf' && tabix '$vcf.gz'
     ",{qsubxopts=>"-hold_jid $holdjid",jobname=>"sortAndCompress",numcpus=>1});
   };
   if($@){
@@ -681,7 +728,7 @@ sub compareTaxa{
 
   if($$settings{msa} || $$settings{trees}){
     logmsg "Launching set_processPooledVcf.pl";
-    my $command="set_processPooledVcf.pl $pooled --prefix $$settings{msadir}/out --numcpus $$settings{numcpus}";
+    my $command="set_processPooledVcf.pl $pooled --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} 2>&1 | tee --append $$settings{logdir}/launch_set.log";
     logmsg "Processing the pooled VCF\n  $command";
     $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"set_processPooledVcf.pl"});
     $sge->wrapItUp();
@@ -692,10 +739,9 @@ sub compareTaxa{
   # Diagnose the project
   # Make sure this gets printed to stdout
   logmsg "Running set_diagnose.pl";
-  my $diagnosis="$$settings{logdir}/diagnosis.txt";
-  $sge->pleaseExecute("set_diagnose.pl -p $project > $diagnosis 2>&1",{jobname=>"set_diagnose",numcpus=>1});
+  #my $diagnosis="$$settings{logdir}/diagnosis.txt";
+  $sge->pleaseExecute("set_diagnose.pl -p $project 2>&1 | tee --append $$settings{logdir}/launch_set.log",{jobname=>"set_diagnose",numcpus=>1});
   $sge->wrapItUp();
-  system("cat $diagnosis");
 
   return 1;
 }
@@ -720,16 +766,6 @@ sub variantsToMatrix{
   my $infile="'".join("' '",@infile)."'";
   my $inVcf="'".join("' '",@vcf)."'";
 
-  # Find the distance that we'd expect SNP-linkage, so that they can be filtered out
-  #if($$settings{allowedFlanking} eq 'auto'){
-  #  my $allowedFlanking=`snpDistribution.pl @vcf`;
-  #  die if $?;
-  #  chomp($allowedFlanking);
-  #
-  #  # let's make it a little bit more strict actually.
-  #  $$settings{allowedFlanking}=$allowedFlanking*3;
-  #}
-  
   # mergevcf deletes its tmpdir and so we need to make a new one
   my $tmpdir=tempdir("$$settings{tmpdir}/mergevcfXXXXXX",CLEANUP=>0);
 
@@ -741,24 +777,6 @@ sub variantsToMatrix{
   $sge->wrapItUp();
 
   return $pooled;
-}
-
-sub pooledToAlignment{
-  my($pooled,$settings)=@_;
-  $$settings{allowedFlanking}||=0;
-  my $outMsa="$$settings{msadir}/out.aln.fas";
-  if(-e $outMsa){
-    logmsg "Found $outMsa and so I will not remake it";
-    return $outMsa;
-  }
-
-  # Make in order: bcftools matrix; filtered matrix; fasta alignment
-  $sge->pleaseExecute("pooledToMatrix.sh -o $$settings{msadir}/out.bcftoolsquery.tsv $$settings{msadir}/out.pooled.vcf.gz",{jobname=>"pooledToMatrix",numcpus=>1});
-  $sge->pleaseExecute("filterMatrix.pl --allowed $$settings{allowedFlanking} --tempdir $$settings{tmpdir} $$settings{msadir}/out.bcftoolsquery.tsv > $$settings{msadir}/out.filteredbcftoolsquery.tsv",{jobname=>"filterMatrix",numcpus=>1,qsubxopts=>"-hold_jid pooledToMatrix"});
-  $sge->pleaseExecute("matrixToAlignment.pl $$settings{msadir}/out.filteredbcftoolsquery.tsv > $$settings{msadir}/out.aln.fas",{jobname=>"matrixToAlignment",numcpus=>1,qsubxopts=>"-hold_jid filterMatrix"});
-  $sge->wrapItUp();
-
-  return $outMsa;
 }
 
 sub usage{
@@ -777,6 +795,7 @@ sub usage{
     Please visit http://github.com/lskatz/Lyve-SET for more information.
 
     Usage: $0 [project] [-ref reference.fasta|reference.gbk]
+
     If project is not given, then it is assumed to be the current working directory.
     If reference is not given, then it is assumed to be proj/reference/reference.fasta
     -ref      proj/reference/reference.fasta   The reference genome assembly. If it is 
@@ -787,46 +806,57 @@ sub usage{
                                                happen. Using a gbk or embl file is currently
                                                experimental.
 
-    SNP MATRIX OPTIONS
-    --allowedFlanking  $$settings{allowedFlanking} allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
-    --min_alt_frac     $$settings{min_alt_frac}  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
-    --min_coverage     $$settings{min_coverage}  Minimum coverage needed before a SNP is called. Otherwise, 'N'
+    SNP FILTER OPTIONS
+    --allowedFlanking  $$settings{allowedFlanking}allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+    --min_alt_frac     $$settings{min_alt_frac}        The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
+    --min_coverage     $$settings{min_coverage}          Minimum coverage needed before a SNP is called. Otherwise, 'N'
     ";
-    return "$help\n  --help To view more help\n" if(!$$settings{help});
+    return "$help\n  --help To view more help\n\n" if(!$$settings{help});
 
     $help.="
     Where parameters with a / are directories
     LOCATIONS OF FILE DIRECTORIES
-    -reads    $$settings{readsdir} where fastq and fastq.gz files are located
-    --bamdir  $$settings{bamdir} where to put bams
-    --vcfdir  $$settings{vcfdir} where to put vcfs
-    --tmpdir  $$settings{tmpdir} tmp/ Where to put temporary files
-    --msadir  $$settings{msadir} multiple sequence alignment and tree files (final output)
-    --logdir  $$settings{logdir} Where to put log files. Qsub commands are also stored here.
-    --asmdir  $$settings{asmdir} directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
+    -reads      $$settings{readsdir}    where fastq and fastq.gz files are located
+    --bamdir    $$settings{bamdir}    where to put bams
+    --vcfdir    $$settings{vcfdir}    where to put vcfs
+    --tmpdir    $$settings{tmpdir}    tmp/ Where to put temporary files
+    --msadir    $$settings{msadir}    multiple sequence alignment and tree files (final output)
+    --logdir    $$settings{logdir}    Where to put log files. Qsub commands are also stored here.
+    --asmdir    $$settings{asmdir}    directory of assemblies. Copy or symlink the reference genome assembly 
+                                   to use it if it is not already in the raw reads directory
 
     PERFORM CERTAIN STEPS
-    --mask-phages                    Search for and mask phages in the reference genome
-    --mask-cliffs                    Search for and mask 'Cliffs' in pileups
+    --mask-phages                  Search for and mask phages in the reference genome
+    --mask-cliffs                  Search for and mask 'Cliffs' in pileups
+
     SKIP CERTAIN STEPS
-    --nomatrix                       Do not create an hqSNP matrix
-    --nomsa                          Do not make a multiple sequence alignment
-    --notrees                        Do not make phylogenies
-    --singleend                      Treat everything like single-end. Useful for when you think there is a single-end/paired-end bias.
+    --nomatrix                     Do not create an hqSNP matrix
+    --nomsa                        Do not make a multiple sequence alignment
+    --notrees                      Do not make phylogenies
+    --singleend                    Treat everything like single-end. Useful for 
+                                   when you think there is a single-end/paired-end bias.
     OTHER SHORTCUTS
-    --fast                           Shorthand for --downsample --mapper snap --nomask-phages --nomask-cliffs --sample-sites
+    --fast                         Shorthand for --downsample --mapper snap --nomask-phages 
+                                                 --nomask-cliffs --sample-sites
     --presets \"\"                   See presets.conf for more information
-    --downsample                     Downsample all reads to 50x. Approximated according to the ref genome assembly
-    --sample-sites                   Randomly choose a genome and find SNPs in a quick and dirty way. Then on the SNP-calling stage, only interrogate those sites for SNPs for each genome (including the randomly-sampled genome).
+    --downsample                   Downsample all reads to 50x. Approximated according 
+                                   to the ref genome assembly
+    --sample-sites                 Randomly choose a genome and find SNPs in a quick 
+                                   and dirty way. Then on the SNP-calling stage, 
+                                   only interrogate those sites for SNPs for each 
+                                   genome (including the randomly-sampled genome).
     MODULES
-    --read_cleaner $$settings{read_cleaner}   Which read cleaner?  Choices: none, CGP, BayesHammer
-    --mapper       $$settings{mapper}   Which mapper? Choices: smalt, snap, stampy
-    --snpcaller    $$settings{snpcaller}   Which SNP caller? Only choice: varscan
+    --read_cleaner none            Which read cleaner? Choices: none, CGP, BayesHammer
+    --mapper       $$settings{mapper} Which mapper? Choices: smalt, snap, stampy, bowtie2, bwa
+    --snpcaller    $$settings{snpcaller} Which SNP caller? Choices: varscan, vcftools
+
     SCHEDULER AND MULTITHREADING OPTIONS
-    --queue        $$settings{queue}             The default queue to use.
-    --numnodes     $$settings{numnodes}                maximum number of nodes
-    --numcpus      $$settings{numcpus}                 number of cpus
-    --qsubxopts    '-N lyve-set'     Extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
+    --queue        $$settings{queue}           default queue to use
+    --numnodes     $$settings{numnodes}              maximum number of nodes
+    --numcpus      $$settings{numcpus}               number of cpus
+    --qsubxopts    '-N lyve-set'   Extra options to pass to qsub. This is not 
+                                   sanitized; internal options might overwrite yours.
+    --noqsub                       Do not use the scheduler, even if it exists
   ";
   return $help;
 }
