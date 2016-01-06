@@ -11,16 +11,20 @@ use File::Temp qw/tempdir/;
 use Bio::Perl;
 use Bio::FeatureIO;
 
+use threads;
+use Thread::Queue;
+
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
-use LyveSET qw/@fastaExt @fastqExt @bamExt/;
+use LyveSET qw/@fastaExt @fastqExt @bamExt logmsg/;
 use Vcf;
 
-my $samplename="SampleNameUnknown"; # to be changed later
-$0=fileparse $0;
-sub logmsg{print STDERR "$0: @_\n";}
+# I want to make $samplename global in this script,
+# which is a rare decision for me. Its value will be
+# changed later.
+my $samplename="SampleNameUnknown";
+
 exit(main());
- 
 
 sub main{
   my $settings={};
@@ -51,13 +55,14 @@ sub main{
   # Transform the sample name, e.g.,
   # NC001416.fasta.wgsim.fastq.gz-reference.sorted.bam => NC001416.fasta.wgsim
   # sample1.fastq.gz-reference.sorted.bam => sample1
-  $samplename=basename($bam,@bamExt);
-  $samplename=~s/\-$refname$//;
-  $samplename=basename($samplename,@fastqExt,@fastaExt);
-  $samplename=basename($samplename,@fastaExt);
+  $samplename=basename($bam,@bamExt);                    # remove bam extension
+  $samplename=~s/\-$refname$//;                          # remove reference genome name
+  $samplename=basename($samplename,@fastqExt,@fastaExt); # remove fast[aq] extension
+  $samplename=basename($samplename,@fastaExt);           # remove fasta extension
 
   my $vcf=varscan2($bam,$reference,$settings);
-  #backfillVcfValues($vcf,$settings);
+
+  # This script pipes to stdout, so go for it.
   system("cat $vcf");
   die "ERROR: missing tmp vcf file $vcf, or I could not read it" if $?;
 
@@ -66,252 +71,147 @@ sub main{
   return 0;
 }
 
+sub varscanWorker{
+  my($bam,$reference,$regionQueue,$settings)=@_;
+
+  my $TID=threads->tid;
+
+  # Figure out mpileup options
+  my $mpileupxopts="";
+  $mpileupxopts.="-Q 0 -B "; # assume that all reads have been properly filtered at this point and that mappings are good
+  $mpileupxopts.="--positions $$settings{region} " if($$settings{region});
+
+  my $tmpdir=tempdir("$$settings{tempdir}/$samplename/varscanWorker.XXXXXX");
+  my $pileup="$tmpdir/$TID.pileup";
+  my $vcf="$tmpdir/$TID.vcf";
+
+  while(defined(my $region=$regionQueue->dequeue)){
+    # Avoid disk I/O problems by sleeping
+    # a random amount of time in this thread.
+    # The max seconds are equal to the number
+    # of threads.
+    sleep int(rand() * $$settings{numcpus});
+
+    # Run mpileup on this one region
+    my $mpileupCommand="samtools mpileup -f $reference $mpileupxopts --region '$region' $bam > $pileup";
+    system($mpileupCommand);
+    die "ERROR running mpileup on region $region:\n  $mpileupCommand" if $?;
+
+    # Estimate the size of the pileup. If it's zero, then
+    # there will be no SNPs in it and should be skipped.
+    if( -s $pileup){
+      logmsg "There is a pileup in region $region and so I will run varscan";
+    } else {
+      logmsg "No pileup was formed in region $region and so there will be no SNPs. Skipping.";
+      next;
+    }
+
+    # Finally run varscan on the pileup. Bgzip and index the
+    # output file. Later it will be combined with bcftools concat.
+    my $varscanCommand="varscan.sh mpileup2cns $pileup --min-coverage $$settings{coverage} --min-var-freq $$settings{altFreq} --output-vcf 1 --min-avg-qual 0 > $vcf.tmp";
+    system($varscanCommand);
+    die "ERROR with varscan!\n  $varscanCommand" if $?;
+
+    # Rename the sample 
+    open(VCFUNREFINED,"$vcf.tmp") or die "ERROR: could not open $vcf.tmp: $!";
+    open(VCFRENAMED,'>',"$vcf") or die "ERROR: could not open $vcf for writing: $!";
+    while(<VCFUNREFINED>){
+      if(/^#CHROM/){
+        s/Sample1/$samplename/;
+      }
+      print VCFRENAMED $_;
+    }
+    close VCFRENAMED;
+    close VCFUNREFINED;
+
+    # Clean up the tmp file
+    unlink("$vcf.tmp");
+
+    # Compress and index
+    system("bgzip $vcf"); die if $?;
+    system("tabix $vcf.gz"); die if $?;
+
+    # Save the VCF
+    system("mv -v $vcf.gz $vcf.gz.tbi $$settings{tempdir}/$samplename/ >&2");
+    die if $?;
+  }
+
+}
+
 sub varscan2{
   my($bam,$reference,$settings)=@_;
-  my $b=fileparse($bam);
+  # I like to use the shorthand $b for basename, but it is a reserved
+  # variable name in sort{} and so I need to use 'local' instead of 'my'
+  local $b=fileparse($bam);
   my $pileup="$$settings{tempdir}/$b.mpileup";
   return $pileup if(-e $pileup && -s $pileup > 0);
-  logmsg "Creating a pileup $pileup";
 
   # Make sure this whole operation is self-contained
+  # and that the temporary dir exists for this sample.
   my $tmpdir="$$settings{tempdir}/$samplename";
   system("rm -rf $tmpdir");
   mkdir($tmpdir);
+  # Make sure that no other pileup file gets in the way.
+  system("rm -vf $$settings{tempdir}/$b*.mpileup $$settings{tempdir}/$b*.vcf.gz* >&2");
+
+  # Kick off multithreading
+  my $regionQueue=Thread::Queue->new();
+  my @thr;
+  for(0..$$settings{numcpus}-1){
+    $thr[$_]=threads->new(\&varscanWorker,$bam,$reference,$regionQueue,$settings);
+  }
 
   # Figure out any regions
-  my $regions=`makeRegions.pl --numcpus $$settings{numcpus} --numchunks $$settings{numcpus} $bam`;
+  my @regions=`makeRegions.pl --numcpus $$settings{numcpus} --numchunks $$settings{numcpus} $bam`;
+  chomp(@regions);
+  # Add the regions and some thread-terminators to the queue
+  $regionQueue->enqueue(@regions);
+  $regionQueue->enqueue(undef) for(@thr);
+  # When each thread encounters an undef, it will terminate.
+  # When the threads are terminated and joined, we
+  # can continue past this line.
+  for(@thr){
+    $_->join;
+    die "ERROR with thread ".$_->tid if($_->error());
+  }
 
-  # Figure out mpileup options
-  my $xopts="";
-  $xopts.="-Q 0 -B "; # assume that all reads have been properly filtered at this point and that mappings are good
-  $xopts.="--positions $$settings{region} " if($$settings{region});
+  # Sort all subVCFs by their starting position since each one is 
+  # already internally sorted.
+  my @subVcf=glob("$tmpdir/*.vcf.gz");
+  @subVcf=sort{
+    my($chromA,$posA)=firstVcfPos($a);
+    my($chromB,$posB)=firstVcfPos($b);
+    return $chromA cmp $chromB if($chromA ne $chromB);
+    return $posA <=> $posB;
+  } @subVcf;
+  my $subVcf=join(" ",@subVcf);
 
-  # Make sure that no other pileup file gets in the way.
-  system("rm -f $$settings{tempdir}/$b*.mpileup $$settings{tempdir}/$b*.vcf.gz* >&2");
-
-  # Multithread a pileup so that each region gets piped into a file.
-  # Then, these individual files can be combined at a later step.
-  my $command=qq(echo "$regions" | xargs -P $$settings{numcpus} -n 1 -I {} bash -c '
-    echo "MPileup on {}"; 
-    pileup=$tmpdir/\$\$.mpileup;
-    vcf=$tmpdir/\$\$.vcf;
-
-    # Avoid disk I/O problems.
-    sleep \$\[ ( \$RANDOM % $$settings{numcpus} ) + 1  ]
-
-    samtools mpileup -f $reference $xopts --region "{}" $bam > \$pileup;
-    if [ \$? -gt 0 ]; then exit 1; fi;
-    size=\$(wc -c < \$pileup);
-    if [ "\$size" -lt 1 ]; then
-      echo \$pileup is empty. I will not run varscan on it.
-      rm -v \$pileup;
-      exit 0;
-    else
-      echo \$pileup is greater than 0 bytes. I will run varscan on it.
-    fi;
-    varscan.sh mpileup2cns \$pileup --min-coverage $$settings{coverage} --min-var-freq $$settings{altFreq} --output-vcf 1 --min-avg-qual 0 | \\
-    sed "s/Sample1/$samplename/" | \\
-    bgzip -c > \$vcf.gz.tmp && \
-    mv -v \$vcf.gz.tmp \$vcf.gz && \
-    tabix \$vcf.gz
-  ' >&2);
-  logmsg "Running mpileup and varscan:\n  $command";
-  system($command);
-  die "ERROR with xargs and samtools mpileup" if $?;
-
-  # bcftools concat $TEMPDIR/merged.*.vcf.gz | vcf-sort > $TEMPDIR/concat.vcf
-  system("bcftools concat $tmpdir/*.vcf.gz  > $$settings{tempdir}/$b.merged.vcf");
+  # Join all pieces of the sample's vcf. All pieces
+  # have been sorted at this point.
+  system("bcftools concat $subVcf > $$settings{tempdir}/$b.merged.vcf");
   die if $?;
 
   # Make sure everything is cleaned up whenever the script ends
   system("rm -rf $tmpdir");
 
-  #backfillVcfValues("$$settings{tempdir}/merged.vcf",$settings);
-
   return "$$settings{tempdir}/$b.merged.vcf";
 }
 
-sub backfillVcfValues{
-  my($vcfFile,$bam,$settings)=@_;
+# Return the first CHROM and POS in a given vcf.gz.
+sub firstVcfPos{
+  my($vcf,$settings)=@_;
+  my($CHROM,$POS) = ("",0);
 
-  my $excludeSites=readBed($$settings{exclude},$settings) if($$settings{exclude});
-
-  logmsg "Backfilling values in $vcfFile and printing to stdout";
-  my $vcf=Vcf->new(file=>$vcfFile);
-
-  # Reasons a SNP doesn't pass
-  my $fail_lowCoverage="DP$$settings{coverage}";
-  my $fail_lowRefFreq ="RF$$settings{altFreq}";
-  my $fail_lowAltFreq ="AF$$settings{altFreq}";
-  my $fail_indel      ="isIndel";
-  my $fail_masked     ="masked";
-
-  # How was the bam generated?
-  my $mapper="unknown";
-  my $CL="unknown";
-  open(SAMTOOLS,"samtools view -H '$bam' | ") or die "ERROR: could not open $bam with samtools: $!";
-  while(<SAMTOOLS>){
-    next if(!/^\@PG/);
-    chomp;
-    my @F=split /\t/;
-    for(@F){
-      my($key,$value)=split /:/;
-      $mapper=$value if($key eq "ID");
-      $CL=$value if($key eq "CL");
-    }
+  open(VCF,"zcat $vcf | ") or die "ERROR: could not open $vcf: $!";
+  while(<VCF>){
+    next if(/^#/);
+    ($CHROM,$POS)=split(/\t/);
+    last if($CHROM);
   }
-  
-  # Add new headers
-  $vcf->add_header_line({key=>'reference',value=>$$settings{reference}});
-  $vcf->add_header_line({key=>'mapper',value=>$mapper});
-  $vcf->add_header_line({key=>'mapperCL',value=>$CL});
-  $vcf->add_header_line({key=>'FILTER', ID=>$fail_lowCoverage, Description=>"Depth is less than $$settings{coverage}, the user-set coverage threshold"});
-  $vcf->add_header_line({key=>'FILTER', ID=>$fail_lowRefFreq, Description=>"Reference variant consensus is less than $$settings{altFreq}, the user-set threshold"});
-  $vcf->add_header_line({key=>'FILTER', ID=>$fail_lowAltFreq, Description=>"Allele variant consensus is less than $$settings{altFreq}, the user-set threshold"});
-  $vcf->add_header_line({key=>'FILTER', ID=>$fail_indel, Description=>"Indels are not used for analysis in Lyve-SET"});
-  $vcf->add_header_line({key=>'FILTER', ID=>$fail_masked, Description=>"This site was masked using a bed file or other means"});
-
-  # Genotype fields
-  $vcf->add_header_line({key=>'FORMAT', ID=>'AF', Number=>'A', Type=>'Float', Description=>"Allele Frequency"});
-  $vcf->add_header_line({key=>'FORMAT', ID=>'RF', Number=>'A', Type=>'Float', Description=>"Reference Frequency"});
-  $vcf->add_header_line({key=>'FORMAT', ID=>'ADP', Number=>'A', Type=>'Integer', Description=>"Depth of bases with Phred score >= 15"});
-
-  # Remove unwanted headers
-  $vcf->remove_header_line(key=>'INFO',ID=>'ADP');
-
-  # Figure out the coverage depth
-  my $depth=covDepth($bam,$settings);
-
-  # Done with headers; parse them
-  $vcf->parse_header();
-
-  # start printing
-  print $vcf->format_header();
-  while(my $x=$vcf->next_data_hash()){
-    my $posId=$$x{CHROM}.':'.$$x{POS};
-    my $pos=$$x{POS};
-    $$x{gtypes}{$samplename}{DP}=$$depth{$posId} || 0;
-
-    # Only one call is allowed for ALT
-    $$x{ALT}=[$$x{ALT}[0]];
-    $$x{FILTER}=[$$x{FILTER}[0]];
-
-    # It's a SNP if it isn't the same as REF and isn't a dot
-    my $is_snp=0;
-    if($$x{ALT}[0] ne $$x{REF} && $$x{ALT}[0] ne '.'){
-      $is_snp=1;
-    }
-
-    # some info fields belong in format fields (deleted in the next step from INFO)
-    for(qw(ADP)){
-      $$x{gtypes}{$samplename}{$_}=$$x{INFO}{$_};
-    }
-    # I just don't think some fields even belong here
-    for(qw(ADP HET NC HOM WT)){
-      delete($$x{INFO}{$_});
-    }
-
-    # Put in allele frequency for the one accepted ALT
-    # Alternate calls are in the AD field for varscan
-    $$x{gtypes}{$samplename}{AD}||=0;
-    $$x{gtypes}{$samplename}{RD}||=0;
-    $$x{gtypes}{$samplename}{AF}||=0;
-    $$x{gtypes}{$samplename}{RF}||=0;
-    if($$x{gtypes}{$samplename}{ADP} > 0){
-      $$x{gtypes}{$samplename}{AF}=$$x{gtypes}{$samplename}{AD}/$$x{gtypes}{$samplename}{ADP};
-      $$x{gtypes}{$samplename}{RF}=$$x{gtypes}{$samplename}{RD}/$$x{gtypes}{$samplename}{ADP};
-    }
-    # round the frequencies
-    $_=sprintf("%0.3f",$_) for($$x{gtypes}{$samplename}{AF},$$x{gtypes}{$samplename}{RF});
-
-    ###########
-    # MASKING
-    # Mask low coverage
-    if( $$depth{$posId} < $$settings{coverage} ){
-      vcf_markAmbiguous($x,$fail_lowCoverage,$settings);
-    }
-
-    # Mask indels
-    if(length($$x{ALT}[0]) > 1 || length($$x{REF}) > 1){
-      vcf_markAmbiguous($x,$fail_indel,$settings);
-    }
-    # Mask sites that are outright masked
-    if($$excludeSites{$$x{CHROM}}{$pos}){
-      vcf_markAmbiguous($x,$fail_masked,$settings);
-    }
-
-    # Mask low frequency
-    if($is_snp && $$x{gtypes}{$samplename}{AF} < $$settings{altFreq}){
-      vcf_markAmbiguous($x,$fail_lowRefFreq,$settings);
-    }
-    if(!$is_snp && $$x{gtypes}{$samplename}{RF} < $$settings{altFreq}){
-      vcf_markAmbiguous($x,$fail_lowAltFreq,$settings);
-    }
-    # END MASKING
-    ###############
-
-    print $vcf->format_line($x);
-  }
-
-  return 1;
+  close VCF;
+  return($CHROM,$POS);
 }
 
-sub covDepth{
-  my($bam,$settings)=@_;
-  my $depthFile="$bam.depth";
-  my %depth;
-  die if $?;
-  open(IN,"samtools depth '$bam' | ") or die "Could not open $bam in samtools:$!";
-  while(<IN>){
-    my($rseq,$pos,$depth)=split(/\t/);
-    chomp($depth);
-    $depth{$rseq.":".$pos}=$depth;
-  }
-  close IN;
-  return \%depth;
-}
-
-# VCF line manipulations
-sub vcf_markAmbiguous{
-  my($x,$reason,$settings)=@_;
-  my $ucRef=uc($$x{REF}); # uppercase reference, to make it easier for str comparison
-
-  # Figure out the alt allele (N) and the correct genotype integer
-  my $gtInt=0; # for the GT, e.g., 1/1 or 2/2
-  # Mark if it is the reference allele
-  if($ucRef eq $$x{ALT}[0] || $ucRef eq '.'){
-    #shift(@{ $$x{ALT} }); # unnecessary to mark the ref base in ALT
-    $gtInt=0;
-  } else {
-    $gtInt=1;
-  }
-  #push(@{ $$x{ALT} }, "N");
-  $$x{ALT}=["N"];
-  $$x{gtypes}{$samplename}{GT}="$gtInt/$gtInt";
-
-  # empty the filter and then put on the fail reason
-  @{$$x{FILTER}}=() if($$x{FILTER}[0] eq "PASS");
-  push(@{$$x{FILTER}},$reason);
-  #$$x{FILTER}=[$reason];
-}
-
-# Get a hash of seqname->{pos} from a bed file
-sub readBed{
-  my($bed,$settings)=@_;
-
-  my %bed;
-  my $bedin=Bio::FeatureIO->new(-format=>"bed",-file=>$bed);
-  while(my $feat=$bedin->next_feature){
-    my $seqname=$feat->seq_id;
-    my $start=$feat->start;
-    my $end=$feat->end;
-    for my $pos($start..$end){
-      $bed{$seqname}{$pos}=1;
-    }
-  }
-  $bedin->close;
-  return \%bed;
-}
 
 sub usage{
   local $0=fileparse $0;
