@@ -20,7 +20,7 @@ $0=fileparse $0;
 exit main();
 sub main{
   my $settings={ambiguities=>1,invariant=>1, 'invariant-loose'=>1};
-  GetOptions($settings,qw(help ambiguities! invariant! tempdir=s allowed=i mask=s@ invariant-loose!)) or die $!;
+  GetOptions($settings,qw(help ambiguities! invariant! tempdir=s allowed|allowedFlanking=i mask=s@ invariant-loose!)) or die $!;
   die usage() if($$settings{help});
   $$settings{tempdir}||=tempdir("$0XXXXXX",TMPDIR=>1,CLEANUP=>1);
   $$settings{allowed}||=0;
@@ -30,7 +30,16 @@ sub main{
   my($in)=@ARGV;
   $in||=""; # avoid undefined warnings
 
-  logmsg "Filtering for clustered SNPs or any other specified filters";
+  # Explain the settings for this script.
+  my $settingsString="";
+  for (sort {$a cmp $b} keys(%$settings)){
+    my $str=$$settings{$_};
+    if(ref($str) eq 'ARRAY'){
+      $str=join("\t",@$str);
+    }
+    $settingsString.=join("\t=\t",$_,$str)."\n";
+  }
+  logmsg "Filtering and other settings for this script:\n$settingsString";
   filterSites($in,$settings);
 
   return 0;
@@ -220,11 +229,17 @@ sub usage{
   Usage: 
     $0 bcftools.tsv > filtered.tsv
     $0 < bcftools.tsv > filtered.tsv # read stdin
-  --noambiguities      Remove any site with an ambiguity (i.e., complete deletion)
-  --noinvariant        Remove any site whose alts are all equal.
-  --noinvariant-loose  Invokes --noinvariant, but does not consider ambiguities when deciding whether a site is variant
-  --allowed 0          How close SNPs can be from each other before being thrown out
-  --tempdir tmp        temporary directory
-  --mask file.bed      BED-formatted file of regions to exclude. Multiple --mask flags are allowed for multiple bed files.
+  --noambiguities               Remove any site with an ambiguity
+                                (i.e., complete deletion)
+  --noinvariant                 Remove any site whose alts are all equal.
+  --noinvariant-loose           Invokes --noinvariant, but does not consider 
+                                ambiguities when deciding whether a site is 
+                                variant. Sites can consist of only REF and N.
+  --allowed           0         How close SNPs can be from each other before 
+                                being thrown out
+  --tempdir           tmp       temporary directory
+  --mask              file.bed  BED-formatted file of regions to exclude.
+                                Multiple --mask flags are allowed for multiple
+                                bed files.
   "
 }

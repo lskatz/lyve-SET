@@ -19,6 +19,7 @@ use Thread::Queue;
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
 use LyveSET qw/logmsg/;
+$ENV{PATH}="$FindBin::RealBin:$ENV{PATH}";
 
 exit main();
 
@@ -26,11 +27,12 @@ sub main{
   local $0=basename $0;
   my $settings={};
 
-  GetOptions($settings,qw(help prefix=s numcpus=i tempdir=s));
+  GetOptions($settings,qw(help prefix=s numcpus=i tempdir=s allowed|allowedFlanking=i));
   $$settings{prefix}||="./out";
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("XXXXXX",TMPDIR=>1,CLEANUP=>1);
-  
+  $$settings{allowed}||=0;
+
   my($VCF)=@ARGV;
   die usage() if(!$VCF || $$settings{help});
 
@@ -40,14 +42,16 @@ sub main{
   system("pooledToMatrix.sh -o $$settings{prefix}.snpmatrix.tsv $VCF");
   die "ERROR with pooledToMatrix" if $?;
 
-  system("filterMatrix.pl --noinvariant-loose < $snpMatrix > $filteredMatrix");
+  system("filterMatrix.pl --allowedFlanking $$settings{allowed} --noinvariant-loose < $snpMatrix > $filteredMatrix");
   die if $?;
 
   my $unfilteredAlignment="$$settings{prefix}.aln.fasta";
   my $filteredAlignment="$$settings{prefix}.informative.fasta";
+  logmsg "Making an alignment from the larger SNP matrix";
   system("matrixToAlignment.pl < $snpMatrix > $unfilteredAlignment");
   die if $?;
 
+  logmsg "Making an alignment from the smaller variants-only matrix";
   system("matrixToAlignment.pl < $filteredMatrix > $filteredAlignment");
   die if $?;
 
@@ -120,7 +124,8 @@ sub usage{
   local $0=basename $0;
   "Process a pooled VCF and get useful information
   Usage: $0 file.vcf.gz
-  --prefix  ./out     Output file prefix. Default: current working directory
-  --numcpus 1         Number of threads to use
+  --prefix          ./out  Output file prefix. Default: current working directory
+  --numcpus         1      Number of threads to use
+  --allowedFlanking 0      How far apart each SNP has to be (see: filterMatrix.pl)
   "
 }

@@ -4,7 +4,7 @@ use warnings;
 use strict;
 use Data::Dumper;
 use Getopt::Long;
-use File::Basename qw/fileparse basename/;
+use File::Basename qw/fileparse basename dirname/;
 use File::Copy qw/copy move/;
 use threads;
 use Thread::Queue;
@@ -39,7 +39,9 @@ sub readFastqs{
   $regex=~s/^\/|\/$//g; # remove slashes in the regex
   my %fastqPair;
   for my $filename(@$fastq){
-    $filename=~/$regex/;
+    my $b=basename($filename);
+    my $d=dirname($filename);
+    $b=~/$regex/;
     my($basename,$therest)=($1,$2);
     my $readNumber;
     if($therest=~/_R([12])_/){
@@ -50,7 +52,7 @@ sub readFastqs{
       die "ERROR: could not parse the read number from file $filename in the second part of the file =>$therest<=";
     }
 
-    die "ERROR: trying to set $filename as read number $readNumber for $basename, but it already exists as ".$fastqPair{$basename}{$readNumber} if($fastqPair{$basename}{$readNumber});
+    die "ERROR: trying to set $filename as read number $readNumber for $basename, but it already exists as ".$fastqPair{$basename}{$readNumber}."\n".Dumper(\%fastqPair) if($fastqPair{$basename}{$readNumber});
     $fastqPair{$basename}{$readNumber}=$filename;
   }
 
