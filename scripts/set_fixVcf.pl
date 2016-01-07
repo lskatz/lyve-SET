@@ -113,8 +113,14 @@ sub reevaluateSites{
     for($$x{REF}, @{$$x{ALT}}){
       $_=substr($_,0,1);
     }
+
+    # If this is looking at a single sample, then just say that
+    # the whole site passes. Then, modify the FT tag to say
+    # whether it really passes.
+    # The filter field will be reevaluated later in the code
+    # anyway.
     if($type eq 'single'){
-      $$x{FILTER}=['PASS']; # only FT will explain whether a site passes
+      $$x{FILTER}=['PASS'];
     }
 
     # Some format tag modification
@@ -164,8 +170,8 @@ sub reevaluateSites{
       }
       # If they all fail, then the site fails.
       if($numFail>=$numSamples){
-        $$x{FILTER}=['FAIL'];
-        $$x{ALT}=['N'];
+        $$x{FILTER}=['FAIL'];  # Mark a failure
+        $$x{ALT}=['N'];        # Mask the base
       }
     }
 
@@ -186,7 +192,8 @@ sub usage{
   --min_coverage 0
   --min_alt_frac 0
   --type         single  Can be single (default) or multi. For multivcfs, reevaluates
-                         whether an entire site passes and fills in FILTER.
+                         whether an entire site fails for the FILTER column
+                         For single, simply adds FILTER in the FORMAT field.
   "
 }
 
