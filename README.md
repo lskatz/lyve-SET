@@ -41,43 +41,43 @@ To see the help for any script, run it without options or with `--help`.  For ex
                                                experimental.
 
     SNP MATRIX OPTIONS
-    --allowedFlanking  0               allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
-    --min_alt_frac     0.75  The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
-    --min_coverage     10  Minimum coverage needed before a SNP is called. Otherwise, 'N'
+    --allowedFlanking  0              allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
+    --min_alt_frac     0.75           The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
+    --min_coverage     10             Minimum coverage needed before a SNP is called. Otherwise, 'N'
 
     Where parameters with a / are directories
     LOCATIONS OF FILE DIRECTORIES
-    -reads    readsdir/       where fastq and fastq.gz files are located
-    -bam      bamdir/         where to put bams
-    -vcf      vcfdir/         where to put vcfs
-    --tmpdir  tmpdir/         tmp/ Where to put temporary files
-    --msadir  msadir/         multiple sequence alignment and tree files (final output)
-    --logdir  logdir/         Where to put log files. Qsub commands are also stored here.
-    -asm      asmdir/         directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
+    -reads             reads/         where fastq and fastq.gz files are located
+    -bam               bam/           where to put bams
+    -vcf               vcf/           where to put vcfs
+    --tmpdir           tmp/           where to put temporary files
+    --msadir           msa/           multiple sequence alignment and tree files (final output)
+    --logdir           log/           where to put log files. Qsub commands are also stored here.
+    -asm               asm/           directory of assemblies. Copy or symlink the reference genome assembly to use it if it is not already in the raw reads directory
 
     PERFORM CERTAIN STEPS
-    --mask-phages                    Search for and mask phages in the reference genome
-    --mask-cliffs                    Search for and mask 'Cliffs' in pileups
+    --mask-phages                     Search for and mask phages in the reference genome
+    --mask-cliffs                     Search for and mask coverage cliffs in each individual sample
 
     SKIP CERTAIN STEPS
-    --nomatrix                       Do not create an hqSNP matrix
-    --nomsa                          Do not make a multiple sequence alignment
-    --notrees                        Do not make phylogenies
-    --singleend                      Treat everything like single-end. Useful for when you think there is a single-end/paired-end bias.
+    --nomatrix                        Do not create an hqSNP matrix
+    --nomsa                           Do not make a multiple sequence alignment
+    --notrees                         Do not make phylogenies
+    --singleend                       Treat everything like single-end. Useful for when you think there is a single-end/paired-end bias.
     OTHER SHORTCUTS
-    --fast                           Shorthand for --downsample --mapper snap --nomask-phages --nomask-cliffs --sample-sites
-    --presets ""                   See presets.conf for more information
-    --downsample                     Downsample all reads to 50x. Approximated according to the ref genome assembly
-    --sample-sites                   Randomly choose a genome and find SNPs in a quick and dirty way. Then on the SNP-calling stage, only interrogate those sites for SNPs for each genome (including the randomly-sampled genome).
+    --fast                            Shorthand for --downsample --mapper snap --nomask-phages --nomask-cliffs --sample-sites
+    --presets ""                      See presets.conf for more information
+    --downsample                      Downsample all reads to 50x. Approximated according to the ref genome assembly
+    --sample-sites                    Randomly choose a genome and find SNPs in a quick and dirty way. Then on the SNP-calling stage, only interrogate those sites for SNPs for each genome (including the randomly-sampled genome).
     MODULES
-    --read_cleaner  none              Which read cleaner?  Choices: none, CGP, BayesHammer
-    --mapper        smalt             Which mapper? Choices: smalt, snap, stampy
-    --snpcaller     varscan           Which variant filterer? Choice: varscan, vcftools
+    --read_cleaner     none           Which read cleaner?  Choices: none, CGP, BayesHammer
+    --mapper           smalt          Which mapper? Choices: bwa, bowtie2, smalt, snap, stampy
+    --snpcaller        varscan        Which variant filterer? Choice: varscan, vcftools
     SCHEDULER AND MULTITHREADING OPTIONS
-    --queue         all.q             The default queue to use.
-    --numnodes      50                maximum number of nodes
-    --numcpus       1                 number of cpus
-    --qsubxopts     '-N lyve-set'     Extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
+    --queue            all.q          default queue to use
+    --numnodes         50             maximum number of nodes
+    --numcpus          1              number of cpus
+    --qsubxopts        '-N lyve-set'  Extra options to pass to qsub. This is not sanitized; internal options might overwrite yours.
 
 Examples
 ------
