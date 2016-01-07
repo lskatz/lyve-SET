@@ -237,6 +237,7 @@ scripts/bwa:
 lib/datasets/scripts/downloadDataset.pl:
 	rm -rf lib/datasets
 	git clone https://github.com/WGS-standards-and-analysis/datasets.git lib/datasets
+	cd lib/datasets && git checkout be0797662ffa9134f27cacb3b2758d5dac72f0d9
 	for i in lib/datasets/datasets/*.xlsx; do \
 	  perl scripts/excel2tsv.pl $$i; \
 	done;
