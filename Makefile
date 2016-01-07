@@ -166,7 +166,7 @@ scripts/raxmlHPC-PTHREADS: scripts/raxmlHPC
 # been installed and so it shouldn't depend on a file existing and
 # should run no matter what. CPAN will know if the module will be
 # there.
-install-perlModules: lib/lib/perl5/Config/Simple.pm lib/lib/perl5/File/Slurp.pm lib/lib/perl5/Math/Round.pm lib/lib/perl5/Number/Range.pm lib/lib/perl5/Statistics/Distributions.pm lib/lib/perl5/Statistics/Basic.pm lib/lib/perl5/Graph/Centrality/Pagerank.pm lib/lib/perl5/String/Escape.pm lib/lib/perl5/Statistics/LineFit.pm
+install-perlModules: lib/lib/perl5/Config/Simple.pm lib/lib/perl5/File/Slurp.pm lib/lib/perl5/Math/Round.pm lib/lib/perl5/Number/Range.pm lib/lib/perl5/Statistics/Distributions.pm lib/lib/perl5/Statistics/Basic.pm lib/lib/perl5/Graph/Centrality/Pagerank.pm lib/lib/perl5/String/Escape.pm lib/lib/perl5/Statistics/LineFit.pm lib/lib/perl5/Spreadsheet/ParseExcel.pm lib/lib/perl5/Spreadsheet/XLSX.pm
 	@echo "Done with Perl modules"
 lib/lib/perl5/Config/Simple.pm:
 	perl scripts/cpanm --self-contained -L lib Config::Simple
@@ -186,6 +186,10 @@ lib/lib/perl5/String/Escape.pm:
 	perl scripts/cpanm --self-contained -L lib String::Escape
 lib/lib/perl5/Statistics/LineFit.pm:
 	perl scripts/cpanm --self-contained -L lib Statistics::LineFit
+lib/lib/perl5/Spreadsheet/ParseExcel.pm:
+	perl scripts/cpanm --self-contained -L lib Spreadsheet::ParseExcel
+lib/lib/perl5/Spreadsheet/XLSX.pm:
+	perl scripts/cpanm --self-contained -L lib Spreadsheet::XLSX
 
 install-config: config/LyveSET.conf config/presets.conf
 config/LyveSET.conf:
@@ -234,6 +238,6 @@ lib/datasets/scripts/downloadDataset.pl:
 	rm -rf lib/datasets
 	git clone https://github.com/WGS-standards-and-analysis/datasets.git lib/datasets
 	for i in lib/datasets/datasets/*.xlsx; do \
-	  bash lib/datasets/scripts/xlsxToTsv.sh $$i $$i.tsv; \
+	  perl scripts/excel2tsv.pl $$i; \
 	done;
 
