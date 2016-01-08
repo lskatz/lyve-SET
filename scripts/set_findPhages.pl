@@ -126,6 +126,7 @@ sub blastWorker{
   my $tempdir=tempdir("$$settings{tempdir}/phastXXXXXX");
 
   my @range;
+  my $i=2; # uniq counter for modified blast files
   while(defined(my $region=$regionQ->dequeue)){
     # Write the sequence to a file
     my($contig,$startStop)=split(/:/,$region);
@@ -140,7 +141,7 @@ sub blastWorker{
     
     # Read the blast results
     open(BLASTOUT,'<',"$tempdir/bls.out") or die "ERROR: could not open $tempdir/bls.out: $!";
-    open(BLASTOUTMOD,'>',"$tempdir/bls.2.out") or die "ERROR: could not open $tempdir/bls.2.out: $!";
+    open(BLASTOUTMOD,'>',"$tempdir/bls.$i.out") or die "ERROR: could not open $tempdir/bls.2.out: $!";
     while(<BLASTOUT>){
       my ($contig,$hit,$identity,$length,$gaps,$mismatches,$qstart,$qend,$sstart,$send,$e,$score)=split /\t/;
       next if($score < 50 || $length < 100);
@@ -159,6 +160,8 @@ sub blastWorker{
     }
     close BLASTOUT;
     close BLASTOUTMOD;
+
+    $i++;
   }
 
   return \@range;
@@ -175,3 +178,4 @@ sub usage{
                   joined, then do not extend them by this flanking length.
   "
 }
+
