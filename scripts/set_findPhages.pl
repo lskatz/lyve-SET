@@ -2,6 +2,8 @@
 # Author:Lee Katz <lkatz@cdc.gov>
 # Thanks: Darlene Wagner for giving me this idea
 
+require 5.12.0;
+
 use warnings;
 use strict;
 use Getopt::Long;
@@ -11,6 +13,8 @@ use File::Temp qw/tempdir/;
 use List::Util qw/min max/;
 use List::MoreUtils qw(uniq);
 use Bio::Perl;
+use threads;
+use Thread::Queue;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
@@ -22,10 +26,12 @@ local $0=fileparse $0;
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help numcpus=i tempdir=s flanking=i));
+  GetOptions($settings,qw(help numcpus=i tempdir=s flanking=i db|database=s));
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("phastXXXXXX",CLEANUP=>1,TMPDIR=>1);
   $$settings{flanking}||=0;
+  $$settings{db}||="$FindBin::RealBin/../lib/phast/phast.faa";
+  logmsg "Running blastx against $$settings{db}";
 
   my $fasta=$ARGV[0];
   die usage() if(!$fasta || $$settings{help});
@@ -42,10 +48,6 @@ sub main{
 
 sub phast{
   my($fasta,$settings)=@_;
-
-  my $tempdir=tempdir("$$settings{tempdir}/phastXXXXXX",CLEANUP=>1,PREFIX=>$$settings{tempdir});
-  my $db="$FindBin::RealBin/../lib/phast/phast.faa";
-  logmsg "Running blastx against $db";
 
   # longest gene in phast is 8573bp, and all regions produced should have 
   # at least that length just in case.
@@ -64,99 +66,99 @@ sub phast{
   }
   $seqin->close;
 
-  my $i=0;
-  for my $region(@regions){
-    my($contig,$coordinates)=split(/:/,$region);
-    my($start,$stop)=split(/\-/,$coordinates);
-      $stop||=$start;
-
-    # The file name will have the start coordinate as its name
-    my $file="$tempdir/$start.fna";
-    open(SEQOUT,">",$file) or die "ERROR: could not write seq to temp file $file: $!";
-    print SEQOUT ">".$contig."\n".$seq{$contig}->subseq($start,$stop)."\n";
-    close SEQOUT;
-    $i++;
+  # Spawn threads to take care of each fasta file
+  my $regionQ=Thread::Queue->new(@regions);
+  my @thr;
+  for(0..$$settings{numcpus}-1){
+    $thr[$_]=threads->new(\&blastWorker,\%seq,$regionQ,$settings);
+    $regionQ->enqueue(undef); # one terminator per thread
   }
-  my $threadsPerBlast=int($$settings{numcpus}/$i);
-  $threadsPerBlast=1 if($threadsPerBlast<1);
 
-  # Better parallelization: one fasta entry per cpu.
-  # Split the query into multiple files and then figure out
-  # how many cpus per blast job we need.
-
-  # Perform blast on these split files.
-  logmsg "Created blast input query files under $tempdir/*.fna";
-  my $xargsCommand=qq(ls $tempdir/*.fna | xargs -P $$settings{numcpus} -n 1 sh -c '
-    offset=\$(basename \$0 .fna); # Find the coordinate offset from the filename
-    blastx -query \$0 -db $db -evalue 0.05 -outfmt 6 -num_threads $threadsPerBlast -max_target_seqs 200000 |\\
-    perl -lane \"
-      \\\$F[6]+=\$offset; # query coordinate offset
-      \\\$F[7]+=\$offset; # query coordinate offset
-      print join(\\\"\\\t\\\",\@F); # lots of backslashes because of language-inception
-    \" > \$0.bls
-  ');
-  #die $xargsCommand;
-  system($xargsCommand);
-  die "ERROR with blastx: $!" if $?;
-  #my $allResults=`blastx -query '$fasta' -db $db -evalue 0.05 -outfmt 6 -num_threads $$settings{numcpus}`;
-  my @allResults=`cat $tempdir/*.fna.bls`;
-  die "ERROR with cat on $tempdir/*.fna.bls" if($?);
-  warn "No results were returned by blastx" if(!@allResults);
-
-  my $flanking=$$settings{flanking}; #bp
-  logmsg "Parsing results with a soft flanking distance of $flanking";
-  my(%range, %seenRange);
-  for my $result(@allResults){
-    $result=~s/^\s+|\s+$//g; # trim
-    my ($contig,$hit,$identity,$length,$gaps,$mismatches,$qstart,$qend,$sstart,$send,$e,$score)=split /\t/, $result;
-    next if($score < 50 || $length < 100);
-    # Don't bother the Range object if this is a range we've already seen.
-    # This will speed things up since Number::Range is slow, and 
-    # it will happen because each genome region can hit multiple phages.
-    next if($seenRange{$contig}{$qstart}{$qend}++);
-
-    # Make sure there is a range object for this contig.
-    $range{$contig}||=Number::Range->new;
-    my $lo=min($qstart,$qend);
-    my $hi=max($qstart,$qend);
-
-    # Add some coordinates between close hits based on
-    # the flanking distance. Start from high to low
-    # flanking numbers so that the longest range possible
-    # is caught.
-
-    # Flanking for lo
-    my $loSoftFlank=$lo;
-    for(my $i=$flanking;$i>0;$i--){
-      if($range{$contig}->inrange($lo-$i)){
-        $loSoftFlank=$lo-$i;
-        last;
-      }
+  # Make a set of Number::Range objects
+  my %range;
+  # Join together the threads.
+  for(@thr){
+    my $tRange=$_->join;
+    if($_->error()){
+      die "ERROR in TID".$_->tid;
     }
-    # Flanking for hi
-    my $hiSoftFlank=$hi;
-    for(my $i=$flanking;$i>0;$i--){
-      if($range{$contig}->inrange($hi+$i)){
-        $hiSoftFlank=$hi+$i;
-        last;
-      }
-    }
-
+    
+    # Figure out ranges from the threads
     # Add these coordinates to ranges
-    no warnings;
-    $range{$contig}->addrange($loSoftFlank..$hiSoftFlank);
+    my %seen; # ranges that have already been added.
+    for my $r(@$tRange){
+      my($contig,$lo,$hi)=@$r;
+      $range{$contig}||=Number::Range->new();
+
+      # Set up the "soft" flanking.
+      # TODO make this smarter in case this skips over an
+      #      intermediate range
+      if($range{$contig}->inrange($lo - $$settings{flanking})){
+        $lo-=$$settings{flanking};
+      }
+      if($range{$contig}->inrange($hi + $$settings{flanking})){
+        $hi+=$$settings{flanking};
+      }
+
+      # Don't add this range if was also added.
+      # If we can do anything to avoid ->addrange(),
+      # then we should. It is slow.
+      next if($seen{$lo}{$hi}++);
+
+      no warnings;
+      $range{$contig}->addrange($lo..$hi);
+    }
   }
 
-  logmsg "Finished adding coordinate ranges. Now creating a bed format";
-
-  # Translate the ranges found in the Range objects into 
-  # an array of [contig,start,stop]
+  # Range objects to arrays [contig,start,stop]
   my @range;
-  while(my($contig,$rangeObj)=each(%range)){
-    my @rangeList=$rangeObj->rangeList;
-    for(@rangeList){
-      push(@range,[$contig,@$_]);
+  while(my($contig,$obj)=each(%range)){
+    for my $r($obj->rangeList){
+      push(@range,[$contig,@$r]);
     }
+  }
+
+  return \@range;
+}
+
+sub blastWorker{
+  my($seqHash,$regionQ,$settings)=@_;
+  my $tempdir=tempdir("$$settings{tempdir}/phastXXXXXX");
+
+  my @range;
+  while(defined(my $region=$regionQ->dequeue)){
+    # Write the sequence to a file
+    my($contig,$startStop)=split(/:/,$region);
+    my($start,$stop)=split(/-/,$startStop);
+    open(BLASTIN,'>',"$tempdir/in.fna") or die "ERROR: could not open $tempdir/in.fna: $!";
+    print BLASTIN '>'.$$seqHash{$contig}->id."\n".$$seqHash{$contig}->subseq($start,$stop)."\n";
+    close BLASTIN;
+
+    # Blast the sequence
+    system("blastx -query $tempdir/in.fna -db $$settings{db} -evalue 0.05 -outfmt 6 -num_threads 1 -max_target_seqs 200000 > $tempdir/bls.out");
+    die if $?;
+    
+    # Read the blast results
+    open(BLASTOUT,'<',"$tempdir/bls.out") or die "ERROR: could not open $tempdir/bls.out: $!";
+    open(BLASTOUTMOD,'>',"$tempdir/bls.2.out") or die "ERROR: could not open $tempdir/bls.2.out: $!";
+    while(<BLASTOUT>){
+      my ($contig,$hit,$identity,$length,$gaps,$mismatches,$qstart,$qend,$sstart,$send,$e,$score)=split /\t/;
+      next if($score < 50 || $length < 100);
+
+      # Reevaluate where the coordinates start based on the subseq
+      $qstart+=$start;
+      $qend+=$start;
+
+      # Record what happened
+      print BLASTOUTMOD join("\t",$contig,$hit,$identity,$length,$gaps,$mismatches,$qstart,$qend,$sstart,$send,$e,$score);
+
+      # Get hi and lo coordinates
+      my $lo=min($qstart,$qend);
+      my $hi=max($qstart,$qend);
+      push(@range,[$contig,$lo,$hi]);
+    }
+    close BLASTOUT;
+    close BLASTOUTMOD;
   }
 
   return \@range;
