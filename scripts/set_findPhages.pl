@@ -49,7 +49,7 @@ sub phast{
 
   # longest gene in phast is 8573bp, and all regions produced should have 
   # at least that length just in case.
-  my $regions=`makeRegions.pl $fasta --numcpus $$settings{numcpus} --numchunks $$settings{numcpus} --overlapby 8573`;
+  my $regions=`makeRegions.pl $fasta --numcpus $$settings{numcpus} --numchunks $$settings{numcpus} --overlapby 9999`;
   die "ERROR: problem with makeRegions.pl" if $?;
   my @regions=split(/\n/,$regions);
   logmsg "Regions are: ".join(", ",@regions);
@@ -88,7 +88,7 @@ sub phast{
   logmsg "Created blast input query files under $tempdir/*.fna";
   my $xargsCommand=qq(ls $tempdir/*.fna | xargs -P $$settings{numcpus} -n 1 sh -c '
     offset=\$(basename \$0 .fna); # Find the coordinate offset from the filename
-    blastx -query \$0 -db $db -evalue 0.05 -outfmt 6 -num_threads $threadsPerBlast |\\
+    blastx -query \$0 -db $db -evalue 0.05 -outfmt 6 -num_threads $threadsPerBlast -max_target_seqs 200000 |\\
     perl -lane \"
       \\\$F[6]+=\$offset; # query coordinate offset
       \\\$F[7]+=\$offset; # query coordinate offset
@@ -109,7 +109,7 @@ sub phast{
   for my $result(@allResults){
     $result=~s/^\s+|\s+$//g; # trim
     my ($contig,$hit,$identity,$length,$gaps,$mismatches,$qstart,$qend,$sstart,$send,$e,$score)=split /\t/, $result;
-    next if($score < 50 || $length < 20);
+    next if($score < 50 || $length < 100);
     # Don't bother the Range object if this is a range we've already seen.
     # This will speed things up since Number::Range is slow, and 
     # it will happen because each genome region can hit multiple phages.
