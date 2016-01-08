@@ -29,7 +29,7 @@ install: install-prerequisites
 	@echo "Don't forget to include scripts in your PATH"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar scripts/vcffixup lib/phast/phast.faa scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py scripts/bowtie2 scripts/bwa lib/datasets/scripts/downloadDataset.pl
+install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar scripts/vcffixup scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py scripts/bowtie2 scripts/bwa lib/datasets/scripts/downloadDataset.pl
 	@echo DONE installing prerequisites
 
 scripts/vcffilter:
@@ -80,16 +80,6 @@ lib/Schedule/SGELK.pm:
 
 lib/varscan.v2.3.7.jar:
 	wget 'http://downloads.sourceforge.net/project/varscan/VarScan.v2.3.7.jar' -O $@
-
-lib/phast/phast.faa:
-	mkdir -p lib/phast
-	wget http://phast.wishartlab.com/phage_finder/DB/prophage_virus.db -O $@.tmp
-	# Remove redundant sequences in a naive but dependency-less way.
-	# Ideally, I'd want to use cd-hit, but I don't want to introduce
-	# another dependency.
-	perl -MBio::Perl -e 'my %seen=(); $$in=Bio::SeqIO->new(-file=>"$@.tmp",-format=>"fasta"); $$out=Bio::SeqIO->new(-file=>">$@"); while($$seq=$$in->next_seq){next if($$seen{$$seq->seq}++); $$out->write_seq($$seq);}'
-	rm $@.tmp
-	makeblastdb -in $@ -dbtype prot
 
 scripts/samtools:
 	rm -rf build/samtools-1.2* lib/samtools-1.2
