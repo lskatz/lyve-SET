@@ -144,7 +144,7 @@ sub blastWorker{
     open(BLASTOUTMOD,'>',"$tempdir/bls.$i.out") or die "ERROR: could not open $tempdir/bls.2.out: $!";
     while(<BLASTOUT>){
       my ($contig,$hit,$identity,$length,$gaps,$mismatches,$qstart,$qend,$sstart,$send,$e,$score)=split /\t/;
-      next if($score < 50 || $length < 100);
+      next if($score < 400 || $identity < 80); # get really good hits (evalue is already < 0.05)
 
       # Reevaluate where the coordinates start based on the subseq
       $qstart+=$start;
