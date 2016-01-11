@@ -29,7 +29,7 @@ sub main{
   GetOptions($settings,qw(help numcpus=i tempdir=s flanking=i db|database=s));
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("phastXXXXXX",CLEANUP=>1,TMPDIR=>1);
-  $$settings{flanking}||=0;
+  $$settings{flanking}||=500;
   $$settings{db}||="$FindBin::RealBin/../lib/phast/phast.faa";
   logmsg "Running blastx against $$settings{db}";
 
@@ -144,7 +144,7 @@ sub blastWorker{
     open(BLASTOUTMOD,'>',"$tempdir/bls.$i.out") or die "ERROR: could not open $tempdir/bls.2.out: $!";
     while(<BLASTOUT>){
       my ($contig,$hit,$identity,$length,$gaps,$mismatches,$qstart,$qend,$sstart,$send,$e,$score)=split /\t/;
-      next if($score < 400 || $identity < 80); # get really good hits (evalue is already < 0.05)
+      next if($score < 100 || $identity < 80); # get really good hits (evalue is already < 0.05)
 
       # Reevaluate where the coordinates start based on the subseq
       $qstart+=$start;
@@ -172,7 +172,7 @@ sub usage{
   Usage: $0 file.fasta
   --numcpus  1
   --tempdir  /tmp
-  --flanking 0    Give 'soft' edges to ranges. If blast hits are this many
+  --flanking 500  Give 'soft' edges to ranges. If blast hits are this many
                   nt away from another blast hit, then join the ranges and
                   include any intermediate positions. If ranges cannot be
                   joined, then do not extend them by this flanking length.
