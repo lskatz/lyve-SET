@@ -102,7 +102,11 @@ sub filterSites{
     # Mask any site found in the BED files
     $hqSite=0 if(defined($$maskedRanges{$CONTIG}) && $$maskedRanges{$CONTIG}->inrange($POS));
 
-    # High-quality sites are far enough away from each other, as defined by the user
+    # High-quality sites are far enough away from each other, as defined by the user.
+    # This step also assumes that there is a SNP right before the contig starts
+    # and does not allow a SNP to start at the beginning of the contig if --allowed
+    # is turned on.
+    # TODO: have this pseudo SNP at the end of the contig too.
     $hqSite=0 if($POS - $currentPos < $$settings{allowed});
 
     # Simply get rid of any site that consists of all Ns
