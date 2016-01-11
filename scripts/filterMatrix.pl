@@ -108,6 +108,8 @@ sub filterSites{
     # Simply get rid of any site that consists of all Ns
     # TODO make this optional somehow.
     my $is_allNs=1;
+    # TODO test this code with grep
+    #   $is_allNs=0 if(grep(!/N/,@GT));
     for(my $i=0;$i<$numAlts;$i++){
       if($GT[$i]!~/N/i){
         $is_allNs=0;
