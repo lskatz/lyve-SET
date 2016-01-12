@@ -29,7 +29,7 @@ sub main{
   GetOptions($settings,qw(help numcpus=i tempdir=s flanking=i db|database=s));
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("phastXXXXXX",CLEANUP=>1,TMPDIR=>1);
-  $$settings{flanking}||=500;
+  $$settings{flanking}||=2000;
   $$settings{db}||="$FindBin::RealBin/../lib/phast/phast.faa";
   logmsg "Running blastx against $$settings{db}";
 
