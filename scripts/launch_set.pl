@@ -729,7 +729,7 @@ sub compareTaxa{
 
   if($$settings{msa} || $$settings{trees}){
     logmsg "Launching set_processPooledVcf.pl";
-    my $command="set_processPooledVcf.pl $pooled --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} 2>&1 | tee --append $$settings{logdir}/launch_set.log";
+    my $command="set_processPooledVcf.pl $pooled --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} --exclude $$settings{refdir}/maskedRegions.bed 2>&1 | tee --append $$settings{logdir}/launch_set.log";
     logmsg "Processing the pooled VCF\n  $command";
     $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"set_processPooledVcf.pl"});
     $sge->wrapItUp();
