@@ -156,7 +156,7 @@ scripts/raxmlHPC-PTHREADS: scripts/raxmlHPC
 # been installed and so it shouldn't depend on a file existing and
 # should run no matter what. CPAN will know if the module will be
 # there.
-install-perlModules: lib/lib/perl5/Config/Simple.pm lib/lib/perl5/File/Slurp.pm lib/lib/perl5/Math/Round.pm lib/lib/perl5/Number/Range.pm lib/lib/perl5/Statistics/Distributions.pm lib/lib/perl5/Statistics/Basic.pm lib/lib/perl5/Graph/Centrality/Pagerank.pm lib/lib/perl5/String/Escape.pm lib/lib/perl5/Statistics/LineFit.pm lib/lib/perl5/Spreadsheet/ParseExcel.pm lib/lib/perl5/Spreadsheet/XLSX.pm
+install-perlModules: lib/lib/perl5/Config/Simple.pm lib/lib/perl5/File/Slurp.pm lib/lib/perl5/Math/Round.pm lib/lib/perl5/Number/Range.pm lib/lib/perl5/Array/IntSpan.pm lib/lib/perl5/Statistics/Distributions.pm lib/lib/perl5/Statistics/Basic.pm lib/lib/perl5/Graph/Centrality/Pagerank.pm lib/lib/perl5/String/Escape.pm lib/lib/perl5/Statistics/LineFit.pm lib/lib/perl5/Spreadsheet/ParseExcel.pm lib/lib/perl5/Spreadsheet/XLSX.pm
 	@echo "Done with Perl modules"
 lib/lib/perl5/Config/Simple.pm:
 	perl scripts/cpanm --self-contained -L lib Config::Simple
@@ -166,6 +166,8 @@ lib/lib/perl5/Math/Round.pm:
 	perl scripts/cpanm --self-contained -L lib Math::Round
 lib/lib/perl5/Number/Range.pm:
 	perl scripts/cpanm --self-contained -L lib Number::Range
+lib/lib/perl5/Array/IntSpan.pm:
+	perl scripts/cpanm --self-contained -L lib Array::IntSpan
 lib/lib/perl5/Statistics/Distributions.pm:
 	perl scripts/cpanm --self-contained -L lib Statistics::Distributions
 lib/lib/perl5/Statistics/Basic.pm:
