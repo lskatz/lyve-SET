@@ -20,7 +20,8 @@ use FindBin;
 use lib "$FindBin::RealBin/../lib";
 use LyveSET qw/logmsg/;
 use lib "$FindBin::RealBin/../lib/lib/perl5";
-use Number::Range;
+#use Number::Range;
+use Array::IntSpan;
 
 local $0=fileparse $0;
 exit main();
@@ -29,7 +30,7 @@ sub main{
   GetOptions($settings,qw(help numcpus=i tempdir=s flanking=i db|database=s));
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("phastXXXXXX",CLEANUP=>1,TMPDIR=>1);
-  $$settings{flanking}||=2000;
+  $$settings{flanking}||=3000;
   $$settings{db}||="$FindBin::RealBin/../lib/phast/phast.faa";
   logmsg "Running blastx against $$settings{db}";
 
@@ -43,6 +44,7 @@ sub main{
   for my $r(@$ranges){
     print join("\t",@$r)."\n";
   }
+
   return 0;
 }
 
@@ -88,32 +90,45 @@ sub phast{
     my %seen; # ranges that have already been added.
     for my $r(@$tRange){
       my($contig,$lo,$hi)=@$r;
-      $range{$contig}||=Number::Range->new();
+      ##$range{$contig}||=Number::Range->new();
+      $range{$contig}||=Array::IntSpan->new();
 
       # Set up the "soft" flanking.
-      # TODO make this smarter in case this skips over an
-      #      intermediate range
-      if($range{$contig}->inrange($lo - $$settings{flanking})){
-        $lo-=$$settings{flanking};
-      }
-      if($range{$contig}->inrange($hi + $$settings{flanking})){
-        $hi+=$$settings{flanking};
+      my $softLo=$lo;
+      my $softHi=$hi;
+      for(my $i=1;$i<$$settings{flanking};$i+=50){
+        my $loTmp=$lo-$i;
+        my $hiTmp=$hi+$i;
+
+        if($range{$contig}->lookup($loTmp)){
+          $softLo=$loTmp;
+        }
+        if($range{$contig}->lookup($hiTmp)){
+          $softHi=$hiTmp;
+        }
       }
 
-      # Don't add this range if was also added.
-      # If we can do anything to avoid ->addrange(),
-      # then we should. It is slow.
-      next if($seen{$lo}{$hi}++);
+      ## Don't add this range if was also added.
+      ## If we can do anything to avoid ->addrange(),
+      ## then we should. It is slow.
+      ##next if($seen{$lo}{$hi}++);
 
-      no warnings;
-      $range{$contig}->addrange($lo..$hi);
+      ##no warnings;
+      ##$range{$contig}->addrange($lo..$hi);
+      $range{$contig}->set_range($softLo,$softHi,1);
     }
   }
 
   # Range objects to arrays [contig,start,stop]
   my @range;
   while(my($contig,$obj)=each(%range)){
-    for my $r($obj->rangeList){
+    ##for my $r($obj->rangeList){
+    $obj->consolidate();
+    for my $r($obj->get_range_list){
+      # Phages are generally longer than just a gene, 
+      # so skip any puny ranges.
+      my $length=$$r[1] - $$r[0] + 1;
+      #next if($length < 2000);
       push(@range,[$contig,@$r]);
     }
   }
@@ -136,7 +151,7 @@ sub blastWorker{
     close BLASTIN;
 
     # Blast the sequence
-    system("blastx -query $tempdir/in.fna -db $$settings{db} -evalue 0.05 -outfmt 6 -num_threads 1 -max_target_seqs 200000 > $tempdir/bls.out");
+    system("blastx -query $tempdir/in.fna -db $$settings{db} -outfmt 6 -num_threads 1 -max_target_seqs 200000 > $tempdir/bls.out");
     die if $?;
     
     # Read the blast results
@@ -144,7 +159,11 @@ sub blastWorker{
     open(BLASTOUTMOD,'>',"$tempdir/bls.$i.out") or die "ERROR: could not open $tempdir/bls.2.out: $!";
     while(<BLASTOUT>){
       my ($contig,$hit,$identity,$length,$gaps,$mismatches,$qstart,$qend,$sstart,$send,$e,$score)=split /\t/;
-      next if($score < 100 || $identity < 80); # get really good hits (evalue is already < 0.05)
+        # Think of a good minimum identity. Phages are very diverse
+        # but you still want to weed out the awful hits. Remember:
+        # this is in protein space and so lower numbers are still
+        # okay.
+        next if($identity < 50 || $e > 0.05);
 
       # Reevaluate where the coordinates start based on the subseq
       $qstart+=$start;
@@ -172,7 +191,7 @@ sub usage{
   Usage: $0 file.fasta
   --numcpus  1
   --tempdir  /tmp
-  --flanking 500  Give 'soft' edges to ranges. If blast hits are this many
+  --flanking 3000 Give 'soft' edges to ranges. If blast hits are this many
                   nt away from another blast hit, then join the ranges and
                   include any intermediate positions. If ranges cannot be
                   joined, then do not extend them by this flanking length.
