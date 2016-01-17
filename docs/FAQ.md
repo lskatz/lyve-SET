@@ -16,6 +16,6 @@ What are the different ways that SNPs in Lyve-SET have high confidence?
 -----------------------------------------------------------------------
 * **Detection of troublesome regions** such that they are not considered in hqSNP analysis.  Currently in v1.0, only phage genes are detected; however other databases could be added in the future, and also I am open to other suggestions.  Users can also specify a BED-formatted file to describe regions to mask.
 * Only **unambiguous mapping** allowed
-* Default **75% consensus** and **10x** coverage thresholds.  These options can be changed when you launch Lyve-SET.
+* Default **75% consensus** and **4x** coverage thresholds.  These options can be changed when you launch Lyve-SET.  Certain presets (found in `config/presets.conf`) can alter these thresholds.  For example, `--preset salmonella_enterica` invokes 20x/95%.  Additionally, each SNP must have at least two supporting reads in each direction.
 * Mechanisms to **remove clustered SNPs** -- not on by default however.
 * **Maximum likelihood** phylogeny reconstruction. Ascertainment bias is also considered through RAxML v8.
