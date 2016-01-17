@@ -16,8 +16,11 @@ There currently is no way to use an SFF file directly.  These usually come from 
 
 * You can convert your SFF files to fastq using a variety of tools.  Some of these include `sffinfo` from the Newbler package, Flower, or sff2fastq.
 * You can also manually map the reads yourself.  This could be a good option, but it could introduce some bias from the mapper software you use.  If you make the bam file yourself, place it into the `project/bam` directory and name it exactly the way that Lyve-SET would expect it.  In this way, you trick Lyve-SET into thinking that it already produced the bam file so that it will not recreate it and will include it in downstream analysis.
+* You can also assemble the genome and include the assembly only.  See below on how to include an assembly.  This could potentially introduce an assembler bias.
 
-##How do I include an assembly?
+##How do I include an assembly in the analysis?
+
+Copy or symlink the assembly into the `project/asm` folder.  Lyve-SET uses the `samtools` program `wgsim` to simulate reads without introducing any errors.  These simulated reads will appear as `wgsim.fastq.gz` files in the reads directory.  Unfortunately, including assembly files in this way could introduce assembly-based errors.
 
 High-quality-ness
 =================
