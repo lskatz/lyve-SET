@@ -1,13 +1,23 @@
-Reference genomes
-=================
+#Reference genomes
 
-Can I have multiple reference genomes?
---------------------------------------
+##Can I have multiple reference genomes?
+
 No.  However, you can add multiple assemblies to the asm directory.  Assemblies don't have the same error profile as reads and so you might expect some skew in the ultimate phylogeny.
 
-How do I choose a reference genome?
------------------------------------
+##How do I choose a reference genome?
+
 The best reference genome for an outbreak is something in-clade.  You might even need to assemble the genome from your own reads before starting.  An outgroup is not as related to your clade by definition and so it is probably not the best genome to use.  The next best quality is a closed genome, or a genome with a high N50.
+
+#My custom input files
+
+##How do I include an SFF file?
+
+There currently is no way to use an SFF file directly.  These usually come from 454 or Ion Torrent and therefore have a different error profile than Illumina.  Therefore, you might observe some bias if you mix these chemistries.  
+
+* You can convert your SFF files to fastq using a variety of tools.  Some of these include `sffinfo` from the Newbler package, Flower, or sff2fastq.
+* You can also manually map the reads yourself.  This could be a good option, but it could introduce some bias from the mapper software you use.  If you make the bam file yourself, place it into the `project/bam` directory and name it exactly the way that Lyve-SET would expect it.  In this way, you trick Lyve-SET into thinking that it already produced the bam file so that it will not recreate it and will include it in downstream analysis.
+
+##How do I include an assembly?
 
 High-quality-ness
 =================
