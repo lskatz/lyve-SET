@@ -29,11 +29,9 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help tempdir=s numcpus=i min_coverage=i min_alt_frac=s type=s)) or die $!;
+  GetOptions($settings,qw(help tempdir=s numcpus=i min_coverage=i min_alt_frac=s fail-samples fail-sites rename-sample=s filter-ft add-N removed-unused-alt)) or die $!;
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("$0XXXXXX",TMPDIR=>1,CLEANUP=>1);
-  $$settings{type}||='single';
-    $$settings{type}=lc($$settings{type});
   mkdir $$settings{tempdir};
   $$settings{min_coverage}||=0;
   $$settings{min_alt_frac}||=0;
@@ -69,12 +67,25 @@ sub addStandardTags{
   logmsg "Filling in AN and AC, and also missing REF in the vcf";
   
   system(qq(
-    bcftools view $compressedVcf -I |\
-    bcftools plugin fill-AN-AC |\
-    bcftools plugin missing2ref > $v
+    bcftools view $compressedVcf --exclude-types indels |\
+    bcftools plugin fill-AN-AC > $v
     )
   );
   die "ERROR: could not run bcftools plugins on $compressedVcf. This is what plugins are available:\n `bcftools plugin -lv 2>&1`:\n".`bcftools plugin -lv 2>&1` if $?;
+
+  # rename the sample if requested
+  if(my $newname=$$settings{'rename-sample'}){
+    my $samplesFile="$$settings{tempdir}/samples.txt";
+
+    # Bcftools reheader is weird. Need to bgzip and need to
+    # account for bgzip'd output.
+    # Also need to make a samplename file.
+    system("echo '$newname' > $samplesFile"); die if $?;
+    system("bgzip $v && tabix $v.gz");
+    system("bcftools reheader --samples $samplesFile $v.gz | zcat > $v");
+    die "ERROR with renaming the sample" if $?;
+    system("rm -f $v.gz $v.tbi");  # cleanup
+  }
 
   return $v;
 }
@@ -82,7 +93,6 @@ sub addStandardTags{
 sub reevaluateSites{
   my($vcf,$settings)=@_;
   my $v="$$settings{tempdir}/reevaluated.vcf";
-  my $type=$$settings{type};
   logmsg "Reevaluating sites on whether they pass thresholds";
 
   my $altFreq=$$settings{min_alt_frac};
@@ -98,7 +108,8 @@ sub reevaluateSites{
   $vcfObj->add_header_line({key=>'FORMAT', ID=>'FT', Number=>1, Type=>'String', Description=>"Genotype filters using the same codes as the FILTER data element"}) if(!@{ $vcfObj->get_header_line(key=>'FORMAT',ID=>'FT') });
 
   # start printing
-  print OUTVCF $vcfObj->format_header();
+  my $vcfHeader=$vcfObj->format_header();
+  print OUTVCF $vcfHeader;
   while(my $x=$vcfObj->next_data_hash()){
     my $posId=$$x{CHROM}.':'.$$x{POS};
     my $pos=$$x{POS};
@@ -119,18 +130,23 @@ sub reevaluateSites{
     # whether it really passes.
     # The filter field will be reevaluated later in the code
     # anyway.
-    if($type eq 'single'){
-      $$x{FILTER}=['PASS'];
-    }
+    #if($type eq 'single'){
+      #$$x{FILTER}=['PASS'];
+    #}
 
-    # Some format tag modification
+    # Some format tag modification:
+    #   1. Make everything haploid
+    #   2. Add the FT tag
     while(my($samplename,$gtypesHash)=each(%{$$x{gtypes}})){
-      # Convert alleles to haploid
+      # Convert alleles to haploid, eg A/A => A
       $$x{gtypes}{$samplename}{GT}=substr($$x{gtypes}{$samplename}{GT},0,1);
       # Convert FILTER to FT tag
       if(!$$gtypesHash{FT} || $$gtypesHash{FT} eq '.'){
-        $$x{gtypes}{$samplename}{FT}=join(";",@{$$x{FILTER}});
         push(@{ $$x{FORMAT} }, 'FT');
+        # Transfer all FILTER to FT, if requested
+        if($$settings{'filter-ft'}){
+          $$x{gtypes}{$samplename}{FT}=join(";",@{$$x{FILTER}});
+        }
       }
     }
 
@@ -143,9 +159,7 @@ sub reevaluateSites{
          $FREQ=$FREQ/100; # convert to decimal
       # Mask low frequency
       if($FREQ < $altFreq && $FREQ > $inverseAltFreq){
-        for(0 .. $numAlts-1){
-          $$x{gtypes}{$samplename}{FT}='FAIL';
-        }
+        markFailure($x,$samplename,$settings);
       }
       # Mask for low coverage.
       # Figure out what the depth is using some common depth definitions.
@@ -162,7 +176,6 @@ sub reevaluateSites{
     ########################
 
     # Reevaluate whether this whole site passes.
-    if($type eq 'multi'){
       # Count how many samples fail at this site.
       my $numFail=0;
       while(my($samplename,$gtypesHash)=each(%{$$x{gtypes}})){
@@ -173,7 +186,6 @@ sub reevaluateSites{
         $$x{FILTER}=['FAIL'];  # Mark a failure
         $$x{ALT}=['N'];        # Mask the base
       }
-    }
 
     # Done! Print the modified line.
     print OUTVCF $vcfObj->format_line($x);
@@ -181,6 +193,45 @@ sub reevaluateSites{
   close OUTVCF;
 
   return $v;
+}
+
+sub markFailure{
+  my($x,$samplename,$settings)=@_;
+
+  # Mark which alt is the number pertaining to N
+  my $nOrdinal;
+  for(my $i=0;$i<@{$$x{ALT}};$i++){
+    if(uc($$x{ALT}) eq 'N'){
+      $nOrdinal=$i;
+      last;
+    }
+  }
+  # Add "N" if not defined since we have to mark
+  # something as a failure.
+  if(!defined($nOrdinal)){
+    push(@{$$x{ALT}},'N');
+    $nOrdinal=scalar(@{$$x{ALT}}) - 1;
+  }
+
+  # Fail a site if requested
+  if($$settings{'fail-sites'}){
+    $$x{FILTER}='FAIL';
+    $$x{ALT}=['N'];
+    # also mark each GT as the masked base
+  }
+  # Fail a sample at this site if requested
+  if($$settings{'fail-samples'}){
+    # Mark this sample as failing.
+    $$x{gtypes}{$samplename}{FT}='FAIL';
+    # Set the gtype equal to N.
+    $$x{gtypes}{$samplename}{GT}=$nOrdinal;
+  }
+  if($$settings{'add-N'}){
+    
+  }
+  if($$settings{'remove-unused-alt'}){
+    
+  }
 }
 
 sub usage{
@@ -191,9 +242,16 @@ sub usage{
   --numcpus      1
   --min_coverage 0
   --min_alt_frac 0
-  --type         single  Can be single (default) or multi. For multivcfs, reevaluates
-                         whether an entire site fails for the FILTER column
-                         For single, simply adds FILTER in the FORMAT field.
+  --rename-sample ''     Rename the sample name to something. Assumes
+                         that there is a single sample.
+  --filter-ft            Before a site is evaluated, transfer values from
+                         FILTER to the FT tag for each sample.
+  --fail-sites           If a site fails, add FAIL under the FEATURE column
+  --fail-samples         If a site fails, add FAIL under the FT tag for
+                         the sample(s)
+  --remove-unused-alt    After a site has been evaluated, if an ALT's
+                         value is no sample's GT, remove it.
   "
+  #--add-N                If a site or a sample fails, add N as an ALT
 }
 
