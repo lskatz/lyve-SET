@@ -29,13 +29,20 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help tempdir=s numcpus=i min_coverage=i min_alt_frac=s fail-samples fail-sites rename-sample=s filter-ft add-N removed-unused-alt)) or die $!;
+  GetOptions($settings,qw(help tempdir=s numcpus=i min_coverage=i min_alt_frac=s fail-samples fail-sites rename-sample=s filter-ft add-N remove-unused-alt type=s)) or die $!;
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("$0XXXXXX",TMPDIR=>1,CLEANUP=>1);
   mkdir $$settings{tempdir};
   $$settings{min_coverage}||=0;
   $$settings{min_alt_frac}||=0;
   die "ERROR: min_alt_frac must be between 0 and 1, inclusive" if($$settings{min_alt_frac} < 0 || $$settings{min_alt_frac} > 1);
+  $$settings{type} && logmsg "WARNING: --type is no longer used in Lyve-SET >= v1.3";
+
+  # If the user wants to mess with samples' FT tags,
+  # then filter-to-FT needs to be turned on.
+  if($$settings{'fail-samples'}){
+    $$settings{'filter-ft'}=1;
+  }
 
   my $VCF=$ARGV[0];
   die usage() if(!$VCF || $$settings{help});
@@ -110,7 +117,9 @@ sub reevaluateSites{
   # start printing
   my $vcfHeader=$vcfObj->format_header();
   print OUTVCF $vcfHeader;
+  my $posCounter=0;
   while(my $x=$vcfObj->next_data_hash()){
+    $posCounter++;
     my $posId=$$x{CHROM}.':'.$$x{POS};
     my $pos=$$x{POS};
     my $numAlts=scalar(@{$$x{ALT}});
@@ -167,28 +176,35 @@ sub reevaluateSites{
       $$x{gtypes}{$samplename}{DP}||=$$x{gtypes}{$samplename}{SDP} || $$x{gtypes}{$samplename}{ADP} || 0;
       $$x{gtypes}{$samplename}{DP}=0 if($$x{gtypes}{$samplename}{DP} eq '.');
       if($$x{gtypes}{$samplename}{DP} < $$settings{min_coverage}){
-        for(0 .. $numAlts-1){
-          $$x{gtypes}{$samplename}{FT}='FAIL';
-        }
+        markFailure($x,$samplename,$settings);
       }
     }
     # END MASKING
     ########################
 
     # Reevaluate whether this whole site passes.
-      # Count how many samples fail at this site.
-      my $numFail=0;
-      while(my($samplename,$gtypesHash)=each(%{$$x{gtypes}})){
-        $numFail++ if($$gtypesHash{FT} ne 'PASS');
-      }
-      # If they all fail, then the site fails.
-      if($numFail>=$numSamples){
-        $$x{FILTER}=['FAIL'];  # Mark a failure
-        $$x{ALT}=['N'];        # Mask the base
-      }
+    # Count how many samples fail at this site.
+    my $numFail=0;
+    while(my($samplename,$gtypesHash)=each(%{$$x{gtypes}})){
+      $numFail++ if($$gtypesHash{FT} ne 'PASS');
+    }
+    # If they all fail, then the site fails.
+    if($numFail==$numSamples){
+      $$x{FILTER}=['FAIL'];  # Mark a failure
+      $$x{ALT}=['N'];        # Mask the base
+    }
+
+    # Remove alternate bases that are not used.
+    # If there is more than one alt, and a dot
+    # is one of the ALT values, remove it.
+    removeUnusedAlts($x,$settings) if($$settings{'remove-unused-alt'});
 
     # Done! Print the modified line.
     print OUTVCF $vcfObj->format_line($x);
+    
+    if($posCounter % reportEvery == 0){
+      logmsg "Looked at $posCounter positions so far";
+    }
   }
   close OUTVCF;
 
@@ -198,40 +214,91 @@ sub reevaluateSites{
 sub markFailure{
   my($x,$samplename,$settings)=@_;
 
+  # Figure out how many samples there are
+  #my $numSamples=scalar(values(%{$$x{gtypes}}));
+  my $numAlts=scalar(@{$$x{ALT}});
+
   # Mark which alt is the number pertaining to N
-  my $nOrdinal;
-  for(my $i=0;$i<@{$$x{ALT}};$i++){
-    if(uc($$x{ALT}) eq 'N'){
-      $nOrdinal=$i;
-      last;
-    }
+  # or any other nucleotide.
+  # By VCF rules, REF is the zeroth ALT.
+  my %ordinal=($$x{REF}=>0);
+  for(my $i=0;$i<$numAlts;$i++){
+    $ordinal{$$x{ALT}[$i]}=$i+1;
   }
   # Add "N" if not defined since we have to mark
-  # something as a failure.
-  if(!defined($nOrdinal)){
+  # something as a failure for this subroutine.
+  if(!$ordinal{N}){
+    $ordinal{N}=$numAlts;
     push(@{$$x{ALT}},'N');
-    $nOrdinal=scalar(@{$$x{ALT}}) - 1;
+    $numAlts++;
   }
 
   # Fail a site if requested
   if($$settings{'fail-sites'}){
     $$x{FILTER}='FAIL';
-    $$x{ALT}=['N'];
     # also mark each GT as the masked base
+    while(my($name,$tagHash)=each(%{$$x{gtypes}})){
+      $$x{gtypes}{$name}{GT}=$ordinal{N};
+    }
   }
   # Fail a sample at this site if requested
   if($$settings{'fail-samples'}){
     # Mark this sample as failing.
     $$x{gtypes}{$samplename}{FT}='FAIL';
     # Set the gtype equal to N.
-    $$x{gtypes}{$samplename}{GT}=$nOrdinal;
+    $$x{gtypes}{$samplename}{GT}=$ordinal{N};
   }
+
+  # TODO 
   if($$settings{'add-N'}){
     
   }
-  if($$settings{'remove-unused-alt'}){
-    
+}
+
+# Remove alternate bases that are not used.
+# If there is more than one alt, and a dot
+# is one of the ALT values, remove it.
+sub removeUnusedAlts{
+  my($x,$settings)=@_;
+  my $altHash=altHash($x,$settings);
+  my %unusedAlt=%$altHash;       # mark which ALTs are unused in the loop
+  delete($unusedAlt{$$x{REF}});  # Delete the ref from consideration
+  # Mark which ALTs are in common with GTs
+  while(my($samplename,$gtypesHash)=each(%{$$x{gtypes}})){
+    # Delete either the ordinal of the nucleotide in the GT tag.
+    delete($unusedAlt{$$x{ALT}[$$gtypesHash{GT}-1]});
   }
+  
+  # For each unused ALT, delete it from the VCF position.
+  # This has to be done in reverse-ordinal position such that
+  # the splice doesn't trip over itself.
+  die "TODO: test this!";
+  for my $ordinal(sort{$unusedAlt{$b} <=> $unusedAlt{$a} } keys(%unusedAlt)){
+    splice(@{$$x{ALT}},$ordinal,1);
+  }
+}
+
+sub altHash{
+  my($x,$settings)=@_;
+  
+  my @ALT=@{$$x{ALT}};
+  my $numAlts=@ALT;
+  # Mark which alt is the number pertaining to N
+  # or any other nucleotide.
+  # By VCF rules, REF is the zeroth ALT.
+  my %ordinal=($$x{REF}=>0);
+  for(my $i=0;$i<$numAlts;$i++){
+    $ordinal{$$x{ALT}[$i]}=$i+1;
+  }
+  # Add "N" if not defined since we have to mark
+  # something as a failure for this subroutine.
+  if(!$ordinal{N}){
+    $ordinal{N}=$numAlts;
+    push(@{$$x{ALT}},'N');
+  }
+
+  return %ordinal if wantarray;
+  return \%ordinal;
 }
 
 sub usage{
@@ -239,7 +306,7 @@ sub usage{
   will also reevaluate sites on whether they have passed filters using the FT tag.
   However, the FILTER field will simply be set to 'PASS'.
   Usage: $0 file.vcf.gz > fixed.vcf
-  --numcpus      1
+  --numcpus      1       Num CPUS currently has no effect on this script.
   --min_coverage 0
   --min_alt_frac 0
   --rename-sample ''     Rename the sample name to something. Assumes
@@ -248,7 +315,7 @@ sub usage{
                          FILTER to the FT tag for each sample.
   --fail-sites           If a site fails, add FAIL under the FEATURE column
   --fail-samples         If a site fails, add FAIL under the FT tag for
-                         the sample(s)
+                         the sample(s). Invokes --filter-ft.
   --remove-unused-alt    After a site has been evaluated, if an ALT's
                          value is no sample's GT, remove it.
   "
