@@ -704,6 +704,7 @@ sub indexAndCompressVcf{
   my $j={};
   eval{
     $j=$sge->pleaseExecute("
+      set_fixVcf.pl --min_alt_frac $$settings{min_alt_frac} --min_coverage $$settings{min_coverage} '$vcf' > $vcf.reevaluated && mv '$vcf.reevaluated' '$vcf' && \
       vcf-sort < '$vcf' > '$vcf.sorted.tmp' && mv '$vcf.sorted.tmp'  '$vcf' && \
       bgzip -f '$vcf' && tabix '$vcf.gz'
     ",{qsubxopts=>"-hold_jid $holdjid",jobname=>"sortAndCompress",numcpus=>1});
@@ -728,7 +729,7 @@ sub compareTaxa{
 
   if($$settings{msa} || $$settings{trees}){
     logmsg "Launching set_processPooledVcf.pl";
-    my $command="set_processPooledVcf.pl $pooled --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} 2>&1 | tee --append $$settings{logdir}/launch_set.log";
+    my $command="set_processPooledVcf.pl $pooled --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} --exclude $$settings{refdir}/maskedRegions.bed 2>&1 | tee --append $$settings{logdir}/launch_set.log";
     logmsg "Processing the pooled VCF\n  $command";
     $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"set_processPooledVcf.pl"});
     $sge->wrapItUp();
@@ -852,12 +853,11 @@ sub usage{
 
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue        $$settings{queue}           default queue to use
-    --numnodes     $$settings{numnodes}              maximum number of nodes
-    --numcpus      $$settings{numcpus}               number of cpus
+    --numnodes     $$settings{numnodes}              maximum number of computer nodes on the scheduler
+    --numcpus      $$settings{numcpus}               number of cpus per node
     --qsubxopts    '-N lyve-set'   Extra options to pass to qsub. This is not 
                                    sanitized; internal options might overwrite yours.
     --noqsub                       Do not use the scheduler, even if it exists
   ";
   return $help;
 }
-
