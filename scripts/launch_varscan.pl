@@ -108,21 +108,16 @@ sub varscanWorker{
 
     # Finally run varscan on the pileup. Bgzip and index the
     # output file. Later it will be combined with bcftools concat.
-    my $varscanCommand="varscan.sh mpileup2cns $pileup --min-coverage $$settings{coverage} --min-var-freq $$settings{altFreq} --output-vcf 1 --min-avg-qual 0 > $vcf.tmp";
+    my $varscanCommand="varscan.sh mpileup2cns $pileup --min-coverage $$settings{coverage} --min-var-freq $$settings{altFreq} --output-vcf 1 --min-avg-qual 0 > $vcf.tmp.vcf";
     system($varscanCommand);
     die "ERROR with varscan!\n  $varscanCommand" if $?;
 
-    # Rename the sample 
-    open(VCFUNREFINED,"$vcf.tmp") or die "ERROR: could not open $vcf.tmp: $!";
-    open(VCFRENAMED,'>',"$vcf") or die "ERROR: could not open $vcf for writing: $!";
-    while(<VCFUNREFINED>){
-      if(/^#CHROM/){
-        s/Sample1/$samplename/;
-      }
-      print VCFRENAMED $_;
-    }
-    close VCFRENAMED;
-    close VCFUNREFINED;
+    system("bgzip $vcf.tmp.vcf && tabix $vcf.tmp.vcf.gz");
+    die if $?;
+    
+    # Fix the VCF and rename the sample
+    system("set_fixVcf.pl --numcpus 1 --min_coverage $$settings{coverage} --min_alt_frac $$settings{altFreq} --fail-samples --fail-sites --rename-sample $samplename $vcf.tmp.vcf.gz > $vcf");
+    die if $?;
 
     # Clean up the tmp file
     unlink("$vcf.tmp");
