@@ -179,15 +179,18 @@ sub main{
   #####################################
   # Finished major steps              #
   #####################################
-
+  
+  # Make an output directory
+  # TODO: put 'out' into set_manage.pl
+  mkdir "$project/out";
   # Find the output files
-  my $absDir=rel2abs($$settings{msadir}); # save the abs. path
+  #my $absDir=rel2abs($$settings{msadir}); # save the abs. path
   my $outPrefix="$project/out"; # consistent output naming
-  symlink("$absDir/out.RAxML_bipartitions","$outPrefix.dnd") if(-e "$absDir/out.RAxML_bipartitions");
-  symlink("$absDir/out.filteredMatrix.tsv","$outPrefix.matrix.tsv") if(-e "$absDir/out.filteredMatrix.tsv");
-  symlink("$absDir/out.informative.fasta","$outPrefix.fasta") if(-e "$absDir/out.informative.fasta");
-  symlink("$$settings{msadir}/out.pairwise.tsv","$outPrefix.pairwise.tallskinny.tsv") if(-e "$absDir/out.pairwise.tsv");
-  symlink("$$settings{msadir}/out.pairwiseMatrix.tsv","$outPrefix.pairwise.matrix.tsv") if(-e "$absDir/out.pairwiseMatrix.tsv");
+  symlink("../msa/out.RAxML_bipartitions","$outPrefix/RAxML.dnd");
+  symlink("../msa/out.filteredMatrix.tsv","$outPrefix/snpmatrix.tsv");
+  symlink("../msa/out.informative.fasta","$outPrefix/snp.aln.fasta");
+  symlink("../msa/out.pairwise.tsv","$outPrefix/pairwise.tsv");
+  symlink("../msa/out.pairwiseMatrix.tsv","$outPrefix/pairwise.matrix.tsv");
 
   my $stopTimestamp=time();
   logmsg "Finished at ".strftime("\%F \%T",localtime());
