@@ -704,7 +704,7 @@ sub indexAndCompressVcf{
   my $j={};
   eval{
     $j=$sge->pleaseExecute("
-      set_fixVcf.pl --min_alt_frac $$settings{min_alt_frac} --min_coverage $$settings{min_coverage} '$vcf' > $vcf.reevaluated && mv '$vcf.reevaluated' '$vcf' && \
+      set_fixVcf.pl --fail-sites --fail-samples --min_alt_frac $$settings{min_alt_frac} --min_coverage $$settings{min_coverage} '$vcf' > $vcf.reevaluated && mv '$vcf.reevaluated' '$vcf' && \
       vcf-sort < '$vcf' > '$vcf.sorted.tmp' && mv '$vcf.sorted.tmp'  '$vcf' && \
       bgzip -f '$vcf' && tabix '$vcf.gz'
     ",{qsubxopts=>"-hold_jid $holdjid",jobname=>"sortAndCompress",numcpus=>1});

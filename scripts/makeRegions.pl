@@ -155,9 +155,9 @@ sub vcfLengths{
   my %max; # used for any of the next methods
 
   # See if bcftools can help find the length if the ref is not found
-  my $bcftoolsIndex=`bcftools index -s '$vcf' 2>/dev/null`;
+  my @bcftoolsIndex=`bcftools index --stats '$vcf' 2>/dev/null`;
   #logmsg "ERROR with command => bcftools index -s '$vcf'\n  $0 @ARGV" if $?;
-  for(split(/\n/,$bcftoolsIndex)){
+  for(@bcftoolsIndex){
     chomp;
     my($seqname,$start,$stop)=split /\t/;
     $max{$seqname}=$stop;
@@ -167,6 +167,17 @@ sub vcfLengths{
   #die "ERROR: could not determine contig lengths for $vcf using either the ##reference tag nor 'bcftools index -s'";
 
   #die Dumper "ERROR",\%max;
+
+  # If bcftools gives that BS error that it can't find the 
+  # lengths of contigs with --stats, then try bcftools query
+  # after figuring out what contigs are present with tabix.
+  my @CHR=`tabix -l '$vcf'`;
+  chomp(@CHR);
+  for my $seqname(@CHR){
+    my $maxPos=`bcftools query -f '%POS\\n' -r '$seqname' '$vcf' | tail -n 1`;
+    $max{$seqname}=$maxPos+0;
+  }
+  return \%max if(keys(%max)>0);
 
   # If a reference is not found and bcftools didn't come through, 
   # then just find the coordinates in the file itself (slow step).

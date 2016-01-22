@@ -76,7 +76,14 @@ echo "$script: temporary directory is $TEMPDIR";
 echo "$script: Running bcftools merge";
 export IN;
 export script;
-echo "$REGION" | xargs -P $NUMCPUS -n 1 -I {} bash -c 'echo "$script: merging SNPs in {}"; out='$TEMPDIR'/merged.$$.vcf; bcftools merge --merge all --regions "{}" --force-samples -o $out $IN && bgzip $out && tabix $out.gz && echo "$script: finished with region {}";'
+echo "$REGION" | xargs -P $NUMCPUS -n 1 -I {} bash -c '
+  echo "$script: merging SNPs in {}"; 
+  out='$TEMPDIR'/merged.$$.vcf; 
+  bcftools merge --apply-filters PASS --merge all --regions "{}" --force-samples -o $out $IN && \
+  bgzip $out && \
+  tabix $out.gz && \
+  echo "$script: finished with region {}";
+'
 if [ $? -gt 0 ]; then
   echo "$script: ERROR with bcftools merge"
   rm -rvf $TEMPDIR;
