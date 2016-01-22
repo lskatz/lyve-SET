@@ -62,7 +62,7 @@ sub main{
 
   my $pairwise="$$settings{prefix}.pairwise.tsv";
   my $pairwiseMatrix="$$settings{prefix}.pairwiseMatrix.tsv";
-  system("pairwiseDistances.pl --numcpus $$settings{numcpus} < $filteredAlignment | sort -k3,3n | tee $pairwise | pairwiseTo2d.pl > $pairwiseMatrix");
+  system("pairwiseDistances.pl --numcpus $$settings{numcpus} < $unfilteredAlignment | sort -k3,3n | tee $pairwise | pairwiseTo2d.pl > $pairwiseMatrix");
   die if $?;
 
   my $numSamples=`grep -c ">" $filteredAlignment` + 0;
