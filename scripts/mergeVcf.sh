@@ -102,11 +102,8 @@ fi
 # Run fixVcf.pl so that if all the samples in a site failed,
 # then the site fails.
 #bgzip $TEMPDIR/concat.vcf && tabix $TEMPDIR/concat.vcf.gz && \
-set_fixVcf.pl --pass-until-fail $TEMPDIR/concat.vcf > $TEMPDIR/fixed.vcf && \
-mv $TEMPDIR/fixed.vcf $TEMPDIR/concat.vcf
-
-# Cleanup
-rm -f $TEMPDIR/concat.vcf.gz*
+#set_fixVcf.pl $TEMPDIR/concat.vcf > $TEMPDIR/fixed.vcf && \
+#mv $TEMPDIR/fixed.vcf $TEMPDIR/concat.vcf
 
 # Generate a SNPs-only merged file, if requested
 if [ "$ALSOSNPS" == 1 ]; then
