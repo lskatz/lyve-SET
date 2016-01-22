@@ -79,7 +79,7 @@ export script;
 echo "$REGION" | xargs -P $NUMCPUS -n 1 -I {} bash -c '
   echo "$script: merging SNPs in {}"; 
   out='$TEMPDIR'/merged.$$.vcf; 
-  bcftools merge --apply-filters PASS --merge all --regions "{}" --force-samples -o $out $IN && \
+  bcftools merge --merge all --regions "{}" --force-samples -o $out $IN && \
   bgzip $out && \
   tabix $out.gz && \
   echo "$script: finished with region {}";
