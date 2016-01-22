@@ -44,6 +44,7 @@ if [ "$TEMPDIR" == "" ]; then
   TEMPDIR=$(mktemp --directory /tmp/mergeVcf.XXXXXX);
 fi
 mkdir -pv "$TEMPDIR"; # just in case
+export TEMPDIR;
 
 REGIONSFILE="$TEMPDIR/regions.txt";
 touch $REGIONSFILE; #make sure this file is accessible
@@ -75,7 +76,14 @@ echo "$script: temporary directory is $TEMPDIR";
 echo "$script: Running bcftools merge";
 export IN;
 export script;
-echo "$REGION" | xargs -P $NUMCPUS -n 1 -I {} bash -c 'echo "$script: merging SNPs in {}"; out='$TEMPDIR'/merged.$$.vcf; bcftools merge --merge all --regions "{}" --force-samples -o $out $IN && bgzip $out && tabix $out.gz && echo "$script: finished with region {}";'
+echo "$REGION" | xargs -P $NUMCPUS -n 1 -I {} bash -c '
+  echo "$script: merging SNPs in {}"; 
+  out='$TEMPDIR'/merged.$$.vcf; 
+  bcftools merge --merge all --regions "{}" --force-samples -o $out $IN && \
+  bgzip $out && \
+  tabix $out.gz && \
+  echo "$script: finished with region {}";
+'
 if [ $? -gt 0 ]; then
   echo "$script: ERROR with bcftools merge"
   rm -rvf $TEMPDIR;
@@ -90,6 +98,12 @@ if [ $? -gt 0 ]; then
   rm -rvf $TEMPDIR;
   exit 1;
 fi
+
+# Run fixVcf.pl so that if all the samples in a site failed,
+# then the site fails.
+#bgzip $TEMPDIR/concat.vcf && tabix $TEMPDIR/concat.vcf.gz && \
+#set_fixVcf.pl $TEMPDIR/concat.vcf > $TEMPDIR/fixed.vcf && \
+#mv $TEMPDIR/fixed.vcf $TEMPDIR/concat.vcf
 
 # Generate a SNPs-only merged file, if requested
 if [ "$ALSOSNPS" == 1 ]; then
@@ -111,7 +125,7 @@ for VCF in $TEMPDIR/concat.vcf $TEMPDIR/hqPos.vcf; do
   fi;
 
   echo "$script: Sorting $VCF and removing indels";
-  bcftools annotate --include '%TYPE!="indel" && %FILTER!="isIndel"' < $VCF > $VCF.tmp && mv $VCF.tmp $VCF;
+  bcftools annotate --include '%TYPE!="indel"' < $VCF > $VCF.tmp && mv $VCF.tmp $VCF;
 
   echo "$script: compressing $VCF";
   bgzip $VCF

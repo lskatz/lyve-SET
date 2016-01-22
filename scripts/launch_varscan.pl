@@ -115,7 +115,9 @@ sub varscanWorker{
     system("bgzip $vcf.tmp.vcf && tabix $vcf.tmp.vcf.gz");
     die if $?;
     
-    # Fix the VCF and rename the sample
+    # Fix the VCF and rename the sample.
+    # Just do one CPU since this is already being
+    # called in a worker thread.
     system("set_fixVcf.pl --numcpus 1 --min_coverage $$settings{coverage} --min_alt_frac $$settings{altFreq} --fail-samples --fail-sites --rename-sample $samplename $vcf.tmp.vcf.gz > $vcf");
     die if $?;
 
