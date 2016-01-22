@@ -275,6 +275,12 @@ sub fixVcfLine{
   # Innocent until proven guilty
   if($$settings{'pass-until-fail'}){
     $y{FILTER}=['PASS'];
+  } else {
+    # If we are not assuming innocent until guilty,
+    # and if there is no value set yet, then it is FAIL
+    if(!defined($y{FILTER}[0]) || $y{FILTER}[0] eq '.'){
+      $y{FILTER}=['FAIL'];
+    }
   }
 
   # Fix up the samples' tags
@@ -290,7 +296,7 @@ sub fixVcfLine{
     if(!$y{gtypes}{$samplename}{FT}){
       push(@{ $y{FORMAT} }, 'FT');
       # must set a default value in case it doesn't get set
-      $y{gtypes}{$samplename}{FT}='.';
+      $y{gtypes}{$samplename}{FT}='FAIL';
     }
     # Convert FILTER to FT tag
     if($y{gtypes}{$samplename}{FT} eq '.'){
@@ -300,6 +306,12 @@ sub fixVcfLine{
     # Innocent until proven guilty
     if($$settings{'pass-until-fail'}){
       $y{gtypes}{$samplename}{FT}='PASS';
+    }else{
+      # If we are not assuming innocent until guilty,
+      # and if there is no value set yet, then it is FAIL
+      if($y{gtypes}{$samplename}{FT} eq '.'){
+        $y{gtypes}{$samplename}{FT}='FAIL';
+      }
     }
   }
   
@@ -334,9 +346,10 @@ sub fixVcfLine{
 }
 
 sub usage{
-  "Fixes a given VCF by adding, removing, or editing fields. This script
-  will also reevaluate sites on whether they have passed filters using the FT tag.
-  However, the FILTER field will simply be set to 'PASS'.
+  "Fixes a given VCF by adding, removing, or editing fields. 
+  Without any options, useless INFO tags and ALT nts are
+  removed.  Additionally, each site will be failed if all samples
+  have failed in the FT tag field
   Usage: $0 file.vcf.gz > fixed.vcf
   --numcpus      1       Num CPUS currently has no effect on this script.
   --tempdir      /tmp/   Choose a temporary directory (optional)
