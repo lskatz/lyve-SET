@@ -82,15 +82,14 @@ sub varscanWorker{
   $mpileupxopts.="--positions $$settings{region} " if($$settings{region});
 
   my $tmpdir=tempdir("$$settings{tempdir}/$samplename/varscanWorker.XXXXXX");
-  my $pileup="$tmpdir/$TID.pileup";
-  my $vcf="$tmpdir/$TID.vcf";
 
+  my $vcfCounter=0;
   while(defined(my $region=$regionQueue->dequeue)){
+    my $pileup="$tmpdir/TID$TID.$vcfCounter.pileup";
+    my $vcf="$tmpdir/TID$TID.$vcfCounter.vcf";
     # Avoid disk I/O problems by sleeping
-    # a random amount of time in this thread.
-    # The max seconds are equal to the number
-    # of threads.
-    sleep int(rand() * $$settings{numcpus});
+    # a bit of time, depending on the number of threads
+    sleep ($TID % $$settings{numcpus});
 
     # Run mpileup on this one region
     my $mpileupCommand="samtools mpileup -f $reference $mpileupxopts --region '$region' $bam > $pileup";
@@ -116,11 +115,9 @@ sub varscanWorker{
     die if $?;
     
     # Fix the VCF and rename the sample
+    logmsg "Fixing the VCF into a new file $vcf";
     system("set_fixVcf.pl --numcpus 1 --min_coverage $$settings{coverage} --min_alt_frac $$settings{altFreq} --fail-samples --fail-sites --rename-sample $samplename $vcf.tmp.vcf.gz > $vcf");
     die if $?;
-
-    # Clean up the tmp file
-    unlink("$vcf.tmp");
 
     # Compress and index
     system("bgzip $vcf"); die if $?;
@@ -129,8 +126,12 @@ sub varscanWorker{
     # Save the VCF
     system("mv -v $vcf.gz $vcf.gz.tbi $$settings{tempdir}/$samplename/ >&2");
     die if $?;
+
+    $vcfCounter++;
   }
 
+  # Some cleanup
+  system("rm -rf $tmpdir");
 }
 
 sub varscan2{
