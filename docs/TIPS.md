@@ -61,3 +61,13 @@ After everything is said and done, you might want to look for certain things lik
 ### Find pairwise SNPs using bcftools
 
     $ bcftools query --include '%TYPE="snp" && ALT!="N"' --print-header -s D7328,D7322 out.pooled.vcf.gz -f '%CHROM\t%POS\t%REF\t%ALT[\t%TGT]\n'
+
+### Are they clustered?
+
+Here is a quick way to make a histogram, rounding to the nearest 10 thousand.  The three columns printed out are: count, contig, pos.  This table can be view in Excel, etc.
+
+    tail -n +2 out.filteredMatrix.tsv |\ 
+    perl -lane 'print join("\t",$F[0],int($F[1]/10000)*100000)' |\
+    sort -k1,1 -k2,2n |\
+    uniq -c |\
+    perl -lane 's/\s+/\t/g; s/^\s+//; print;' > hist.tsv
