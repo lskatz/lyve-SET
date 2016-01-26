@@ -28,7 +28,7 @@ use threads;
 use Thread::Queue;
 use Schedule::SGELK;
 use Config::Simple;
-use Number::Range;
+use Array::IntSpan;
 
 use LyveSET qw/@fastaExt @richseqExt @fastqExt @bamExt @vcfExt rangeUnion rangeInversion/;
 
@@ -325,10 +325,8 @@ sub maskReference{
     while(<BED>){
       chomp;
       my($contig,$start,$stop)=split /\t/;
-      $maskedRange{$contig}||=Number::Range->new;
-
-      no warnings;
-      $maskedRange{$contig}->addrange("$start..$stop");
+      $maskedRange{$contig}||=Array::IntSpan->new;
+      $maskedRange{$contig}->set_range($start,$stop,1);
     }
     close BED;
   }
@@ -338,8 +336,9 @@ sub maskReference{
   my $maskedRegions="$$settings{refdir}/maskedRegions.bed";
   open(MASKEDBED,">$maskedRegions") or die "ERROR: could not open $maskedRegions: $!";
   while(my($contig,$RangeObj)=each(%maskedRange)){
-    for my $range(split(/,/,$RangeObj->range)){
-      my($min,$max)=split(/\.\./,$range);
+    $RangeObj->consolidate(); # merge ranges
+    for my $rangeArr($RangeObj->get_range_list()){
+      my($min,$max)=@$rangeArr;
       logmsg "Masking ".join("\t",$contig,$min,$max);
       print MASKEDBED join("\t",$contig,$min,$max)."\n";
     }
@@ -349,18 +348,28 @@ sub maskReference{
   # Invert the coordinates to make the unmasked coordinates
   my %unmaskedRange=();
   while(my($contig,$RangeObj)=each(%maskedRange)){
-    $unmaskedRange{$contig}||=Number::Range->new(1..$seqLength{$contig}-1);
-    no warnings; # avoid Number::Range warnings 'X not in range or already removed'
-    logmsg "Deleting $contig ".$maskedRange{$contig}->range;
-    $unmaskedRange{$contig}->delrange($maskedRange{$contig}->range);
+    # Make a range spanning the whole contig
+    $unmaskedRange{$contig}||=Array::IntSpan->new;
+    $unmaskedRange{$contig}->set_range(1,$seqLength{$contig},1);
+
+    # Find where this contig has been masked
+    my @maskedRanges=$maskedRange{$contig}->get_range_list();
+    my $maskedRanges=$maskedRange{$contig}->get_range_list();
+    logmsg "Deleting from $contig: $maskedRanges";
+    # Wherever it is masked, remove it from the unmasked objects
+    for my $rangeArr(@maskedRanges){
+      $unmaskedRange{$contig}->set_range($$rangeArr[0],$$rangeArr[1],undef);
+    }
+    # Simplify the set of ranges that are unmasked
+    $maskedRange{$contig}->consolidate();
   }
 
   # Write inverted (unmasked) regions to a file
   my $unmaskedRegionsTmp="$unmaskedRegions.tmp";
   open(UNMASKEDBED,">$unmaskedRegionsTmp") or die "ERROR: could not open $unmaskedRegionsTmp: $!";
   while(my($contig,$RangeObj)=each(%unmaskedRange)){
-    for my $range(split(/,/,$RangeObj->range)){
-      my($min,$max)=split(/\.\./,$range);
+    for my $rangeArr($RangeObj->get_range_list){
+      my($min,$max)=@$rangeArr;
       logmsg "Unmasked: ".join("\t",$contig,$min,$max);
       print UNMASKEDBED join("\t",$contig,$min,$max)."\n";
     }
