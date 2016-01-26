@@ -13,7 +13,7 @@ use FindBin;
 use lib "$FindBin::RealBin/../lib";
 use LyveSET qw/logmsg/;
 use lib "$FindBin::RealBin/../lib/lib/perl5";
-use Number::Range;
+use Array::IntSpan;
 
 $0=fileparse $0;
 
@@ -100,7 +100,7 @@ sub filterSites{
     $bcfMatrixLine=join("\t",$CONTIG,$POS,$REF,@GT);
 
     # Mask any site found in the BED files
-    $hqSite=0 if(defined($$maskedRanges{$CONTIG}) && $$maskedRanges{$CONTIG}->inrange($POS));
+    $hqSite=0 if(defined($$maskedRanges{$CONTIG}) && $$maskedRanges{$CONTIG}->lookup($POS));
 
     # High-quality sites are far enough away from each other, as defined by the user.
     # This step also assumes that there is a SNP right before the contig starts
@@ -209,7 +209,7 @@ sub readBedFiles{
     undef($seqname);
 
     # Initialize ranges
-    $range{$_}=Number::Range->new() for(@seqname);
+    $range{$_}=Array::IntSpan->new() for(@seqname);
   }
 
   # Read the bed files
@@ -218,12 +218,17 @@ sub readBedFiles{
     while(<BED>){
       chomp;
       my($seqname,$start,$stop)=split(/\t/);
-      $range{$seqname}=Number::Range->new() if(!$range{$seqname});
+      $range{$seqname}=Array::IntSpan->new() if(!$range{$seqname});
       my $lo=min($start,$stop);
       my $hi=max($start,$stop);
-      $range{$seqname}->addrange("$lo..$hi");
+      $range{$seqname}->set_range($lo,$hi,1);
     }
     close BED;
+  }
+
+  # Consolidate the ranges just in case they can be merged
+  for my $contig(keys(%range)){
+    $range{$contig}->consolidate();
   }
 
   return \%range;
