@@ -20,7 +20,6 @@ use FindBin;
 use lib "$FindBin::RealBin/../lib";
 use LyveSET qw/logmsg/;
 use lib "$FindBin::RealBin/../lib/lib/perl5";
-#use Number::Range;
 use Array::IntSpan;
 
 local $0=fileparse $0;
@@ -76,7 +75,6 @@ sub phast{
     $regionQ->enqueue(undef); # one terminator per thread
   }
 
-  # Make a set of Number::Range objects
   my %range;
   # Join together the threads.
   for(@thr){
@@ -90,7 +88,6 @@ sub phast{
     my %seen; # ranges that have already been added.
     for my $r(@$tRange){
       my($contig,$lo,$hi)=@$r;
-      ##$range{$contig}||=Number::Range->new();
       $range{$contig}||=Array::IntSpan->new();
 
       # Set up the "soft" flanking.
@@ -113,8 +110,6 @@ sub phast{
       ## then we should. It is slow.
       ##next if($seen{$lo}{$hi}++);
 
-      ##no warnings;
-      ##$range{$contig}->addrange($lo..$hi);
       $range{$contig}->set_range($softLo,$softHi,1);
     }
   }
