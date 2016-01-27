@@ -235,8 +235,8 @@ sub readBedFiles{
 }
 
 sub usage{
-  "Multiple VCF format to alignment
-  $0: filters a bcftools query matrix. The first three columns of the matrix are contig/pos/ref, and the next columns are all GT.
+  "$0: filter a bcftools query matrix.
+  The first three columns of the matrix are contig/pos/ref, and the next columns are all GT.
   Usage: 
     $0 bcftools.tsv > filtered.tsv
     $0 < bcftools.tsv > filtered.tsv # read stdin
