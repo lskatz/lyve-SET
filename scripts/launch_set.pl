@@ -692,8 +692,6 @@ sub variantCalls{
   logmsg "All variant-calling jobs have been submitted. Waiting on them to finish";
   $sge->wrapItUp();
 
-  # TODO set_fixVcf.pl - should it go into indexAndCompressVcf() ?
-
   return 1;
 }
 
@@ -715,8 +713,6 @@ sub indexAndCompressVcf{
   my($vcf,$holdjid,$settings)=@_;
   my $j={};
   eval{
-      # removing fixVcf because it is done internally in launch_vcf.pl
-      #set_fixVcf.pl --fail-sites --fail-samples --min_alt_frac $$settings{min_alt_frac} --min_coverage $$settings{min_coverage} '$vcf' > $vcf.reevaluated && mv '$vcf.reevaluated' '$vcf' && \
     $j=$sge->pleaseExecute("
       vcf-sort < '$vcf' > '$vcf.sorted.tmp' && mv '$vcf.sorted.tmp'  '$vcf' && \
       bgzip -f '$vcf' && tabix '$vcf.gz'
