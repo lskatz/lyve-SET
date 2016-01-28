@@ -116,6 +116,10 @@ sub reevaluateSites{
   my $numSamples=scalar(@samples);
   $vcfObj->add_header_line({key=>'FILTER', ID=>"FAIL", Description=>"This site did not pass QC"}) if(!@{ $vcfObj->get_header_line(key=>'FILTER',ID=>'FAIL') });
   $vcfObj->add_header_line({key=>'FORMAT', ID=>'FT', Number=>1, Type=>'String', Description=>"Genotype filters using the same codes as the FILTER data element"}) if(!@{ $vcfObj->get_header_line(key=>'FORMAT',ID=>'FT') });
+  $vcfObj->add_header_line({key=>'FORMAT', ID=>'DP4', Number=>'4', Type=>'Integer', Description=>"Number of forward ref alleles; reverse ref; forward non-ref; reverse non-ref alleles."}) if(!@{ $vcfObj->get_header_line(key=>'FORMAT',ID=>'DP4') });
+  for my $tag(qw(RDF RDR ADF ADR)){
+    $vcfObj->add_header_line({key=>'FORMAT', ID=>$tag, Number=>1, Type=>'Integer', Description=>"See: DP4"}) if(!@{ $vcfObj->get_header_line(key=>'FORMAT',ID=>$tag) });
+  }
 
   # start printing
   my $vcfHeader=$vcfObj->format_header();
