@@ -308,6 +308,10 @@ sub fixVcfLine{
     }
   }
 
+  # Index the FORMAT tags
+  $y{formatHash}={};
+  $y{formatHash}{$_}=1 for(@{$y{FORMAT}});
+
   # Fix up the samples' tags
   for my $samplename(@samplename){
     # Convert alleles to haploid first, eg 1/1 => 1
@@ -319,20 +323,28 @@ sub fixVcfLine{
 
     # Add an FT tag to describe whether the sample's GT passes.
     if(!$y{gtypes}{$samplename}{FT}){
-      push(@{ $y{FORMAT} }, 'FT');
+      # Only add it to this array if it hasn't been added yet.
+      # We don't want to add it once per sample.
+      if(!$y{formatHash}{FT}++){
+        push(@{ $y{FORMAT} }, 'FT');
+      }
       # must set a default value in case it doesn't get set
       $y{gtypes}{$samplename}{FT}='FAIL';
     }
     # add RDF RDR ADF ADR tags
     for my $tag(qw(RDF RDR ADF ADR)){
       next if(defined($y{gtypes}{$samplename}{$tag}));
-      push(@{ $y{FORMAT} },$tag);
+      if(!$y{formatHash}{$tag}++){
+        push(@{ $y{FORMAT} },$tag);
+      }
       $y{gtypes}{$samplename}{$tag}='.';
     }
 
     # Add DP4 tag
     if(!defined($y{gtypes}{$samplename}{DP4})){
-      push(@{ $y{FORMAT} }, 'DP4');
+      if(!$y{formatHash}{DP4}++){
+        push(@{ $y{FORMAT} }, 'DP4');
+      }
       # Take the DP4 value from INFO if possible
       if($y{INFO}{DP4}){
         $y{gtypes}{$samplename}{DP4}=$y{INFO}{DP4};
