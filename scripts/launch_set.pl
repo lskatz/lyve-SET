@@ -764,6 +764,7 @@ sub variantsToMatrix{
 
   my $matrix="$msadir/out.matrix.tsv";
   my $pooled="$msadir/out.pooled.vcf.gz";
+  my $snpPooled="$msadir/out.pooled.snps.vcf.gz";
   if(-e $pooled){
     logmsg "Found $pooled -- already present. Not re-converting.";
     return $pooled;
@@ -784,6 +785,11 @@ sub variantsToMatrix{
   my $mergeCommand="mergeVcf.sh $mergexopts -s -n $$settings{numcpus} -t $tmpdir -o $pooled $inVcf >&2";
   logmsg $mergeCommand;
   $sge->pleaseExecute($mergeCommand,{jobname=>"poolVcfs",numcpus=>$$settings{numcpus}});
+  $sge->wrapItUp();
+
+  # Spruce up the VCF so that it conforms to Lyve-SET thresholds.
+  $sge->pleaseExecute("set_fixVcf.pl --fail-samples --pass-until-fail --DP4 2 --min_coverage $$settings{min_coverage} --min_alt_frac $$settings{min_alt_frac} $pooled > $$settings{tmpdir}/out.pooled.vcf && bgzip -c $$settings{tmpdir}/out.pooled.vcf > $pooled && tabix -f $pooled",{jobname=>"fixPooled",numcpus=>1});
+  $sge->pleaseExecute("set_fixVcf.pl --fail-samples --pass-until-fail --DP4 2 --min_coverage $$settings{min_coverage} --min_alt_frac $$settings{min_alt_frac} $snpPooled > $$settings{tmpdir}/out.snps.vcf && bgzip -c $$settings{tmpdir}/out.snps.vcf > $snpPooled && tabix -f $snpPooled",{jobname=>"fixSnpsPooled",numcpus=>1});
   $sge->wrapItUp();
 
   return $pooled;
