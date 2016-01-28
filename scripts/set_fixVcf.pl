@@ -174,8 +174,8 @@ sub reevaluateSites{
 
       # Mask for DP4
       my($RDF, $RDR, $ADF, $ADR)=split(/\s*,\s*/,$$x{gtypes}{$samplename}{DP4});
-      for($RDF, $RDR, $ADF, $ADR){
-        $_=0 if($_ eq '.');
+      for my $tag ($RDF, $RDR, $ADF, $ADR){
+        $tag=0 if(!defined($tag) || $tag eq '.');
       }
       if(($RDF + $ADF) < $$settings{DF} || ($RDR + $ADR) < $$settings{DR}){
         if($$settings{'fail-samples'}){
