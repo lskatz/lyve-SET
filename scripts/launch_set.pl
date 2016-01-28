@@ -763,6 +763,8 @@ sub variantsToMatrix{
   my $logdir=$$settings{logdir};
 
   my $matrix="$msadir/out.matrix.tsv";
+  my $unFixedPooled="$msadir/out.unfixed.pooled.vcf.gz";
+  my $unFixedSnpPooled="$msadir/out.unfixed.pooled.snps.vcf.gz";
   my $pooled="$msadir/out.pooled.vcf.gz";
   my $snpPooled="$msadir/out.pooled.snps.vcf.gz";
   if(-e $pooled){
@@ -782,15 +784,19 @@ sub variantsToMatrix{
 
   my $mergexopts="";
   $mergexopts.="-r $ref.regions.txt" if(-e "$ref.regions.txt" && -s "$ref.regions.txt" > 0);
-  my $mergeCommand="mergeVcf.sh $mergexopts -s -n $$settings{numcpus} -t $tmpdir -o $pooled $inVcf >&2";
+  my $mergeCommand="mergeVcf.sh $mergexopts -s -n $$settings{numcpus} -t $tmpdir -o $unFixedPooled $inVcf >&2";
   logmsg $mergeCommand;
   $sge->pleaseExecute($mergeCommand,{jobname=>"poolVcfs",numcpus=>$$settings{numcpus}});
   $sge->wrapItUp();
 
   # Spruce up the VCF so that it conforms to Lyve-SET thresholds.
-  $sge->pleaseExecute("set_fixVcf.pl --fail-samples --pass-until-fail --DP4 2 --min_coverage $$settings{min_coverage} --min_alt_frac $$settings{min_alt_frac} $pooled > $$settings{tmpdir}/out.pooled.vcf && bgzip -c $$settings{tmpdir}/out.pooled.vcf > $pooled && tabix -f $pooled",{jobname=>"fixPooled",numcpus=>1});
-  $sge->pleaseExecute("set_fixVcf.pl --fail-samples --pass-until-fail --DP4 2 --min_coverage $$settings{min_coverage} --min_alt_frac $$settings{min_alt_frac} $snpPooled > $$settings{tmpdir}/out.snps.vcf && bgzip -c $$settings{tmpdir}/out.snps.vcf > $snpPooled && tabix -f $snpPooled",{jobname=>"fixSnpsPooled",numcpus=>1});
+  logmsg "Reevaluating the pooled VCF with set_fixVcf.pl";
+  $sge->pleaseExecute("set_fixVcf.pl --fail-samples --pass-until-fail --DP4 2 --min_coverage $$settings{min_coverage} --min_alt_frac $$settings{min_alt_frac} $unFixedPooled > $$settings{tmpdir}/out.pooled.vcf && bgzip -c $$settings{tmpdir}/out.pooled.vcf > $pooled && tabix $pooled",{jobname=>"fixPooled",numcpus=>1});
+  $sge->pleaseExecute("set_fixVcf.pl --fail-samples --pass-until-fail --DP4 2 --min_coverage $$settings{min_coverage} --min_alt_frac $$settings{min_alt_frac} $unFixedSnpPooled> $$settings{tmpdir}/out.snps.vcf && bgzip -c $$settings{tmpdir}/out.snps.vcf > $snpPooled && tabix $snpPooled",{jobname=>"fixSnpsPooled",numcpus=>1});
   $sge->wrapItUp();
+
+  logmsg "Done reevaluating.";
+  system("rm -f $unFixedPooled $unFixedSnpPooled");
 
   return $pooled;
 }
