@@ -653,7 +653,7 @@ sub variantCalls{
       $jobname="varscan$b";
       my $varscanxopts="";
       $varscanxopts.="--region $regionsFile " if($regionsFile);
-      $varscanxopts.="--exclude $bam.cliffs.bed " if(-s "$bam.cliffs.bed");
+      $varscanxopts.="--mask $bam.cliffs.bed " if(-s "$bam.cliffs.bed");
       my $varscanCommand="$scriptsdir/launch_varscan.pl $bam --numcpus $$settings{numcpus} --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $varscanxopts > $vcfdir/$b.vcf";
       logmsg $varscanCommand;
       $sge->pleaseExecute($varscanCommand,{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
