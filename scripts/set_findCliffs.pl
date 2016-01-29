@@ -199,7 +199,7 @@ sub usage{
   --numcpus              1
   --tempdir              ''
   --windowSize           10   How many positions are used when calculating a slope
-  --slopeThreshold       3    Ie, the depth changes X per every position in the window
+  --slopeThreshold       5    Ie, the depth changes X per every position in the window
   --rSquaredThreshold    0.7  The level of significance in the slope trendline
   "
 }
