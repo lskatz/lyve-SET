@@ -16,6 +16,9 @@ use lib "$FindBin::RealBin/../lib";
 use LyveSET qw/@fastaExt @fastqExt @bamExt/;
 use Vcf;
 
+use lib "$FindBin::RealBin/../lib/lib/perl5";
+use Array::IntSpan;
+
 $ENV{PATH}="$FindBin::RealBin:$ENV{PATH}";
 $ENV{BCFTOOLS_PLUGINS}="$FindBin::RealBin/../lib/bcftools-1.2/plugins";
 $ENV{LD_LIBRARY_PATH}||="";
@@ -31,7 +34,7 @@ sub main{
   my $settings={};
   my @thresholdOpts=qw(min_coverage|min-coverage|coverage=i min_alt_frac|min-alt-frac=s DF|min-DF=i DR|min-DR=i DP4=i);
   my @lyvesetOpts=qw(help tempdir=s numcpus=i);
-  GetOptions($settings,qw(fail-all fail-samples fail-sites rename-sample=s type=s pass-until-fail),@thresholdOpts,@lyvesetOpts) or die $!;
+  GetOptions($settings,qw(fail-all fail-samples fail-sites rename-sample=s type=s pass-until-fail mask=s),@thresholdOpts,@lyvesetOpts) or die $!;
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("$0XXXXXX",TMPDIR=>1,CLEANUP=>1);
   mkdir $$settings{tempdir};
@@ -40,7 +43,8 @@ sub main{
   $$settings{$_}||=0 for(qw(min_coverage min_alt_frac DF DR DP4));
   # Some parameter checking
   die "ERROR: min_alt_frac must be between 0 and 1, inclusive" if($$settings{min_alt_frac} < 0 || $$settings{min_alt_frac} > 1);
-  $$settings{type} && logmsg "WARNING: --type is no longer used in Lyve-SET >= v1.3";
+  logmsg "WARNING: --type is no longer used in Lyve-SET >= v1.3" if($$settings{type});
+  die "ERROR: could not locate $$settings{mask}" if($$settings{mask} && !-e $$settings{mask});
   
   # Shorthand options
   if($$settings{'fail-all'}){
@@ -103,6 +107,9 @@ sub addStandardTags{
 sub reevaluateSites{
   my($vcf,$settings)=@_;
   my $v="$$settings{tempdir}/reevaluated.vcf";
+
+  my $maskRange=bedToRanges($$settings{mask},$settings);
+
   logmsg "Reevaluating sites on whether they pass thresholds";
 
   my $altFreq=$$settings{min_alt_frac};
@@ -137,8 +144,20 @@ sub reevaluateSites{
     my $numSamples=@samplename;
 
     #######################
-    ## MASKING
+    ## MASKING SAMPLES
     for my $samplename(@samplename){
+      # If specified in the masking file, mask!
+      if(defined($$maskRange{$$x{CHROM}}) && $$maskRange{$$x{CHROM}}->lookup($pos)){
+        if($$settings{'fail-samples'}){
+          $$x{gtypes}{$samplename}{GT}=$$x{altIndex}{N};
+          $$x{gtypes}{$samplename}{FT}='FAIL';
+        }
+        if($$settings{'fail-sites'}){
+          $$x{gtypes}{$samplename}{GT}=$$x{altIndex}{N};
+          $$x{FILTER}=['FAIL'];
+        }
+      }
+
       # Figure out an alt-frequency between 0 and 1
       my $FREQ=$$x{gtypes}{$samplename}{FREQ} || '0%';
          $FREQ='0%' if($FREQ eq '.');
@@ -411,6 +430,28 @@ sub fixVcfLine{
   return \%y;
 }
 
+sub bedToRanges{
+  my($bed,$settings)=@_;
+  
+  my %range;
+  open(BED,"<", $bed) or die "ERROR: could not open file $bed for reading: $!";
+  while(<BED>){
+    chomp;
+    my($contig,$start,$stop)=split /\t/;
+    $stop--; # bed files are not inclusive on the stop position for some reason
+    $range{$contig}||=Array::IntSpan->new;
+    $range{$contig}->set_range($start,$stop,1);
+  }
+
+  close BED;
+
+  for my $contig(keys(%range)){
+    $range{$contig}->consolidate();
+  }
+
+  return \%range;
+}
+
 sub usage{
   my($settings)=@_;
   $settings||={};
@@ -446,6 +487,7 @@ sub usage{
   --rename-sample ''     Rename the sample name to something. Assumes
                          that there is a single sample.
 
+  Not supported yet:
   --min-DF       0       Minimum number of supporting bases on FWD strand
   --min-DR       0       Minimum number of supporting bases on REV strand
   ";
