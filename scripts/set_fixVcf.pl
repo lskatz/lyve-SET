@@ -432,8 +432,9 @@ sub fixVcfLine{
 
 sub bedToRanges{
   my($bed,$settings)=@_;
-  
   my %range;
+  return \%range if(!$bed);
+  
   open(BED,"<", $bed) or die "ERROR: could not open file $bed for reading: $!";
   while(<BED>){
     chomp;
