@@ -28,7 +28,7 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help reference=s tempdir=s altFreq=s coverage=i region=s exclude=s numcpus=i)) or die $!;
+  GetOptions($settings,qw(help reference=s tempdir=s altFreq=s coverage=i region=s mask|exclude=s numcpus=i)) or die $!;
 
   my $bam=$ARGV[0] or die "ERROR: need bam\n".usage();
   die "ERROR: only one bam allowed right now" if (@ARGV > 1);
@@ -115,8 +115,10 @@ sub varscanWorker{
     die if $?;
     
     # Fix the VCF and rename the sample
+    my $maskParam="";
+       $maskParam="--mask $$settings{mask}" if($$settings{mask});
     logmsg "Fixing the VCF into a new file $vcf";
-    system("set_fixVcf.pl --numcpus 1 --min_coverage $$settings{coverage} --min_alt_frac $$settings{altFreq} --fail-samples --pass-until-fail --DP4 2 --rename-sample $samplename $vcf.tmp.vcf.gz > $vcf");
+    system("set_fixVcf.pl --numcpus 1 --min_coverage $$settings{coverage} --min_alt_frac $$settings{altFreq} --fail-samples --pass-until-fail --DP4 2 --rename-sample $samplename $maskParam $vcf.tmp.vcf.gz > $vcf");
     die if $?;
 
     # Compress and index
