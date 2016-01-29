@@ -354,6 +354,7 @@ sub fixVcfLine{
         $y{gtypes}{$samplename}{DP4}=$y{INFO}{DP4};
         delete($y{INFO}{DP4});
       } 
+      $y{gtypes}{$samplename}{DP4}||=join(",",qw(. . . .));
       # If it wasn't defined before, set it up
       $y{gtypes}{$samplename}{DP4}=join(",",
         $y{gtypes}{$samplename}{RDF},
