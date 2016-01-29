@@ -796,7 +796,7 @@ sub variantsToMatrix{
   $sge->wrapItUp();
 
   logmsg "Done reevaluating.";
-  system("rm -f $unFixedPooled $unFixedSnpPooled");
+  system("rm -f $unFixedPooled $unFixedSnpPooled $$settings{tmpdir}/out.snps.vcf $$settings{tmpdir}/out.pooled.vcf");
 
   return $pooled;
 }
