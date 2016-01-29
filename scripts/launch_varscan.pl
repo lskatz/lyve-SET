@@ -116,7 +116,7 @@ sub varscanWorker{
     
     # Fix the VCF and rename the sample
     logmsg "Fixing the VCF into a new file $vcf";
-    system("set_fixVcf.pl --numcpus 1 --min_coverage $$settings{coverage} --min_alt_frac $$settings{altFreq} --fail-samples --fail-sites --rename-sample $samplename $vcf.tmp.vcf.gz > $vcf");
+    system("set_fixVcf.pl --numcpus 1 --min_coverage $$settings{coverage} --min_alt_frac $$settings{altFreq} --fail-samples --pass-until-fail --DP4 2 --rename-sample $samplename $vcf.tmp.vcf.gz > $vcf");
     die if $?;
 
     # Compress and index

@@ -29,22 +29,30 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help tempdir=s numcpus=i min_coverage|min-coverage=i min_alt_frac|min-alt-frac=s fail-all fail-samples fail-sites rename-sample=s type=s pass-until-fail)) or die $!;
+  my @thresholdOpts=qw(min_coverage|min-coverage|coverage=i min_alt_frac|min-alt-frac=s DF|min-DF=i DR|min-DR=i DP4=i);
+  my @lyvesetOpts=qw(help tempdir=s numcpus=i);
+  GetOptions($settings,qw(fail-all fail-samples fail-sites rename-sample=s type=s pass-until-fail),@thresholdOpts,@lyvesetOpts) or die $!;
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("$0XXXXXX",TMPDIR=>1,CLEANUP=>1);
   mkdir $$settings{tempdir};
-  $$settings{min_coverage}||=0;
-  $$settings{min_alt_frac}||=0;
+
+  # Set zero as the min threshold if not specified.
+  $$settings{$_}||=0 for(qw(min_coverage min_alt_frac DF DR DP4));
+  # Some parameter checking
   die "ERROR: min_alt_frac must be between 0 and 1, inclusive" if($$settings{min_alt_frac} < 0 || $$settings{min_alt_frac} > 1);
   $$settings{type} && logmsg "WARNING: --type is no longer used in Lyve-SET >= v1.3";
   
+  # Shorthand options
   if($$settings{'fail-all'}){
     $$settings{'fail-samples'}=1;
     $$settings{'fail-sites'}=1;
   }
+  if(my $DP4=$$settings{'DP4'}){
+    $$settings{$_}=$DP4 for(qw(DF DR));
+  }
 
   my $VCF=$ARGV[0];
-  die usage() if(!$VCF || $$settings{help});
+  die usage($settings) if(!$VCF || $$settings{help});
   
   my $fixedVcf=fixVcf($VCF,$settings);
 
@@ -108,6 +116,10 @@ sub reevaluateSites{
   my $numSamples=scalar(@samples);
   $vcfObj->add_header_line({key=>'FILTER', ID=>"FAIL", Description=>"This site did not pass QC"}) if(!@{ $vcfObj->get_header_line(key=>'FILTER',ID=>'FAIL') });
   $vcfObj->add_header_line({key=>'FORMAT', ID=>'FT', Number=>1, Type=>'String', Description=>"Genotype filters using the same codes as the FILTER data element"}) if(!@{ $vcfObj->get_header_line(key=>'FORMAT',ID=>'FT') });
+  $vcfObj->add_header_line({key=>'FORMAT', ID=>'DP4', Number=>'4', Type=>'Integer', Description=>"Number of forward ref alleles; reverse ref; forward non-ref; reverse non-ref alleles."}) if(!@{ $vcfObj->get_header_line(key=>'FORMAT',ID=>'DP4') });
+  for my $tag(qw(RDF RDR ADF ADR)){
+    $vcfObj->add_header_line({key=>'FORMAT', ID=>$tag, Number=>1, Type=>'Integer', Description=>"See: DP4"}) if(!@{ $vcfObj->get_header_line(key=>'FORMAT',ID=>$tag) });
+  }
 
   # start printing
   my $vcfHeader=$vcfObj->format_header();
@@ -159,6 +171,23 @@ sub reevaluateSites{
           $$x{FILTER}=['FAIL'];
         }
       }
+
+      # Mask for DP4
+      my($RDF, $RDR, $ADF, $ADR)=split(/\s*,\s*/,$$x{gtypes}{$samplename}{DP4});
+      for my $tag ($RDF, $RDR, $ADF, $ADR){
+        $tag=0 if(!defined($tag) || $tag eq '.');
+      }
+      if(($RDF + $ADF) < $$settings{DF} || ($RDR + $ADR) < $$settings{DR}){
+        if($$settings{'fail-samples'}){
+          $$x{gtypes}{$samplename}{GT}=$$x{altIndex}{N};
+          $$x{gtypes}{$samplename}{FT}='FAIL';
+        }
+        if($$settings{'fail-sites'}){
+          $$x{gtypes}{$samplename}{GT}=$$x{altIndex}{N};
+          $$x{FILTER}=['FAIL'];
+        }
+      }
+
     }
     # END MASKING
     ########################
@@ -283,6 +312,10 @@ sub fixVcfLine{
     }
   }
 
+  # Index the FORMAT tags
+  $y{formatHash}={};
+  $y{formatHash}{$_}=1 for(@{$y{FORMAT}});
+
   # Fix up the samples' tags
   for my $samplename(@samplename){
     # Convert alleles to haploid first, eg 1/1 => 1
@@ -294,9 +327,42 @@ sub fixVcfLine{
 
     # Add an FT tag to describe whether the sample's GT passes.
     if(!$y{gtypes}{$samplename}{FT}){
-      push(@{ $y{FORMAT} }, 'FT');
+      # Only add it to this array if it hasn't been added yet.
+      # We don't want to add it once per sample.
+      if(!$y{formatHash}{FT}++){
+        push(@{ $y{FORMAT} }, 'FT');
+      }
       # must set a default value in case it doesn't get set
       $y{gtypes}{$samplename}{FT}='FAIL';
+    }
+    # add RDF RDR ADF ADR tags
+    for my $tag(qw(RDF RDR ADF ADR)){
+      next if(defined($y{gtypes}{$samplename}{$tag}));
+      if(!$y{formatHash}{$tag}++){
+        push(@{ $y{FORMAT} },$tag);
+      }
+      $y{gtypes}{$samplename}{$tag}='.';
+    }
+
+    # Add DP4 tag
+    if(!defined($y{gtypes}{$samplename}{DP4})){
+      if(!$y{formatHash}{DP4}++){
+        push(@{ $y{FORMAT} }, 'DP4');
+      }
+      # Take the DP4 value from INFO if possible
+      if($y{INFO}{DP4}){
+        $y{gtypes}{$samplename}{DP4}=$y{INFO}{DP4};
+        delete($y{INFO}{DP4});
+      } 
+      $y{gtypes}{$samplename}{DP4}||=join(",",qw(. . . .));
+      # If it wasn't defined before, set it up
+      $y{gtypes}{$samplename}{DP4}=join(",",
+        $y{gtypes}{$samplename}{RDF},
+        $y{gtypes}{$samplename}{RDR},
+        $y{gtypes}{$samplename}{ADF},
+        $y{gtypes}{$samplename}{ADR}
+      );
+
     }
     # Convert FILTER to FT tag
     if($y{gtypes}{$samplename}{FT} eq '.'){
@@ -335,7 +401,7 @@ sub fixVcfLine{
 
   # Fix up the info column.
   # I just don't think some fields even belong here
-  for(qw(ADP HET NC HOM WT)){
+  for(qw(ADP HET NC HOM WT DP4)){
     delete($y{INFO}{$_});
   }
     
@@ -346,15 +412,20 @@ sub fixVcfLine{
 }
 
 sub usage{
-  "Fixes a given VCF by adding, removing, or editing fields. 
+  my($settings)=@_;
+  $settings||={};
+  my $usage="Fixes a given VCF by adding, removing, or editing fields. 
   Without any options, useless INFO tags and ALT nts are
   removed.  Additionally, each site will be failed if all samples
   have failed in the FT tag field
   Usage: $0 file.vcf.gz > fixed.vcf
-  --numcpus      1       Num CPUS currently has no effect on this script.
-  --tempdir      /tmp/   Choose a temporary directory (optional)
   --min_coverage 0
   --min_alt_frac 0
+  --DP4          0       Shorthand for --min-DF x --min-DR x where x 
+                         is an integer. If these individual options are 
+                         not found in the VCF but DP4 is, the actual 
+                         DP4 value will be used.
+
   --fail-all             Short for '--fail-sites --fail-samples'
   --fail-sites           If a site fails, add FAIL under the FEATURE column
   --fail-samples         If a site fails, add FAIL under the FT tag for
@@ -363,10 +434,21 @@ sub usage{
                          Assume every site and sample passes unless
                          proven otherwise. Without this argument, previous
                          FAIL filters will remain in place.
+
+  --help                 for more help
+  ";
+
+  return $usage if(!$$settings{help});
+
+  $usage.="
+  --numcpus      1       Num CPUS currently has no effect on this script.
+  --tempdir      /tmp/   Choose a temporary directory (optional)
   --rename-sample ''     Rename the sample name to something. Assumes
                          that there is a single sample.
-  "
-  #--remove-unused-alt    After a site has been evaluated, if an ALT's
-  #                       value is no sample's GT, remove it.
+
+  --min-DF       0       Minimum number of supporting bases on FWD strand
+  --min-DR       0       Minimum number of supporting bases on REV strand
+  ";
+  return $usage;
 }
 
