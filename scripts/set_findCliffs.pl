@@ -54,9 +54,19 @@ sub main{
 
   # Find cliffs by enquing region information
   logmsg "Finding cliffs whose slopes are at least $$settings{slopeThreshold} with an rSquared value of at least $$settings{rSquaredThreshold} in a sliding window size of $$settings{windowSize}.";
-  my $seqLength=bamSeqnames($bam,$settings);
-  while(my($seqname,$length)=each(%$seqLength)){
-    $Q->enqueue([$bam,$seqname,1,$length]);
+
+  my $overlapby=$$settings{windowSize} * 3;
+  my @region=`makeRegions.pl --numcpus $$settings{numcpus} --numchunks $$settings{numcpus} --overlapby $overlapby $bam`;
+  chomp(@region);
+  for my $region(@region){
+    if($region=~/(.+?):(\d+)(-(\d+))?/){
+      my $seqname=$1;
+      my $start=$2;
+      my $end=$4 || $start;
+      $Q->enqueue([$bam,$seqname,$start,$end]);
+    } else {
+      logmsg "warning: I could not parse the region $region";
+    }
   }
 
   # Join all the threads.
@@ -109,7 +119,7 @@ sub findCliffsBySlope{
   my($bam,$seqname,$pos,$lastPos,$settings)=@_;
 
   # Find the depth of the whole bam file one time, to save cpu.
-  logmsg "Calculating depth of $bam:$seqname";
+  logmsg "$bam $seqname:$pos-$lastPos";
   my (undef,$depthfile)=tempfile("depthXXXXXX",SUFFIX=>".depth",DIR=>$$settings{tempdir});
   system("samtools depth -r '$seqname' $bam > $depthfile");
   die "ERROR with samtools depth: $!" if $?;
@@ -169,31 +179,6 @@ sub findCliffsBySlope{
 
 
   return \@cliff;
-}
-
-# Use samtools view -H to find the seqnames and their lengths
-sub bamSeqnames{
-  my($bam,$settings)=@_;
-  
-  my %seqLength;
-
-  open(BAMINFO,"samtools view -H '$bam' | ") or die "ERROR: could not use samtools view on $bam: $!";
-  while(<BAMINFO>){
-    chomp;
-    my($type,@theRest)=split(/\t/,$_);
-    next if($type ne '@SQ');
-    my $theRest=join("\t",@theRest);
-
-    my ($seqname,$length);
-    while($theRest=~/(\w+?):([^\t]+)/g){
-      $seqname=$2 if($1 eq "SN");
-      $length=$2 if($1 eq "LN");
-    }
-
-    $seqLength{$seqname}=$length;
-  }
-  close BAMINFO;
-  return \%seqLength;
 }
 
 sub usage{
