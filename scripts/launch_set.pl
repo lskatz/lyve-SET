@@ -69,7 +69,7 @@ sub main{
   # Initialize settings by reading the global configuration
   # file, LyveSET.conf
   my $settings=readGlobalSettings(1);
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s qsub!)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s outdir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s qsub!)) or die $!;
 
   # What options change when --fast is used?
   if($$settings{fast}){
@@ -133,11 +133,11 @@ sub main{
 
   # Check SET directories' existence and set their defaults
   die "ERROR: could not find dir $project" if(!-e $project);
-  for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir logdir)){
+  for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir logdir outdir)){
     my $b=$param;
     $b=~s/dir$//;  # e.g., vcfdir => vcf
     $$settings{$param}||="$project/$b";
-    die "ERROR: Could not find $param under $$settings{$param}/\n  mkdir $$settings{$param} to resolve this problem.\n".usage($settings) if(!-d $$settings{$param});
+    die "ERROR: Could not find $param under $$settings{$param}/\n  SOLUTION: `mkdir $$settings{$param}` to resolve this problem.\n\n" if(!-d $$settings{$param});
     $$settings{$param}=rel2abs($$settings{$param});
   }
 
