@@ -846,6 +846,7 @@ sub usage{
     --logdir    $$settings{logdir}    Where to put log files. Qsub commands are also stored here.
     --asmdir    $$settings{asmdir}    directory of assemblies. Copy or symlink the reference genome assembly 
                                    to use it if it is not already in the raw reads directory
+    --outdir    $$settings{logdir}    Where to put output files
 
     PERFORM CERTAIN STEPS
     --mask-phages                  Search for and mask phages in the reference genome
