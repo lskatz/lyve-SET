@@ -24,6 +24,7 @@ use Getopt::Long;
 use File::Basename;
 use File::Spec::Functions qw/rel2abs abs2rel/;
 use File::Temp qw/tempdir/;
+use File::Copy qw/copy/;
 use threads;
 use Thread::Queue;
 use Schedule::SGELK;
@@ -180,17 +181,12 @@ sub main{
   # Finished major steps              #
   #####################################
   
-  # Make an output directory
-  # TODO: put 'out' into set_manage.pl
-  mkdir "$project/out";
   # Find the output files
-  #my $absDir=rel2abs($$settings{msadir}); # save the abs. path
-  my $outPrefix="$project/out"; # consistent output naming
-  symlink("../msa/out.RAxML_bipartitions","$outPrefix/RAxML.dnd");
-  symlink("../msa/out.filteredMatrix.tsv","$outPrefix/snpmatrix.tsv");
-  symlink("../msa/out.informative.fasta","$outPrefix/snp.aln.fasta");
-  symlink("../msa/out.pairwise.tsv","$outPrefix/pairwise.tsv");
-  symlink("../msa/out.pairwiseMatrix.tsv","$outPrefix/pairwise.matrix.tsv");
+  copy("$$settings{msadir}/out.RAxML_bipartitions","$$settings{outdir}/RAxML.dnd");
+  copy("$$settings{msadir}/out.filteredMatrix.tsv","$$settings{outdir}/snpmatrix.tsv");
+  copy("$$settings{msadir}/out.informative.fasta", "$$settings{outdir}/snp.aln.fasta");
+  copy("$$settings{msadir}/out.pairwise.tsv",      "$$settings{outdir}/pairwise.tsv");
+  copy("$$settings{msadir}/out.pairwiseMatrix.tsv","$$settings{outdir}/pairwise.matrix.tsv");
 
   my $stopTimestamp=time();
   logmsg "Finished at ".strftime("\%F \%T",localtime());
