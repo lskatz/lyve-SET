@@ -54,3 +54,20 @@ Hopefully all these commands make sense but please tell me if I need to expound.
     applyFstToTree.pl --numcpus 12 -t RAxML_bipartitions.informative -p pairwise.tsv --outprefix fst --outputType averages > fst.avg.tsv  # look at the Fst for your tree (might result in an error for some trees, like polytomies)
     applyFstToTree.pl --numcpus 12 -t RAxML_bipartitions.informative -p pairwise.tsv --outprefix fst --outputType samples > fst.samples.tsv  # instead of average Fst values per tree node, shows you each repetition
     
+## Interrogate the SNP calls
+
+After everything is said and done, you might want to look for certain things like hotspots.  I'll start listing those tips and tricks here.  Because Lyve-SET depends on standard file formats, there are very standard ways to scrutinize the output files.
+
+### Find pairwise SNPs using bcftools
+
+    $ bcftools query --include '%TYPE="snp" && ALT!="N"' --print-header -s D7328,D7322 out.pooled.vcf.gz -f '%CHROM\t%POS\t%REF\t%ALT[\t%TGT]\n'
+
+### Are they clustered?
+
+Here is a quick way to make a histogram, rounding to the nearest 10 thousand.  The three columns printed out are: count, contig, pos.  This table can be view in Excel, etc.
+
+    tail -n +2 out.filteredMatrix.tsv |\ 
+    perl -lane 'print join("\t",$F[0],int($F[1]/10000)*100000)' |\
+    sort -k1,1 -k2,2n |\
+    uniq -c |\
+    perl -lane 's/\s+/\t/g; s/^\s+//; print;' > hist.tsv

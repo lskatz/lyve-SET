@@ -13,10 +13,9 @@ sub logmsg{$|++;print STDERR "@_\n";$|--;}
 exit(main());
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help numcpus=i estimate samplingFrequency=s header));
+  GetOptions($settings,qw(help numcpus=i header));
   die usage() if($$settings{help});
   $$settings{numcpus}||=1;
-  $$settings{samplingFrequency}||=0.25;
 
   my ($in,%seq);
   if($ARGV[0]){
@@ -91,7 +90,6 @@ sub pairwiseDistance{
   my $pdist=0;
   my $denominator=0;
   for(my $i=0;$i<$length;$i++){
-    next if($$settings{estimate} && rand() >$$settings{samplingFrequency});
     my $nt1=substr($seq1,$i,1);
     my $nt2=substr($seq2,$i,1);
 
@@ -103,7 +101,6 @@ sub pairwiseDistance{
     next if($nt1 eq $nt2);
     $pdist++;
   }
-  $pdist=int($pdist / $$settings{samplingFrequency}) if($$settings{estimate});
 
   return ($pdist,$denominator,sprintf("%0.7f",($pdist/$denominator))) if(wantarray);
   return $pdist;
@@ -121,9 +118,5 @@ sub usage{
   Usage: $0 alignment.fasta > pairwise.tsv
   --header          Display a header for the columns        
   --numcpus   1
-  -e                Estimate the number of pairwise distances using random sampling. 
-                    1/4 of all pairwise bases will be analyzed instead of 100%.
-  -s          0.25  (to be used with -e) The frequency at which to analyze 
-                    positions for pairwise differences
   "
 }

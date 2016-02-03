@@ -10,7 +10,6 @@ lib/bcftools-1.1/
 lib/bcftools-1.2/
 lib/samtools-1.2/
 lib/cg-pipeline/
-lib/phast/
 lib/phispy/
 lib/samtools-1.1/
 lib/smalt-0.7.6/

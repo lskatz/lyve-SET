@@ -24,11 +24,12 @@ use Getopt::Long;
 use File::Basename;
 use File::Spec::Functions qw/rel2abs abs2rel/;
 use File::Temp qw/tempdir/;
+use File::Copy qw/copy/;
 use threads;
 use Thread::Queue;
 use Schedule::SGELK;
 use Config::Simple;
-use Number::Range;
+use Array::IntSpan;
 
 use LyveSET qw/@fastaExt @richseqExt @fastqExt @bamExt @vcfExt rangeUnion rangeInversion/;
 
@@ -69,7 +70,7 @@ sub main{
   # Initialize settings by reading the global configuration
   # file, LyveSET.conf
   my $settings=readGlobalSettings(1);
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s qsub!)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s outdir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s qsub!)) or die $!;
 
   # What options change when --fast is used?
   if($$settings{fast}){
@@ -133,11 +134,11 @@ sub main{
 
   # Check SET directories' existence and set their defaults
   die "ERROR: could not find dir $project" if(!-e $project);
-  for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir logdir)){
+  for my $param (qw(vcfdir bamdir msadir readsdir tmpdir asmdir logdir outdir)){
     my $b=$param;
     $b=~s/dir$//;  # e.g., vcfdir => vcf
     $$settings{$param}||="$project/$b";
-    die "ERROR: Could not find $param under $$settings{$param}/\n  mkdir $$settings{$param} to resolve this problem.\n".usage($settings) if(!-d $$settings{$param});
+    die "ERROR: Could not find $param under $$settings{$param}/\n  SOLUTION: `mkdir $$settings{$param}` to resolve this problem.\n\n" if(!-d $$settings{$param});
     $$settings{$param}=rel2abs($$settings{$param});
   }
 
@@ -179,15 +180,13 @@ sub main{
   #####################################
   # Finished major steps              #
   #####################################
-
+  
   # Find the output files
-  my $absDir=rel2abs($$settings{msadir}); # save the abs. path
-  my $outPrefix="$project/out"; # consistent output naming
-  symlink("$absDir/out.RAxML_bipartitions","$outPrefix.dnd") if(-e "$absDir/out.RAxML_bipartitions");
-  symlink("$absDir/out.filteredMatrix.tsv","$outPrefix.matrix.tsv") if(-e "$absDir/out.filteredMatrix.tsv");
-  symlink("$absDir/out.informative.fasta","$outPrefix.fasta") if(-e "$absDir/out.informative.fasta");
-  symlink("$$settings{msadir}/out.pairwise.tsv","$outPrefix.pairwise.tallskinny.tsv") if(-e "$absDir/out.pairwise.tsv");
-  symlink("$$settings{msadir}/out.pairwiseMatrix.tsv","$outPrefix.pairwise.matrix.tsv") if(-e "$absDir/out.pairwiseMatrix.tsv");
+  copy("$$settings{msadir}/out.RAxML_bipartitions","$$settings{outdir}/RAxML.dnd");
+  copy("$$settings{msadir}/out.filteredMatrix.tsv","$$settings{outdir}/snpmatrix.tsv");
+  copy("$$settings{msadir}/out.informative.fasta", "$$settings{outdir}/snp.aln.fasta");
+  copy("$$settings{msadir}/out.pairwise.tsv",      "$$settings{outdir}/pairwise.tsv");
+  copy("$$settings{msadir}/out.pairwiseMatrix.tsv","$$settings{outdir}/pairwise.matrix.tsv");
 
   my $stopTimestamp=time();
   logmsg "Finished at ".strftime("\%F \%T",localtime());
@@ -322,10 +321,8 @@ sub maskReference{
     while(<BED>){
       chomp;
       my($contig,$start,$stop)=split /\t/;
-      $maskedRange{$contig}||=Number::Range->new;
-
-      no warnings;
-      $maskedRange{$contig}->addrange("$start..$stop");
+      $maskedRange{$contig}||=Array::IntSpan->new;
+      $maskedRange{$contig}->set_range($start,$stop,1);
     }
     close BED;
   }
@@ -335,8 +332,9 @@ sub maskReference{
   my $maskedRegions="$$settings{refdir}/maskedRegions.bed";
   open(MASKEDBED,">$maskedRegions") or die "ERROR: could not open $maskedRegions: $!";
   while(my($contig,$RangeObj)=each(%maskedRange)){
-    for my $range(split(/,/,$RangeObj->range)){
-      my($min,$max)=split(/\.\./,$range);
+    $RangeObj->consolidate(); # merge ranges
+    for my $rangeArr($RangeObj->get_range_list()){
+      my($min,$max)=@$rangeArr;
       logmsg "Masking ".join("\t",$contig,$min,$max);
       print MASKEDBED join("\t",$contig,$min,$max)."\n";
     }
@@ -346,18 +344,28 @@ sub maskReference{
   # Invert the coordinates to make the unmasked coordinates
   my %unmaskedRange=();
   while(my($contig,$RangeObj)=each(%maskedRange)){
-    $unmaskedRange{$contig}||=Number::Range->new(1..$seqLength{$contig}-1);
-    no warnings; # avoid Number::Range warnings 'X not in range or already removed'
-    logmsg "Deleting $contig ".$maskedRange{$contig}->range;
-    $unmaskedRange{$contig}->delrange($maskedRange{$contig}->range);
+    # Make a range spanning the whole contig
+    $unmaskedRange{$contig}||=Array::IntSpan->new;
+    $unmaskedRange{$contig}->set_range(1,$seqLength{$contig},1);
+
+    # Find where this contig has been masked
+    my @maskedRanges=$maskedRange{$contig}->get_range_list();
+    my $maskedRanges=$maskedRange{$contig}->get_range_list();
+    logmsg "Deleting from $contig: $maskedRanges";
+    # Wherever it is masked, remove it from the unmasked objects
+    for my $rangeArr(@maskedRanges){
+      $unmaskedRange{$contig}->set_range($$rangeArr[0],$$rangeArr[1],undef);
+    }
+    # Simplify the set of ranges that are unmasked
+    $maskedRange{$contig}->consolidate();
   }
 
   # Write inverted (unmasked) regions to a file
   my $unmaskedRegionsTmp="$unmaskedRegions.tmp";
   open(UNMASKEDBED,">$unmaskedRegionsTmp") or die "ERROR: could not open $unmaskedRegionsTmp: $!";
   while(my($contig,$RangeObj)=each(%unmaskedRange)){
-    for my $range(split(/,/,$RangeObj->range)){
-      my($min,$max)=split(/\.\./,$range);
+    for my $rangeArr($RangeObj->get_range_list){
+      my($min,$max)=@$rangeArr;
       logmsg "Unmasked: ".join("\t",$contig,$min,$max);
       print UNMASKEDBED join("\t",$contig,$min,$max)."\n";
     }
@@ -641,7 +649,7 @@ sub variantCalls{
       $jobname="varscan$b";
       my $varscanxopts="";
       $varscanxopts.="--region $regionsFile " if($regionsFile);
-      $varscanxopts.="--exclude $bam.cliffs.bed " if(-s "$bam.cliffs.bed");
+      $varscanxopts.="--mask $bam.cliffs.bed " if(-s "$bam.cliffs.bed");
       my $varscanCommand="$scriptsdir/launch_varscan.pl $bam --numcpus $$settings{numcpus} --tempdir $$settings{tmpdir} --reference $ref --altfreq $$settings{min_alt_frac} --coverage $$settings{min_coverage} $varscanxopts > $vcfdir/$b.vcf";
       logmsg $varscanCommand;
       $sge->pleaseExecute($varscanCommand,{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
@@ -680,8 +688,6 @@ sub variantCalls{
   logmsg "All variant-calling jobs have been submitted. Waiting on them to finish";
   $sge->wrapItUp();
 
-  # TODO set_fixVcf.pl - should it go into indexAndCompressVcf() ?
-
   return 1;
 }
 
@@ -704,7 +710,6 @@ sub indexAndCompressVcf{
   my $j={};
   eval{
     $j=$sge->pleaseExecute("
-      set_fixVcf.pl --min_alt_frac $$settings{min_alt_frac} --min_coverage $$settings{min_coverage} '$vcf' > $vcf.reevaluated && mv '$vcf.reevaluated' '$vcf' && \
       vcf-sort < '$vcf' > '$vcf.sorted.tmp' && mv '$vcf.sorted.tmp'  '$vcf' && \
       bgzip -f '$vcf' && tabix '$vcf.gz'
     ",{qsubxopts=>"-hold_jid $holdjid",jobname=>"sortAndCompress",numcpus=>1});
@@ -729,7 +734,7 @@ sub compareTaxa{
 
   if($$settings{msa} || $$settings{trees}){
     logmsg "Launching set_processPooledVcf.pl";
-    my $command="set_processPooledVcf.pl $pooled --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} 2>&1 | tee --append $$settings{logdir}/launch_set.log";
+    my $command="set_processPooledVcf.pl $pooled --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} --exclude $$settings{refdir}/maskedRegions.bed 2>&1 | tee --append $$settings{logdir}/launch_set.log";
     logmsg "Processing the pooled VCF\n  $command";
     $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"set_processPooledVcf.pl"});
     $sge->wrapItUp();
@@ -754,7 +759,10 @@ sub variantsToMatrix{
   my $logdir=$$settings{logdir};
 
   my $matrix="$msadir/out.matrix.tsv";
+  my $unFixedPooled="$msadir/out.unfixed.pooled.vcf.gz";
+  my $unFixedSnpPooled="$msadir/out.unfixed.pooled.snps.vcf.gz";
   my $pooled="$msadir/out.pooled.vcf.gz";
+  my $snpPooled="$msadir/out.pooled.snps.vcf.gz";
   if(-e $pooled){
     logmsg "Found $pooled -- already present. Not re-converting.";
     return $pooled;
@@ -772,10 +780,19 @@ sub variantsToMatrix{
 
   my $mergexopts="";
   $mergexopts.="-r $ref.regions.txt" if(-e "$ref.regions.txt" && -s "$ref.regions.txt" > 0);
-  my $mergeCommand="mergeVcf.sh $mergexopts -s -n $$settings{numcpus} -t $tmpdir -o $pooled $inVcf >&2";
+  my $mergeCommand="set_mergeVcf.sh $mergexopts -s -n $$settings{numcpus} -t $tmpdir -o $unFixedPooled $inVcf >&2";
   logmsg $mergeCommand;
   $sge->pleaseExecute($mergeCommand,{jobname=>"poolVcfs",numcpus=>$$settings{numcpus}});
   $sge->wrapItUp();
+
+  # Spruce up the VCF so that it conforms to Lyve-SET thresholds.
+  logmsg "Reevaluating the pooled VCF with set_fixVcf.pl";
+  $sge->pleaseExecute("set_fixVcf.pl --fail-samples --pass-until-fail --DP4 2 --min_coverage $$settings{min_coverage} --min_alt_frac $$settings{min_alt_frac} $unFixedPooled > $$settings{tmpdir}/out.pooled.vcf && bgzip -c $$settings{tmpdir}/out.pooled.vcf > $pooled && tabix $pooled",{jobname=>"fixPooled",numcpus=>1});
+  $sge->pleaseExecute("set_fixVcf.pl --fail-samples --pass-until-fail --DP4 2 --min_coverage $$settings{min_coverage} --min_alt_frac $$settings{min_alt_frac} $unFixedSnpPooled> $$settings{tmpdir}/out.snps.vcf && bgzip -c $$settings{tmpdir}/out.snps.vcf > $snpPooled && tabix $snpPooled",{jobname=>"fixSnpsPooled",numcpus=>1});
+  $sge->wrapItUp();
+
+  logmsg "Done reevaluating.";
+  system("rm -f $unFixedPooled $unFixedSnpPooled $$settings{tmpdir}/out.snps.vcf $$settings{tmpdir}/out.pooled.vcf");
 
   return $pooled;
 }
@@ -825,6 +842,7 @@ sub usage{
     --logdir    $$settings{logdir}    Where to put log files. Qsub commands are also stored here.
     --asmdir    $$settings{asmdir}    directory of assemblies. Copy or symlink the reference genome assembly 
                                    to use it if it is not already in the raw reads directory
+    --outdir    $$settings{logdir}    Where to put output files
 
     PERFORM CERTAIN STEPS
     --mask-phages                  Search for and mask phages in the reference genome

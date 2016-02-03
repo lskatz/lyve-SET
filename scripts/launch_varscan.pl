@@ -28,7 +28,7 @@ exit(main());
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help reference=s tempdir=s altFreq=s coverage=i region=s exclude=s numcpus=i)) or die $!;
+  GetOptions($settings,qw(help reference=s tempdir=s altFreq=s coverage=i region=s mask|exclude=s numcpus=i)) or die $!;
 
   my $bam=$ARGV[0] or die "ERROR: need bam\n".usage();
   die "ERROR: only one bam allowed right now" if (@ARGV > 1);
@@ -82,15 +82,14 @@ sub varscanWorker{
   $mpileupxopts.="--positions $$settings{region} " if($$settings{region});
 
   my $tmpdir=tempdir("$$settings{tempdir}/$samplename/varscanWorker.XXXXXX");
-  my $pileup="$tmpdir/$TID.pileup";
-  my $vcf="$tmpdir/$TID.vcf";
 
+  my $vcfCounter=0;
   while(defined(my $region=$regionQueue->dequeue)){
+    my $pileup="$tmpdir/TID$TID.$vcfCounter.pileup";
+    my $vcf="$tmpdir/TID$TID.$vcfCounter.vcf";
     # Avoid disk I/O problems by sleeping
-    # a random amount of time in this thread.
-    # The max seconds are equal to the number
-    # of threads.
-    sleep int(rand() * $$settings{numcpus});
+    # a bit of time, depending on the number of threads
+    sleep ($TID % $$settings{numcpus});
 
     # Run mpileup on this one region
     my $mpileupCommand="samtools mpileup -f $reference $mpileupxopts --region '$region' $bam > $pileup";
@@ -108,24 +107,19 @@ sub varscanWorker{
 
     # Finally run varscan on the pileup. Bgzip and index the
     # output file. Later it will be combined with bcftools concat.
-    my $varscanCommand="varscan.sh mpileup2cns $pileup --min-coverage $$settings{coverage} --min-var-freq $$settings{altFreq} --output-vcf 1 --min-avg-qual 0 > $vcf.tmp";
+    my $varscanCommand="varscan.sh mpileup2cns $pileup --min-coverage $$settings{coverage} --min-var-freq $$settings{altFreq} --output-vcf 1 --min-avg-qual 0 > $vcf.tmp.vcf";
     system($varscanCommand);
     die "ERROR with varscan!\n  $varscanCommand" if $?;
 
-    # Rename the sample 
-    open(VCFUNREFINED,"$vcf.tmp") or die "ERROR: could not open $vcf.tmp: $!";
-    open(VCFRENAMED,'>',"$vcf") or die "ERROR: could not open $vcf for writing: $!";
-    while(<VCFUNREFINED>){
-      if(/^#CHROM/){
-        s/Sample1/$samplename/;
-      }
-      print VCFRENAMED $_;
-    }
-    close VCFRENAMED;
-    close VCFUNREFINED;
-
-    # Clean up the tmp file
-    unlink("$vcf.tmp");
+    system("bgzip $vcf.tmp.vcf && tabix $vcf.tmp.vcf.gz");
+    die if $?;
+    
+    # Fix the VCF and rename the sample
+    my $maskParam="";
+       $maskParam="--mask $$settings{mask}" if($$settings{mask});
+    logmsg "Fixing the VCF into a new file $vcf";
+    system("set_fixVcf.pl --numcpus 1 --min_coverage $$settings{coverage} --min_alt_frac $$settings{altFreq} --fail-samples --pass-until-fail --DP4 2 --rename-sample $samplename $maskParam $vcf.tmp.vcf.gz > $vcf");
+    die if $?;
 
     # Compress and index
     system("bgzip $vcf"); die if $?;
@@ -134,8 +128,12 @@ sub varscanWorker{
     # Save the VCF
     system("mv -v $vcf.gz $vcf.gz.tbi $$settings{tempdir}/$samplename/ >&2");
     die if $?;
+
+    $vcfCounter++;
   }
 
+  # Some cleanup
+  system("rm -rf $tmpdir");
 }
 
 sub varscan2{

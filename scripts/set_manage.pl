@@ -23,7 +23,7 @@ use File::Slurp qw/read_file/;
 $ENV{PATH}="$ENV{PATH}:$FindBin::RealBin/../lib/edirect";
 
 # The directories a project should have
-my @projectSubdir=qw(vcf msa bam reads reference tmp asm log);
+my @projectSubdir=qw(vcf msa bam reads reference tmp asm log out);
 
 # get project test data
 my $testDir="$FindBin::RealBin/../testdata";

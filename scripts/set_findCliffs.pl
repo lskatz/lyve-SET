@@ -15,7 +15,8 @@ use Bio::FeatureIO;
 use lib "$FindBin::RealBin/../lib";
 use LyveSET qw/logmsg/;
 use lib "$FindBin::RealBin/../lib/lib/perl5";
-use Number::Range;
+#use Number::Range;
+use Array::IntSpan;
 use Statistics::LineFit;
 use Statistics::Descriptive;
 
@@ -53,9 +54,19 @@ sub main{
 
   # Find cliffs by enquing region information
   logmsg "Finding cliffs whose slopes are at least $$settings{slopeThreshold} with an rSquared value of at least $$settings{rSquaredThreshold} in a sliding window size of $$settings{windowSize}.";
-  my $seqLength=bamSeqnames($bam,$settings);
-  while(my($seqname,$length)=each(%$seqLength)){
-    $Q->enqueue([$bam,$seqname,1,$length]);
+
+  my $overlapby=$$settings{windowSize} * 3;
+  my @region=`makeRegions.pl --numcpus $$settings{numcpus} --numchunks $$settings{numcpus} --overlapby $overlapby $bam`;
+  chomp(@region);
+  for my $region(@region){
+    if($region=~/(.+?):(\d+)(-(\d+))?/){
+      my $seqname=$1;
+      my $start=$2;
+      my $end=$4 || $start;
+      $Q->enqueue([$bam,$seqname,$start,$end]);
+    } else {
+      logmsg "warning: I could not parse the region $region";
+    }
   }
 
   # Join all the threads.
@@ -71,33 +82,35 @@ sub main{
   my %cliffRange;
   for my $cliff(@cliff){
     my $name=$$cliff{seqname};
-    $cliffRange{$name}||=Number::Range->new;
-    no warnings;
-    $cliffRange{$name}->addrange($$cliff{start}..$$cliff{stop});
+    $cliffRange{$name}||=Array::IntSpan->new;
+    # rounded to the nearest 5 or whatever the user specifies as a
+    # minimum threshold.
+    my $roundedSlope=int($$cliff{slope}/$$settings{slopeThreshold})*$$settings{slopeThreshold};
+    $cliffRange{$name}->set_range($$cliff{start},$$cliff{stop},$roundedSlope);
   }
 
   # Print regions where cliffs are.
-  # TODO: print slope and rSquared next to cliffs
+  # Include slope information as the score, but its directionality
+  # as the strand.
   my $bedOut=Bio::FeatureIO->new(-format=>"bed"); # STDOUT
   for my $seqname(sort {$a cmp $b} keys(%cliffRange)){
-    my $range=$cliffRange{$seqname}->range();
+    $cliffRange{$seqname}->consolidate(); # merge intersecting regions
 
-    # some internal sorting by start
-    my @pos;
-    while($range=~/(\d+)\.\.(\d+),?/g){
-      push(@pos,[$1,$2]);
-    }
+    for my $range($cliffRange{$seqname}->get_range_list()){
+      my($lo,$hi)=@$range;
+      my $slope=$cliffRange{$seqname}->lookup($lo);
+      my $score=abs($slope);
 
-    # Print out these features in a standardized bed format
-    for my $lohi(sort {$$a[0] <=> $$b[0]} @pos){
-      my($lo,$hi)=@$lohi;
+      # Positive slope: 1; Negative slope: 0; unknown: -1
+      my $strand=1;
+         $strand=0 if($slope < 0);
+
       my $name="$seqname:$lo";
-      my $feat=Bio::SeqFeature::Annotated->new(-seq_id=>$seqname,-start=>$lo, -end=>$hi, -strand=>-1, -primary=>"Cliff", -Name=>$name, -source=>basename($0));
+      my $feat=Bio::SeqFeature::Annotated->new(-seq_id=>$seqname,-start=>$lo, -end=>$hi, -primary=>"Cliff", -Name=>$name, -source=>basename($0), -score=>$score, -strand=>$strand);
       $feat->annotation->add_Annotation("Name",Bio::Annotation::SimpleValue->new(-tagname=>"name",-value=>$name));
       $bedOut->write_feature($feat);
     }
   }
-  $bedOut->close;
 
   return 0;
 }
@@ -106,7 +119,7 @@ sub findCliffsBySlope{
   my($bam,$seqname,$pos,$lastPos,$settings)=@_;
 
   # Find the depth of the whole bam file one time, to save cpu.
-  logmsg "Calculating depth of $bam:$seqname";
+  logmsg "$bam $seqname:$pos-$lastPos";
   my (undef,$depthfile)=tempfile("depthXXXXXX",SUFFIX=>".depth",DIR=>$$settings{tempdir});
   system("samtools depth -r '$seqname' $bam > $depthfile");
   die "ERROR with samtools depth: $!" if $?;
@@ -168,38 +181,13 @@ sub findCliffsBySlope{
   return \@cliff;
 }
 
-# Use samtools view -H to find the seqnames and their lengths
-sub bamSeqnames{
-  my($bam,$settings)=@_;
-  
-  my %seqLength;
-
-  open(BAMINFO,"samtools view -H '$bam' | ") or die "ERROR: could not use samtools view on $bam: $!";
-  while(<BAMINFO>){
-    chomp;
-    my($type,@theRest)=split(/\t/,$_);
-    next if($type ne '@SQ');
-    my $theRest=join("\t",@theRest);
-
-    my ($seqname,$length);
-    while($theRest=~/(\w+?):([^\t]+)/g){
-      $seqname=$2 if($1 eq "SN");
-      $length=$2 if($1 eq "LN");
-    }
-
-    $seqLength{$seqname}=$length;
-  }
-  close BAMINFO;
-  return \%seqLength;
-}
-
 sub usage{
   "Finds cliffs in the depth in a given sorted/indexed bam file.
   Usage: $0 file.bam
   --numcpus              1
   --tempdir              ''
   --windowSize           10   How many positions are used when calculating a slope
-  --slopeThreshold       3    Ie, the depth changes X per every position in the window
+  --slopeThreshold       5    Ie, the depth changes X per every position in the window
   --rSquaredThreshold    0.7  The level of significance in the slope trendline
   "
 }

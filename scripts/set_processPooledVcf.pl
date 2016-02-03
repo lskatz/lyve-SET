@@ -27,11 +27,12 @@ sub main{
   local $0=basename $0;
   my $settings={};
 
-  GetOptions($settings,qw(help prefix=s numcpus=i tempdir=s allowed|allowedFlanking=i));
+  GetOptions($settings,qw(help prefix=s numcpus=i tempdir=s allowed|allowedFlanking=i exclude=s)) or die $!;
   $$settings{prefix}||="./out";
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("XXXXXX",TMPDIR=>1,CLEANUP=>1);
   $$settings{allowed}||=0;
+  $$settings{exclude}||="";
 
   my($VCF)=@ARGV;
   die usage() if(!$VCF || $$settings{help});
@@ -42,7 +43,11 @@ sub main{
   system("pooledToMatrix.sh -o $$settings{prefix}.snpmatrix.tsv $VCF");
   die "ERROR with pooledToMatrix" if $?;
 
-  system("filterMatrix.pl --allowedFlanking $$settings{allowed} --noinvariant-loose < $snpMatrix > $filteredMatrix");
+  # If requested, start off by excluding sites in a bed file
+  my $filterxopts="";
+     $filterxopts="--mask $$settings{exclude}" if($$settings{exclude});
+
+  system("filterMatrix.pl $filterxopts --allowedFlanking $$settings{allowed} --noinvariant-loose < $snpMatrix > $filteredMatrix");
   die if $?;
 
   my $unfilteredAlignment="$$settings{prefix}.aln.fasta";
@@ -57,7 +62,7 @@ sub main{
 
   my $pairwise="$$settings{prefix}.pairwise.tsv";
   my $pairwiseMatrix="$$settings{prefix}.pairwiseMatrix.tsv";
-  system("pairwiseDistances.pl --numcpus $$settings{numcpus} < $filteredAlignment | sort -k3,3n | tee $pairwise | pairwiseTo2d.pl > $pairwiseMatrix");
+  system("pairwiseDistancesMatrix.pl --numcpus $$settings{numcpus} --header $filteredMatrix | sort -k3,3n -k5,5n | tee $pairwise | tail -n +2 | pairwiseTo2d.pl > $pairwiseMatrix");
   die if $?;
 
   my $numSamples=`grep -c ">" $filteredAlignment` + 0;
@@ -127,5 +132,7 @@ sub usage{
   --prefix          ./out  Output file prefix. Default: current working directory
   --numcpus         1      Number of threads to use
   --allowedFlanking 0      How far apart each SNP has to be (see: filterMatrix.pl)
+  --exclude         ''     A bed file describing ranges of SNPs to exclude
+                           By default, no sites are directly excluded.
   "
 }
