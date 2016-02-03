@@ -780,7 +780,7 @@ sub variantsToMatrix{
 
   my $mergexopts="";
   $mergexopts.="-r $ref.regions.txt" if(-e "$ref.regions.txt" && -s "$ref.regions.txt" > 0);
-  my $mergeCommand="mergeVcf.sh $mergexopts -s -n $$settings{numcpus} -t $tmpdir -o $unFixedPooled $inVcf >&2";
+  my $mergeCommand="set_mergeVcf.sh $mergexopts -s -n $$settings{numcpus} -t $tmpdir -o $unFixedPooled $inVcf >&2";
   logmsg $mergeCommand;
   $sge->pleaseExecute($mergeCommand,{jobname=>"poolVcfs",numcpus=>$$settings{numcpus}});
   $sge->wrapItUp();

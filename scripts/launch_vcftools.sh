@@ -166,7 +166,7 @@ COMMAND="$(echo $VCFFMT $VCF $OUTPREF $COVERAGE $FLANK $MINQ $REGION $EXCLUDE $D
 vcftools $COMMAND 2> /dev/null
 echo 'VCFtools completed'
 [[ -n "$MPILEUP" ]] && rm -v "$TMP"/"$B".vcf
-#discard PL field due to inconsisent lines which breaks downstream mergeVcf.sh (that invokes bcftools merge); some lines='GT:PL	1/1:255,63,0', others='GT:PL	1/1:0,105:94:99:255,255,0'
+#discard PL field due to inconsisent lines which breaks downstream set_mergeVcf.sh (that invokes bcftools merge); some lines='GT:PL	1/1:255,63,0', others='GT:PL	1/1:0,105:94:99:255,255,0'
 vcffilter -g 'GT = 1/1' "$TMP"/"$B".recode.vcf | vcffixup - | vcffilter -f 'AC > 0' | vcf-sort | bcftools annotate -x PL,FORMAT - | bcftools reheader -s "$TMP"/sampleID - > "$TMP"/"$B".vcf 
 echo 'vcffilter completed'
 
