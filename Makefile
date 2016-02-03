@@ -15,11 +15,11 @@ PREFIXNOTE="Must be an absolute path directory. Default: $(PWD)"
 
 .DEFAULT: install
 
-.PHONY: install install-perlModules install-config install-prerequisites
+.PHONY: install install-perlModules install-config core extras
 
 .DELETE_ON_ERROR:
 
-install: install-prerequisites
+install: core
 	# Making sure prereqs are in place
 	@blastp -version
 	@perl -v | grep -i version
@@ -29,8 +29,13 @@ install: install-prerequisites
 	@echo "Don't forget to include scripts in your PATH"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: scripts/vcf-sort lib/Vcf.pm scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar scripts/vcffixup scripts/samtools scripts/wgsim scripts/bgzip scripts/tabix scripts/bcftools scripts/vcfutils.pl scripts/smalt scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/snpEff.jar scripts/stampy.py scripts/bowtie2 scripts/bwa lib/datasets/scripts/downloadDataset.pl
-	@echo DONE installing prerequisites
+all: core extras
+
+core: scripts/run_assembly_isFastqPE.pl scripts/run_assembly_trimClean.pl scripts/run_assembly_shuffleReads.pl scripts/run_assembly_removeDuplicateReads.pl scripts/run_assembly_readMetrics.pl scripts/run_assembly_metrics.pl scripts/wgsim scripts/vcf-sort lib/Vcf.pm lib/Schedule/SGELK.pm lib/varscan.v2.3.7.jar scripts/samtools scripts/bgzip scripts/tabix scripts/bcftools scripts/smalt scripts/raxmlHPC scripts/raxmlHPC-PTHREADS install-perlModules install-config lib/datasets/scripts/downloadDataset.pl
+	@echo DONE installing core prerequisites
+
+extras: scripts/vcfutils.pl scripts/basqcol scripts/fetchseq scripts/mixreads scripts/readstats scripts/simqual scripts/simread scripts/splitmates scripts/splitreads scripts/trunkreads scripts/snap scripts/snapxl scripts/stampy.py scripts/bowtie2 scripts/bwa
+	@echo DONE installing extras
 
 scripts/vcffilter:
 	rm -rf {build,lib}/vcflib
@@ -56,8 +61,8 @@ scripts/vcf-sort:
 lib/Vcf.pm: scripts/vcf-sort
 	cp lib/vcftools-0.1.14/src/perl/Vcf.pm $@
 
+# CGP scripts that are needed and that don't depend on CGP libraries
 scripts/run_assembly_isFastqPE.pl: 
-	# CGP scripts that are needed and that don't depend on CGP libraries
 	git clone https://github.com/lskatz/cg-pipeline lib/cg-pipeline
 	ln -sf ../lib/cg-pipeline/scripts/run_assembly_isFastqPE.pl $@
 scripts/run_assembly_trimClean.pl: scripts/run_assembly_isFastqPE.pl
