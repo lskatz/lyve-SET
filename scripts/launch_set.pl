@@ -791,8 +791,8 @@ sub variantsToMatrix{
 
   # Spruce up the VCF so that it conforms to Lyve-SET thresholds.
   logmsg "Reevaluating the pooled VCF with set_fixVcf.pl";
-  $sge->pleaseExecute("set_fixVcf.pl --fail-samples --pass-until-fail --DP4 2 --min_coverage $$settings{min_coverage} --min_alt_frac $$settings{min_alt_frac} $unFixedPooled > $$settings{tmpdir}/out.pooled.vcf && bgzip -c $$settings{tmpdir}/out.pooled.vcf > $pooled && tabix $pooled",{jobname=>"fixPooled",numcpus=>1});
-  $sge->pleaseExecute("set_fixVcf.pl --fail-samples --pass-until-fail --DP4 2 --min_coverage $$settings{min_coverage} --min_alt_frac $$settings{min_alt_frac} $unFixedSnpPooled> $$settings{tmpdir}/out.snps.vcf && bgzip -c $$settings{tmpdir}/out.snps.vcf > $snpPooled && tabix $snpPooled",{jobname=>"fixSnpsPooled",numcpus=>1});
+  $sge->pleaseExecute("set_fixVcf.pl --fail-samples --pass-until-fail --DP4 2 --min_coverage $$settings{min_coverage} --min_alt_frac $$settings{min_alt_frac} $unFixedPooled > $$settings{tmpdir}/out.pooled.vcf && bgzip -c $$settings{tmpdir}/out.pooled.vcf > $pooled && tabix -f $pooled",{jobname=>"fixPooled",numcpus=>1});
+  $sge->pleaseExecute("set_fixVcf.pl --fail-samples --pass-until-fail --DP4 2 --min_coverage $$settings{min_coverage} --min_alt_frac $$settings{min_alt_frac} $unFixedSnpPooled> $$settings{tmpdir}/out.snps.vcf && bgzip -c $$settings{tmpdir}/out.snps.vcf > $snpPooled && tabix -f $snpPooled",{jobname=>"fixSnpsPooled",numcpus=>1});
   $sge->wrapItUp();
 
   logmsg "Done reevaluating.";
