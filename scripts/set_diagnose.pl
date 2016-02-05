@@ -110,7 +110,7 @@ sub reportMaskedGenomes{
 
     # split that index into site info and sample info
     for(qw(CHROM POS REF)){
-      die "ERROR: field $_ was not found in $matrix" if(!$site{$_});
+      die "ERROR: field $_ was not found in $matrix ".Dumper \%sample if(!$sample{$_});
       $site{$_}=$sample{$_};
       delete($sample{$_});
     }
