@@ -45,7 +45,8 @@ fi
 
 # bcftools query
 t='\t'
-command="bcftools query -i '%TYPE=\"snp\"' -f '%CHROM$t%POS$t%REF$t[%TGT$t]\\n' --print-header $IN > $OUT.unrefined.tmp"
+n='\n'
+command="bcftools query -i '%TYPE=\"snp\"' -f '%CHROM$t%POS$t%REF$t[%TGT$t]$n' --print-header $IN > $OUT.unrefined.tmp"
 logmsg $command;
 eval $command
 if [ $? -gt 0 ]; then
