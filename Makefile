@@ -209,7 +209,7 @@ install-config:
 	cp -vn $(PREFIX)/config/original/*.conf $(PREFIX)/config/
 
 clean-config:
-	rm -v $(PREFIX)/config/*.conf
+	rm -vf $(PREFIX)/config/*.conf
 
 env:
 	echo "#Lyve-SET" >> $(PROFILE)
