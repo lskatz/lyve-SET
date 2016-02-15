@@ -7,7 +7,7 @@ use Getopt::Long;
 use Bio::Perl;
 use File::Basename;
 use File::Temp qw/tempdir/;
-use List::Util qw/min max/;
+use List::Util qw/min max sum/;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
@@ -54,6 +54,7 @@ sub filterSites{
   if($bcfqueryFile){
     open($fp,"<",$bcfqueryFile) or die "ERROR: could not open bcftools query file $bcfqueryFile for reading: $!";
   } else {
+    logmsg "Input file not given. Reading from stdin";
     $fp=*STDIN;
   }
 
@@ -67,43 +68,24 @@ sub filterSites{
   $header=~s/^\s+|^#|\s+$//g; # trim and remove pound sign
   my @header=split /\t/, $header;
 
-  # Read the actual content with variant calls
-  my ($currentPos,$currentChr);
   while(my $bcfMatrixLine=<$fp>){
-    my $lineLength=length($bcfMatrixLine);  # for seeking
     chomp $bcfMatrixLine;
 
-    # start by assuming that this is a high-quality site
+    # Start by assuming that this is a high-quality site
+    # i.e., innocent until proven guilty.
     my $hqSite=1;
 
     # get the fields from the matrix
     my($CONTIG,$POS,$REF,@GT)=split(/\t/,$bcfMatrixLine);
     my $numAlts=@GT;
 
+    # Change the geotype to haploid.
     for(my $i=0;$i<$numAlts;$i++){
       $GT[$i]=diploidGtToHaploid($GT[$i],$REF,$settings);
     }
 
-    # get the values of the contig/pos if they aren't set
-    if(!defined($currentChr) || $CONTIG ne $currentChr){
-      # If the contig's value has switched, then undefine the position and start comparing on the new contig
-      undef($currentChr);
-      undef($currentPos);
-
-      # start anew with these coordinates
-      $currentChr=$CONTIG;
-      $currentPos=$POS;
-      seek($fp,-$lineLength,1);
-      next;
-    }
-    # Alter the bcf line after the seeking line, so that the correct seek length can be established.
-    $bcfMatrixLine=join("\t",$CONTIG,$POS,$REF,@GT);
-
     # Mask any site found in the BED files
     $hqSite=0 if(defined($$maskedRanges{$CONTIG}) && $$maskedRanges{$CONTIG}->inrange($POS));
-
-    # High-quality sites are far enough away from each other, as defined by the user
-    $hqSite=0 if($POS - $currentPos < $$settings{allowed});
 
     # Simply get rid of any site that consists of all Ns
     # TODO make this optional somehow.
@@ -111,7 +93,7 @@ sub filterSites{
     for(my $i=0;$i<$numAlts;$i++){
       if($GT[$i]!~/N/i){
         $is_allNs=0;
-        last; # save a nanosecond
+        last; # No need to loop over the other ALTs if a nonN was found
       }
     }
     $hqSite=0 if($is_allNs);
@@ -159,15 +141,41 @@ sub filterSites{
       $hqSite=0 if(!$is_variant);
     }
     
-    # print out the results
-    print $bcfMatrixLine ."\n" if($hqSite);
+    # Print out the results
+    if($hqSite){
+      print $bcfMatrixLine ."\n";
+      seekToPosition($CONTIG,$POS+$$settings{allowed},$fp,$settings)
+    }
 
-    # update the position
-    $currentPos=$POS;
   }
   close $fp;
 
   return 1;
+}
+
+# Seek ahead to a certain position in the VCF. If that pos
+# is not found, go to the 1st pos in the next contig.
+# Then, seek back one line if it's not the same pos
+# going into the sub as going out.
+sub seekToPosition{
+  my($seekContig,$seekPos,$fp,$settings)=@_;
+
+  return if($$settings{allowed} < 2);
+
+  my $numLinesAdvanced=0;
+  my @lineLength=();
+  while(my $line=<$fp>){
+    push(@lineLength,length($line));
+    chomp $line;
+    $numLinesAdvanced++;
+
+    my($CONTIG,$POS,$REF,@GT)=split(/\t/,$line);
+    if($CONTIG ne $seekContig || $POS >= $seekPos){
+      my $bytesToGoBack=-1 * $lineLength[-1];
+      seek($fp,$bytesToGoBack,1);
+      last;
+    }
+  }
 }
 
 sub diploidGtToHaploid{
@@ -236,7 +244,8 @@ sub usage{
                                 ambiguities when deciding whether a site is 
                                 variant. Sites can consist of only REF and N.
   --allowed           0         How close SNPs can be from each other before 
-                                being thrown out
+                                being thrown out. Zero or one means they can
+                                be adjacent.
   --tempdir           tmp       temporary directory
   --mask              file.bed  BED-formatted file of regions to exclude.
                                 Multiple --mask flags are allowed for multiple
