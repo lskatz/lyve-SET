@@ -16,19 +16,20 @@ use LyveSET qw/logmsg/;
 use lib "$FindBin::RealBin/../lib/lib/perl5";
 use Number::Range;
 
-use constant reportEvery=>10000;
+use constant reportEvery=>100000;
 
 $0=fileparse $0;
 
 exit main();
 sub main{
   my $settings={ambiguities=>1,invariant=>1, 'invariant-loose'=>1};
-  GetOptions($settings,qw(help ambiguities! invariant! tempdir=s allowed|allowedFlanking=i mask=s@ invariant-loose!)) or die $!;
+  GetOptions($settings,qw(help ambiguities! invariant! tempdir=s allowed|allowedFlanking=i mask=s@ invariant-loose! numcpus=i)) or die $!;
   die usage() if($$settings{help});
   $$settings{tempdir}||=tempdir("$0XXXXXX",TMPDIR=>1,CLEANUP=>1);
   $$settings{allowed}||=0;
   $$settings{mask}||=[];
   $$settings{invariant}=0 if(!$$settings{'invariant-loose'});
+  $$settings{numcpus}||=1;
 
   my($in)=@ARGV;
   $in or die "ERROR: need input file\n".usage();
@@ -70,6 +71,7 @@ sub filterSites{
   my $outputSitesCount=0;
   while(my $bcfMatrixLine=<$fp>){
     chomp $bcfMatrixLine;
+    $inputSitesCount++;
 
     # Start by assuming that this is a high-quality site
     # i.e., innocent until proven guilty.
@@ -160,14 +162,18 @@ sub filterSites{
       $outputSitesCount++;
     }
 
-    if(++$inputSitesCount % reportEvery == 0){
+    if($inputSitesCount % reportEvery == 0){
       my $hqPercent=sprintf("%0.4f",($outputSitesCount/$inputSitesCount*100))."%";
       logmsg "Reviewed $inputSitesCount sites so far with $outputSitesCount hqSites accepted ($hqPercent)";
     }
   }
   close $fp;
 
-  return 1;
+  my $hqPercent=sprintf("%0.4f",($outputSitesCount/$inputSitesCount*100))."%";
+  logmsg "Finished reviewing $inputSitesCount sites with $outputSitesCount hqSites accepted ($hqPercent)";
+
+  return ($inputSitesCount,$outputSitesCount) if wantarray;
+  return $inputSitesCount;
 }
 
 # Seek ahead to a certain position in the VCF. If that pos
@@ -268,5 +274,6 @@ sub usage{
   --mask              file.bed  BED-formatted file of regions to exclude.
                                 Multiple --mask flags are allowed for multiple
                                 bed files.
+  --numcpus           1         (not yet implemented)
   "
 }
