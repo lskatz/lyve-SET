@@ -8,12 +8,15 @@ use Bio::Perl;
 use File::Basename;
 use File::Temp qw/tempdir/;
 use List::Util qw/min max sum/;
+use Fcntl qw(SEEK_SET SEEK_CUR SEEK_END); #SEEK_SET=0 SEEK_CUR=1 ...
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
 use LyveSET qw/logmsg/;
 use lib "$FindBin::RealBin/../lib/lib/perl5";
 use Number::Range;
+
+use constant reportEvery=>10000;
 
 $0=fileparse $0;
 
@@ -28,7 +31,7 @@ sub main{
   $$settings{invariant}=0 if(!$$settings{'invariant-loose'});
 
   my($in)=@ARGV;
-  $in||=""; # avoid undefined warnings
+  $in or die "ERROR: need input file\n".usage();
 
   # Explain the settings for this script.
   my $settingsString="";
@@ -51,12 +54,7 @@ sub filterSites{
 
   # Open the unfiltered BCF query file
   my $fp;
-  if($bcfqueryFile){
-    open($fp,"<",$bcfqueryFile) or die "ERROR: could not open bcftools query file $bcfqueryFile for reading: $!";
-  } else {
-    logmsg "Input file not given. Reading from stdin";
-    $fp=*STDIN;
-  }
+  open($fp,"<",$bcfqueryFile) or die "ERROR: could not open bcftools query file $bcfqueryFile for reading: $!";
 
   # If there are any coordinates explicitly listed for masking,
   # combine them all into a single range object, one per seqname.
@@ -68,6 +66,8 @@ sub filterSites{
   $header=~s/^\s+|^#|\s+$//g; # trim and remove pound sign
   my @header=split /\t/, $header;
 
+  my $inputSitesCount=0;
+  my $outputSitesCount=0;
   while(my $bcfMatrixLine=<$fp>){
     chomp $bcfMatrixLine;
 
@@ -78,6 +78,12 @@ sub filterSites{
     # get the fields from the matrix
     my($CONTIG,$POS,$REF,@GT)=split(/\t/,$bcfMatrixLine);
     my $numAlts=@GT;
+
+    # If the user wants to make sure that this snp is --allowedFlanking
+    # SNPs apart from other SNPs, make sure it is that many
+    # positions away from the beginning of the contig.
+    next if($POS < $$settings{allowed});
+    # TODO: also do this for the end of the contig if the lengths are known.
 
     # Change the geotype to haploid.
     for(my $i=0;$i<$numAlts;$i++){
@@ -141,12 +147,23 @@ sub filterSites{
       $hqSite=0 if(!$is_variant);
     }
     
-    # Print out the results
+    # Special things happen if we see an hq site
     if($hqSite){
+      # Print out the results
       print $bcfMatrixLine ."\n";
-      seekToPosition($CONTIG,$POS+$$settings{allowed},$fp,$settings)
+
+      # Move ahead $$settings{allowed} positions to 
+      # separate flanking hq sites
+      my $numSitesSkipped=seekToPosition($CONTIG,$POS+$$settings{allowed},$fp,$settings);
+
+      $inputSitesCount+=$numSitesSkipped;
+      $outputSitesCount++;
     }
 
+    if(++$inputSitesCount % reportEvery == 0){
+      my $hqPercent=sprintf("%0.4f",($outputSitesCount/$inputSitesCount*100))."%";
+      logmsg "Reviewed $inputSitesCount sites so far with $outputSitesCount hqSites accepted ($hqPercent)";
+    }
   }
   close $fp;
 
@@ -160,8 +177,6 @@ sub filterSites{
 sub seekToPosition{
   my($seekContig,$seekPos,$fp,$settings)=@_;
 
-  return if($$settings{allowed} < 2);
-
   my $numLinesAdvanced=0;
   my @lineLength=();
   while(my $line=<$fp>){
@@ -171,11 +186,15 @@ sub seekToPosition{
 
     my($CONTIG,$POS,$REF,@GT)=split(/\t/,$line);
     if($CONTIG ne $seekContig || $POS >= $seekPos){
-      my $bytesToGoBack=-1 * $lineLength[-1];
-      seek($fp,$bytesToGoBack,1);
+      my $bytesToGoBack = $lineLength[-1];
+      my $whence=1; 
+      seek($fp,-$bytesToGoBack,$whence) or die "ERROR: could not seek in the input file ($bytesToGoBack, $whence): $!";
+      $numLinesAdvanced--;
       last;
     }
   }
+
+  return $numLinesAdvanced;
 }
 
 sub diploidGtToHaploid{
@@ -236,7 +255,6 @@ sub usage{
   $0: filters a bcftools query matrix. The first three columns of the matrix are contig/pos/ref, and the next columns are all GT.
   Usage: 
     $0 bcftools.tsv > filtered.tsv
-    $0 < bcftools.tsv > filtered.tsv # read stdin
   --noambiguities               Remove any site with an ambiguity
                                 (i.e., complete deletion)
   --noinvariant                 Remove any site whose alts are all equal.
