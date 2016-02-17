@@ -1,5 +1,6 @@
 #!/usr/bin/env perl
 
+require 5.12.0;
 use strict;
 use warnings;
 use Data::Dumper;
@@ -22,13 +23,15 @@ $0=fileparse $0;
 
 exit main();
 sub main{
-  my $settings={ambiguities=>1,invariant=>1, 'invariant-loose'=>1};
-  GetOptions($settings,qw(help ambiguities! invariant! tempdir=s allowed|allowedFlanking=i mask=s@ invariant-loose! numcpus=i)) or die $!;
+  my $settings={};
+  GetOptions($settings,qw(help ambiguities|ambiguities-allowed! invariant! tempdir=s allowed|allowedFlanking=i mask=s@ numcpus=i Ns-as-ref)) or die $!;
   die usage() if($$settings{help});
+  $$settings{ambiguities}//=0;
+  $$settings{invariant}//=0;
+  $$settings{'Ns-as-ref'}//=0;
   $$settings{tempdir}||=tempdir("$0XXXXXX",TMPDIR=>1,CLEANUP=>1);
   $$settings{allowed}||=0;
   $$settings{mask}||=[];
-  $$settings{invariant}=0 if(!$$settings{'invariant-loose'});
   $$settings{numcpus}||=1;
 
   my($in)=@ARGV;
@@ -91,6 +94,8 @@ sub filterSites{
     for(my $i=0;$i<$numAlts;$i++){
       $GT[$i]=diploidGtToHaploid($GT[$i],$REF,$settings);
     }
+    # Save these genotypes for printing later, even if @GT gets altered.
+    #my @GT_original=@GT; # ACTUALLY: @GT is not printed anyway
 
     # Mask any site found in the BED files
     $hqSite=0 if(defined($$maskedRanges{$CONTIG}) && $$maskedRanges{$CONTIG}->inrange($POS));
@@ -105,6 +110,12 @@ sub filterSites{
       }
     }
     $hqSite=0 if($is_allNs);
+
+    if($$settings{'Ns-as-ref'}){
+      for(@GT){
+        $_=$REF if($_ =~/[Nn\.]/);
+      }
+    }
 
     # The user can specify that high quality sites are those where every site is defined
     # (ie through --noambiguities)
@@ -140,8 +151,8 @@ sub filterSites{
       # until proven otherwise.
       my $is_variant=0;
       for(my $i=1;$i<$numAlts;$i++){
+        # TODO look at this position
         if($GT[$i] ne $altRef){
-          next if(!$$settings{'invariant-loose'} &&  $GT[$i]=~/N/i);
           $is_variant=1;
           last; # save a nanosecond of time here
         }
@@ -206,11 +217,13 @@ sub seekToPosition{
 sub diploidGtToHaploid{
   my($gt,$REF,$settings)=@_;
 
+  # GT are in the format of N/N or N
   my($gt1,$gt2)=split(/\//,$gt);
-  $gt2||=$gt1;
+  $gt2||=$gt1; # if it was already haploid, temporarily change it to homozygous diploid
   for($gt1,$gt2){
-    $_=$REF if($_ eq ".");
+    $_='N' if($_ eq ".");
   }
+  # If heterozygous, then it is masked
   if($gt1 ne $gt2){
     $gt="N";
   } else {
@@ -261,12 +274,13 @@ sub usage{
   $0: filters a bcftools query matrix. The first three columns of the matrix are contig/pos/ref, and the next columns are all GT.
   Usage: 
     $0 bcftools.tsv > filtered.tsv
-  --noambiguities               Remove any site with an ambiguity
-                                (i.e., complete deletion)
-  --noinvariant                 Remove any site whose alts are all equal.
-  --noinvariant-loose           Invokes --noinvariant, but does not consider 
-                                ambiguities when deciding whether a site is 
-                                variant. Sites can consist of only REF and N.
+  --ambiguities                 Keep sites with ambiguities
+  --invariant                   Keep sites that are invariant
+  --Ns-as-ref                   When considering ambiguities and invariant
+                                sites, pretend Ns are equal to REF. This
+                                will not change Ns to REF in the output.
+                                If this option is not used, then a site with
+                                an N will be considered variant.
   --allowed           0         How close SNPs can be from each other before 
                                 being thrown out. Zero or one means they can
                                 be adjacent.
@@ -275,5 +289,6 @@ sub usage{
                                 Multiple --mask flags are allowed for multiple
                                 bed files.
   --numcpus           1         (not yet implemented)
+
   "
 }

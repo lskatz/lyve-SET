@@ -42,7 +42,7 @@ sub main{
   system("pooledToMatrix.sh -o $$settings{prefix}.snpmatrix.tsv $VCF");
   die "ERROR with pooledToMatrix" if $?;
 
-  system("filterMatrix.pl --allowedFlanking $$settings{allowed} --noinvariant-loose < $snpMatrix > $filteredMatrix");
+  system("filterMatrix.pl --allowedFlanking $$settings{allowed} --ambiguities --Ns-as-ref < $snpMatrix > $filteredMatrix");
   die if $?;
 
   my $unfilteredAlignment="$$settings{prefix}.aln.fasta";
