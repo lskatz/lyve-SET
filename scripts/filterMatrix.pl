@@ -1,5 +1,6 @@
 #!/usr/bin/env perl
 
+require 5.12.0;
 use strict;
 use warnings;
 use Data::Dumper;
@@ -8,6 +9,7 @@ use Bio::Perl;
 use File::Basename;
 use File::Temp qw/tempdir/;
 use List::Util qw/min max sum/;
+use Fcntl qw(SEEK_SET SEEK_CUR SEEK_END); #SEEK_SET=0 SEEK_CUR=1 ...
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
@@ -15,20 +17,25 @@ use LyveSET qw/logmsg/;
 use lib "$FindBin::RealBin/../lib/lib/perl5";
 use Number::Range;
 
+use constant reportEvery=>100000;
+
 $0=fileparse $0;
 
 exit main();
 sub main{
-  my $settings={ambiguities=>1,invariant=>1, 'invariant-loose'=>1};
-  GetOptions($settings,qw(help ambiguities! invariant! tempdir=s allowed|allowedFlanking=i mask=s@ invariant-loose!)) or die $!;
+  my $settings={};
+  GetOptions($settings,qw(help ambiguities|ambiguities-allowed! invariant! tempdir=s allowed|allowedFlanking=i mask=s@ numcpus=i Ns-as-ref)) or die $!;
   die usage() if($$settings{help});
+  $$settings{ambiguities}//=0;
+  $$settings{invariant}//=0;
+  $$settings{'Ns-as-ref'}//=0;
   $$settings{tempdir}||=tempdir("$0XXXXXX",TMPDIR=>1,CLEANUP=>1);
   $$settings{allowed}||=0;
   $$settings{mask}||=[];
-  $$settings{invariant}=0 if(!$$settings{'invariant-loose'});
+  $$settings{numcpus}||=1;
 
   my($in)=@ARGV;
-  $in||=""; # avoid undefined warnings
+  $in or die "ERROR: need input file\n".usage();
 
   # Explain the settings for this script.
   my $settingsString="";
@@ -51,12 +58,7 @@ sub filterSites{
 
   # Open the unfiltered BCF query file
   my $fp;
-  if($bcfqueryFile){
-    open($fp,"<",$bcfqueryFile) or die "ERROR: could not open bcftools query file $bcfqueryFile for reading: $!";
-  } else {
-    logmsg "Input file not given. Reading from stdin";
-    $fp=*STDIN;
-  }
+  open($fp,"<",$bcfqueryFile) or die "ERROR: could not open bcftools query file $bcfqueryFile for reading: $!";
 
   # If there are any coordinates explicitly listed for masking,
   # combine them all into a single range object, one per seqname.
@@ -68,8 +70,11 @@ sub filterSites{
   $header=~s/^\s+|^#|\s+$//g; # trim and remove pound sign
   my @header=split /\t/, $header;
 
+  my $inputSitesCount=0;
+  my $outputSitesCount=0;
   while(my $bcfMatrixLine=<$fp>){
     chomp $bcfMatrixLine;
+    $inputSitesCount++;
 
     # Start by assuming that this is a high-quality site
     # i.e., innocent until proven guilty.
@@ -79,10 +84,18 @@ sub filterSites{
     my($CONTIG,$POS,$REF,@GT)=split(/\t/,$bcfMatrixLine);
     my $numAlts=@GT;
 
+    # If the user wants to make sure that this snp is --allowedFlanking
+    # SNPs apart from other SNPs, make sure it is that many
+    # positions away from the beginning of the contig.
+    next if($POS < $$settings{allowed});
+    # TODO: also do this for the end of the contig if the lengths are known.
+
     # Change the geotype to haploid.
     for(my $i=0;$i<$numAlts;$i++){
       $GT[$i]=diploidGtToHaploid($GT[$i],$REF,$settings);
     }
+    # Save these genotypes for printing later, even if @GT gets altered.
+    #my @GT_original=@GT; # ACTUALLY: @GT is not printed anyway
 
     # Mask any site found in the BED files
     $hqSite=0 if(defined($$maskedRanges{$CONTIG}) && $$maskedRanges{$CONTIG}->inrange($POS));
@@ -97,6 +110,12 @@ sub filterSites{
       }
     }
     $hqSite=0 if($is_allNs);
+
+    if($$settings{'Ns-as-ref'}){
+      for(@GT){
+        $_=$REF if($_ =~/[Nn\.]/);
+      }
+    }
 
     # The user can specify that high quality sites are those where every site is defined
     # (ie through --noambiguities)
@@ -132,8 +151,8 @@ sub filterSites{
       # until proven otherwise.
       my $is_variant=0;
       for(my $i=1;$i<$numAlts;$i++){
+        # TODO look at this position
         if($GT[$i] ne $altRef){
-          next if(!$$settings{'invariant-loose'} &&  $GT[$i]=~/N/i);
           $is_variant=1;
           last; # save a nanosecond of time here
         }
@@ -141,16 +160,31 @@ sub filterSites{
       $hqSite=0 if(!$is_variant);
     }
     
-    # Print out the results
+    # Special things happen if we see an hq site
     if($hqSite){
+      # Print out the results
       print $bcfMatrixLine ."\n";
-      seekToPosition($CONTIG,$POS+$$settings{allowed},$fp,$settings)
+
+      # Move ahead $$settings{allowed} positions to 
+      # separate flanking hq sites
+      my $numSitesSkipped=seekToPosition($CONTIG,$POS+$$settings{allowed},$fp,$settings);
+
+      $inputSitesCount+=$numSitesSkipped;
+      $outputSitesCount++;
     }
 
+    if($inputSitesCount % reportEvery == 0){
+      my $hqPercent=sprintf("%0.4f",($outputSitesCount/$inputSitesCount*100))."%";
+      logmsg "Reviewed $inputSitesCount sites so far with $outputSitesCount hqSites accepted ($hqPercent)";
+    }
   }
   close $fp;
 
-  return 1;
+  my $hqPercent=sprintf("%0.4f",($outputSitesCount/$inputSitesCount*100))."%";
+  logmsg "Finished reviewing $inputSitesCount sites with $outputSitesCount hqSites accepted ($hqPercent)";
+
+  return ($inputSitesCount,$outputSitesCount) if wantarray;
+  return $inputSitesCount;
 }
 
 # Seek ahead to a certain position in the VCF. If that pos
@@ -159,8 +193,6 @@ sub filterSites{
 # going into the sub as going out.
 sub seekToPosition{
   my($seekContig,$seekPos,$fp,$settings)=@_;
-
-  return if($$settings{allowed} < 2);
 
   my $numLinesAdvanced=0;
   my @lineLength=();
@@ -171,21 +203,27 @@ sub seekToPosition{
 
     my($CONTIG,$POS,$REF,@GT)=split(/\t/,$line);
     if($CONTIG ne $seekContig || $POS >= $seekPos){
-      my $bytesToGoBack=-1 * $lineLength[-1];
-      seek($fp,$bytesToGoBack,1);
+      my $bytesToGoBack = $lineLength[-1];
+      my $whence=1; 
+      seek($fp,-$bytesToGoBack,$whence) or die "ERROR: could not seek in the input file ($bytesToGoBack, $whence): $!";
+      $numLinesAdvanced--;
       last;
     }
   }
+
+  return $numLinesAdvanced;
 }
 
 sub diploidGtToHaploid{
   my($gt,$REF,$settings)=@_;
 
+  # GT are in the format of N/N or N
   my($gt1,$gt2)=split(/\//,$gt);
-  $gt2||=$gt1;
+  $gt2||=$gt1; # if it was already haploid, temporarily change it to homozygous diploid
   for($gt1,$gt2){
-    $_=$REF if($_ eq ".");
+    $_='N' if($_ eq ".");
   }
+  # If heterozygous, then it is masked
   if($gt1 ne $gt2){
     $gt="N";
   } else {
@@ -236,13 +274,13 @@ sub usage{
   $0: filters a bcftools query matrix. The first three columns of the matrix are contig/pos/ref, and the next columns are all GT.
   Usage: 
     $0 bcftools.tsv > filtered.tsv
-    $0 < bcftools.tsv > filtered.tsv # read stdin
-  --noambiguities               Remove any site with an ambiguity
-                                (i.e., complete deletion)
-  --noinvariant                 Remove any site whose alts are all equal.
-  --noinvariant-loose           Invokes --noinvariant, but does not consider 
-                                ambiguities when deciding whether a site is 
-                                variant. Sites can consist of only REF and N.
+  --ambiguities                 Keep sites with ambiguities
+  --invariant                   Keep sites that are invariant
+  --Ns-as-ref                   When considering ambiguities and invariant
+                                sites, pretend Ns are equal to REF. This
+                                will not change Ns to REF in the output.
+                                If this option is not used, then a site with
+                                an N will be considered variant.
   --allowed           0         How close SNPs can be from each other before 
                                 being thrown out. Zero or one means they can
                                 be adjacent.
@@ -250,5 +288,7 @@ sub usage{
   --mask              file.bed  BED-formatted file of regions to exclude.
                                 Multiple --mask flags are allowed for multiple
                                 bed files.
+  --numcpus           1         (not yet implemented)
+
   "
 }
