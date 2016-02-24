@@ -84,11 +84,14 @@ sub shuffleWorker{
   while(defined(my $tmp=$Q->dequeue)){
     my($basename,$reads)=@$tmp;
 
-    logmsg "Looking for $basename";
-    my $outfile="$outdir/$basename.fastq.gz";
-    next if(-e $outfile);
-
-    system("run_assembly_shuffleReads.pl $$reads{1} $$reads{2} | gzip -c > $outfile.tmp");
+    my $outfile="$outdir/".basename($basename).".fastq.gz";
+    logmsg "Looking for $basename*";
+    if(-e $outfile){
+      logmsg "Found $outfile; will not reshuffle";
+      next;
+    }
+    my $command="run_assembly_shuffleReads.pl $$reads{1} $$reads{2} | gzip -c > $outfile.tmp";
+    system($command);
     die "ERROR with run_assembly_shuffleReads.pl" if $?;
     system("mv -v $outfile.tmp $outfile");
   }
@@ -99,6 +102,7 @@ sub usage{
   "$0: shuffle a set of fastq files into a directory. Uses run_assembly_shuffleReads.pl.
   Usage: $0 *.fastq.gz -o outdir
   --outdir  output directory
+  --numcpus How many sets of reads to shuffle at once.  Be careful of disk I/O.
   --regex   A regular expression with parentheses to capture the basename of both F/R files. Also must have parentheses to capture the second half of the filename.
   "
 }
