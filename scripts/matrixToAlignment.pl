@@ -8,6 +8,7 @@ use Data::Dumper;
 use Getopt::Long;
 use Bio::Perl;
 use File::Basename;
+use constant reportEvery => 100000;
 
 $0=fileparse $0;
 sub logmsg{print STDERR "$0: @_\n";}
@@ -87,7 +88,7 @@ sub bcfqueryToFasta{
       $matrix{$genome}{$extra{CHROM}}{$extra{POS}}=$nt;
     }
     $i++;
-    if($i % 10000 == 0){
+    if($i % reportEvery == 0){
       logmsg "Finished calling $i SNPs";
     }
   }
