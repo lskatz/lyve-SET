@@ -101,22 +101,27 @@ sub filterSites{
     $hqSite=0 if(defined($$maskedRanges{$CONTIG}) && $$maskedRanges{$CONTIG}->inrange($POS));
 
     # Simply get rid of any site that consists of all Ns
-    # TODO make this optional somehow.
     my $is_allNs=1;
+    # Need a ref base that will be in the MSA that
+    # is not ambiguous for decent comparison.
+    # The bases in the MSA are only coming from alts
+    # and not from ref.
+    my $altRef;
+    my $altRefIndex=0;
     for(my $i=0;$i<$numAlts;$i++){
-      if($GT[$i]!~/N/i){
-        $is_allNs=0;
-        last; # No need to loop over the other ALTs if a nonN was found
+      next if($GT[$i]=~/[Nn\.]/);
+
+      $is_allNs=0;
+
+      # Generate the reference base.
+      if(!$altRef){
+        $altRef=$GT[$i];
+        $altRefIndex=$i;
       }
+      #last; # No need to loop over the other ALTs if a nonN was found
     }
     $hqSite=0 if($is_allNs);
-
-    if($$settings{'Ns-as-ref'}){
-      for(@GT){
-        $_=$REF if($_ =~/[Nn\.]/);
-      }
-    }
-
+    
     # The user can specify that high quality sites are those where every site is defined
     # (ie through --noambiguities)
     if(!$$settings{ambiguities}){
@@ -128,6 +133,15 @@ sub filterSites{
       }
     }
 
+    # If we want to treat ambiguous bases as the reference
+    # but not print them out that way, then change them
+    # internally here.
+    if($$settings{'Ns-as-ref'}){
+      for(@GT){
+        $_=$altRef if($_ =~/[Nn\.]/);
+      }
+    }
+
     # Remove any invariant site, if specified.
     # invariant means "keep invariant sites"
     # !invariant means "remove invariant sites"
@@ -135,22 +149,10 @@ sub filterSites{
     # sites if all alts are masked as Ns.
     if(!$is_allNs && !$$settings{invariant}){
 
-      # Need a ref base that will be in the MSA that
-      # is not ambiguous for decent comparison.
-      # The bases in the MSA are only coming from alts.
-      my $altRefIndex=0;
-      my $altRef='N';
-      while($altRef=~/N/i){
-        $altRef=$GT[$altRefIndex];
-        die "Internal error: could not find unambiguous base at this site: $CONTIG:$POS" if($altRefIndex > 99999);
-        $altRefIndex++;
-      }
-      die "Internal error: alt reference not found at $CONTIG:$POS" if(!$altRef);
-
       # Start off assuming that the site is not variant,
       # until proven otherwise.
       my $is_variant=0;
-      for(my $i=1;$i<$numAlts;$i++){
+      for(my $i=0;$i<$numAlts;$i++){
         # TODO look at this position
         if($GT[$i] ne $altRef){
           $is_variant=1;
@@ -158,6 +160,8 @@ sub filterSites{
         }
       }
       $hqSite=0 if(!$is_variant);
+
+      #die Dumper ["@GT",$altRefIndex,$altRef,$hqSite,$is_variant] if($POS==150615);
     }
     
     # Special things happen if we see an hq site
