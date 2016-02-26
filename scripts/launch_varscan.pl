@@ -13,8 +13,8 @@ use Bio::FeatureIO;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib/vcftools_0.1.12b/perl";
-use Vcf;
 use lib "$FindBin::RealBin/../lib";
+use Vcf;
 use LyveSET qw/@fastaExt @fastqExt @bamExt/;
 
 my $samplename="Sample1"; # to be changed later
