@@ -80,8 +80,8 @@ sub bcfqueryToFasta{
         $nt="N";
       }
 
-      # ALT is defined as REF if it is a dot
-      $nt=$extra{REF} if($nt eq '.' || $nt eq ',');
+      # ALT is ambiguous if it is a dot.
+      $nt="N" if($nt eq '.');
       # take care of indels or ambiguities
       $nt="N" if(length($nt)!=1 || $nt!~/^\w$/i);
 
