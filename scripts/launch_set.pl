@@ -183,11 +183,8 @@ sub main{
   # Find the output files
   my $absDir=rel2abs($$settings{msadir}); # save the abs. path
   my $outPrefix="$project/out"; # consistent output naming
-  symlink("$absDir/out.RAxML_bipartitions","$outPrefix.dnd") if(-e "$absDir/out.RAxML_bipartitions");
-  symlink("$absDir/out.filteredMatrix.tsv","$outPrefix.matrix.tsv") if(-e "$absDir/out.filteredMatrix.tsv");
-  symlink("$absDir/out.informative.fasta","$outPrefix.fasta") if(-e "$absDir/out.informative.fasta");
-  symlink("$$settings{msadir}/out.pairwise.tsv","$outPrefix.pairwise.tallskinny.tsv") if(-e "$absDir/out.pairwise.tsv");
-  symlink("$$settings{msadir}/out.pairwiseMatrix.tsv","$outPrefix.pairwise.matrix.tsv") if(-e "$absDir/out.pairwiseMatrix.tsv");
+
+  symlink("out.RAxML_bipartitions","$$settings{msadir}/tree.dnd");
 
   my $stopTimestamp=time();
   logmsg "Finished at ".strftime("\%F \%T",localtime());
