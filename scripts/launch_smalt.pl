@@ -7,10 +7,14 @@ use warnings;
 use Data::Dumper;
 use Getopt::Long;
 use File::Basename qw/fileparse dirname basename/;
+use File::Copy qw/cp/;
 use Bio::Perl;
 
+use FindBin;
+use lib "$FindBin::RealBin/../lib";
+use LyveSET qw/@fastqExt logmsg/;
+
 $0=fileparse $0;
-sub logmsg{print STDERR "@_\n";}
 exit(main());
 
 sub main{
@@ -59,7 +63,7 @@ sub mapReads{
     return 1;
   }
 
-  my $b=fileparse $query;
+  my ($b,$infilePath,$infileExt)=fileparse($query,@fastqExt);
   my $prefix="$$settings{tempdir}/$b";
   
   my $RANDOM=rand(999999);
@@ -90,8 +94,15 @@ sub mapReads{
     # remove any paired end parameters that would cause an error
     $$settings{smaltxopts}=~s/-i\s+\d+//;
 
-    system("gunzip -c '$query' > $prefix.SE.fastq");
-    die "Problem gunzipping $query to $prefix.SE.fastq" if $?;
+    # Need to think about gzip vs un-gzipped files
+    if($infileExt=~/\.gz$/){
+      system("gunzip -c '$query' > $prefix.SE.fastq");
+      die "Problem gunzipping $query to $prefix.SE.fastq" if $?;
+    } else {
+      cp($query,"$prefix.SE.fastq")
+        or die "ERROR: could not copy to $prefix.SE.fastq";
+    }
+
     # Mapping
     system("smalt map $$settings{smaltxopts} $ref '$prefix.SE.fastq' > $tmpSamOut"); 
     die if $?;
