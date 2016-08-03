@@ -245,12 +245,32 @@ sub readBedFiles{
   # Find what seqnames there are out there first,
   # so that every expected range object will be defined.
   if(-e $bcfqueryFile){
-    my $command="grep -v '^#' $bcfqueryFile | cut -f 1 | sort | uniq";
-    my $seqname=`$command`;
-    die "ERROR getting sequence names from $bcfqueryFile: $!\n  $command" if $?;
-    my @seqname=split(/\n/,$seqname);
-    chomp(@seqname);
-    undef($seqname);
+    my %seqname;
+    open(BCFQUERYFILE,"<",$bcfqueryFile) or die "ERROR: could not read $bcfqueryFile: $!";
+    while(<BCFQUERYFILE>){
+      next if(/^#/);
+      my($seqname)=split(/\t/,$_);
+      $seqname{$seqname}=1;
+    }
+    close BCFQUERYFILE;
+    # Sort function found at http://www.perlmonks.org/index.pl?node_id=68185
+    my @seqname=sort {
+      my @a = split /(\d+)/, lc($a);
+      my @b = split /(\d+)/, lc($b);
+      my $M = @a > @b ? @a : @b;
+      my $res = 0;
+      for (my $i = 0; $i < $M; $i++) {
+        return -1 if ! defined $a[$i];
+        return 1 if  ! defined $b[$i];
+        if ($a[$i] =~ /\d/) {
+          $res = $a[$i] <=> $b[$i];
+        } else {
+          $res = $a[$i] cmp $b[$i];
+        }
+        last if $res;
+      }
+      return $res;
+    } keys(%seqname);
 
     # Initialize ranges
     $range{$_}=Number::Range->new() for(@seqname);
