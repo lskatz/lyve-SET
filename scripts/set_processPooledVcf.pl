@@ -60,8 +60,17 @@ sub main{
   system("pairwiseDistances.pl --numcpus $$settings{numcpus} < $filteredAlignment | sort -k3,3n | tee $pairwise | pairwiseTo2d.pl > $pairwiseMatrix");
   die if $?;
 
-  my $numSamples=`grep -c ">" $filteredAlignment` + 0;
-  die "ERROR: could not count the number of samples in $filteredAlignment" if $?;
+  # How many samples are there?  Read the filtered alignment for simplicity.
+  my $numSamples=0;
+  {
+    local $/="\n>";
+    open(FILTEREDALIGNMENT,"<",$filteredAlignment) or die "ERROR: could not read $filteredAlignment: $!";
+    while(<FILTEREDALIGNMENT>){
+      $numSamples++;
+    }
+    close FILTEREDALIGNMENT;
+  }
+  die "ERROR: could not count the number of samples in $filteredAlignment" if($numSamples < 1);
 
   # Process a resulting VCF: make an MSA; remove uninformative sites; find pairwise distances;
   # find Fst; make a tree; calculate the eigenvector
@@ -84,9 +93,11 @@ sub main{
     # TODO: reroot the tree
     #rerootLongestBranch("$$settings{prefix}.RAxML_bipartitions",$settings);
 
+    ## removing clade distances since Tinsel is coming out
+    
     # Get combined distance statistics on the tree
-    system("cladeDistancesFromTree.pl -t $$settings{prefix}.RAxML_bipartitions -p $$settings{prefix}.pairwise.tsv --outprefix $$settings{prefix}");
-    die "ERROR with cladeDistancesFromTree.pl" if $?;
+    #system("cladeDistancesFromTree.pl -t $$settings{prefix}.RAxML_bipartitions -p $$settings{prefix}.pairwise.tsv --outprefix $$settings{prefix}");
+    #die "ERROR with cladeDistancesFromTree.pl" if $?;
   } else {
     logmsg "WARNING: only $numSamples samples are in the alignment; skipping tree-building.";
   }
