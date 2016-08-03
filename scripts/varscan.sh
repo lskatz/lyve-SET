@@ -5,6 +5,18 @@
 # Lee Katz <lkatz@cdc.gov>
 
 JAR=$(dirname $0)"/../lib/varscan.v2.3.7.jar"
+JAVA=$(\which java 2>/dev/null || /usr/bin/java);
+GREP=$(\which grep 2>/dev/null || /bin/grep);
+
+if [ ! -e $JAVA ]; then
+  echo "ERROR: java is not in your path!";
+  exit 1;
+fi;
+if [ ! -e $GREP ]; then
+  echo "ERROR: grep is not in your path!";
+  exit 1;
+fi;
+
 if [ ! -e "$JAR" ]; then
   echo "ERROR: jar file does not exist at $JAR"
   echo "  Please edit $0 to reflect where the jar file is."
@@ -18,9 +30,9 @@ if [ "$1" == "" ]; then
   echo
   echo "USAGE: $script [COMMAND] [OPTIONS]"
   echo
-  java -jar "$JAR" 2>&1 | grep -v 'java -jar' | grep .
+  $JAVA -jar "$JAR" 2>&1 | $GREP -v 'java -jar' | $GREP .
   echo
   exit 0
 fi
 
-java -jar "$JAR" "$@"
+$JAVA -jar "$JAR" "$@"
