@@ -15,7 +15,7 @@ exit main();
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help outdir=s)) or die $!;
+  GetOptions($settings,qw(help outdir=s numcpus=i)) or die $!;
   
   my($proj)=@ARGV;
 
