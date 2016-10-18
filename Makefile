@@ -196,7 +196,7 @@ clean-edirect:
 install-perlModules:
 	@echo "Installing Perl modules using cpanminus"
 	#for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Descriptive Statistics::Basic Graph::Centrality::Pagerank String::Escape Statistics::LineFit; do
-	for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Basic Graph::Centrality::Pagerank String::Escape Statistics::LineFit; do \
+	for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Basic Graph::Centrality::Pagerank String::Escape Statistics::LineFit Array::IntSpan; do \
 	  perl scripts/cpanm --self-contained -L $(PREFIX)/lib $$package; \
 		if [ $$? -gt 0 ]; then exit 1; fi; \
 	done;
