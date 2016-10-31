@@ -15,11 +15,12 @@ exit(main());
 sub main{
   my $settings={};
   die usage($settings) if(!@ARGV);
-  GetOptions($settings,qw(help reference=s project=s matrix=s));
+  GetOptions($settings,qw(help reference=s project=s matrix=s bamdir=s numcpus=i));
   $$settings{maskedThresholdPercent}=10;
   $$settings{project}||="";
   $$settings{reference}||="";
   $$settings{matrix}||="";
+  $$settings{numcpus}||=1;
 
   die usage($settings) if($$settings{help});
 
@@ -54,7 +55,14 @@ sub main{
         last;
       }
     }
-    
+
+    # Find the bam directory
+    if(!$$settings{bamdir}){
+      if(-e "$$settings{project}/bam"){
+        $$settings{bamdir}="$$settings{project}/bam";
+      }
+    }
+
   }
   # END if project is given
 
@@ -65,10 +73,37 @@ sub main{
 
   # Now do some diagnostics
   my $refInfo=readAssembly($settings);
+  reportSmallInsertLengths($$settings{bamdir},$settings);
   reportMaskedGenomes($$settings{matrix},$refInfo,$settings);
 
   return 0;
 }
+
+sub reportSmallInsertLengths{
+  my($bamdir,$settings)=@_;
+  if(!$bamdir || !-e $bamdir){
+    return;
+  }
+
+  logmsg "Checking insert lengths in bam directory $bamdir";
+  for my $bam(glob("$bamdir/*.bam")){
+    my($metricsHeader,$readMetrics)=`run_assembly_readMetrics.pl --fast --numcpus $$settings{numcpus} $bam`;
+    die "ERROR: with run_assembly_readMetrics $bam" if $?;
+    chomp($metricsHeader,$readMetrics);
+    my %metrics;
+    @metrics{split(/\t/,$metricsHeader)}=split(/\t/,$readMetrics);
+
+    # Get the insert length but just extract the median
+    # instead of the distribution.
+    my $insertLength=$metrics{medianFragmentLength};
+    $insertLength=~s/\D.*//;  # remove everything that's not a digit and after
+
+    if($insertLength * 2 < $metrics{maxReadLength}){
+      logmsg "$bam - low insert length ($metrics{medianFragmentLength}) when compared to the planned read length of $metrics{maxReadLength}";
+    }
+  }
+}
+
 
 sub readAssembly{
   my($settings)=@_;
@@ -170,12 +205,18 @@ sub usage{
   my $help = "Diagnoses a SNP matrix file
   USAGE: $0 -p set-project
   note: set-project must be a Lyve-SET project folder
-  -h for more help
   ";
-  return $help if(!$$settings{help});
+  if(!$$settings{help}){
+    $help.="-h for more help";
+    return $help;
+  }
   $help.="
-  Alternate USAGE: $0 --matrix snpmatrix.tsv [-r reference.fasta]
-  note: snpmatrix.tsv must have as the first three columns: CHROM, POS, REF and must have subsequent columns pertaining to each sample
+  ALTERNATE USAGE: $0 --matrix snpmatrix.tsv [-r reference.fasta]
+  note: snpmatrix.tsv must have as the first three columns: 
+    CHROM, POS, REF and must have subsequent columns pertaining to each sample
+
+  --bamdir     specify where the bam directory is. Default:
+               under project/bam
   ";
   return $help;
 }
