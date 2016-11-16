@@ -96,7 +96,10 @@ sub reportSmallInsertLengths{
     # Get the insert length but just extract the median
     # instead of the distribution.
     my $insertLength=$metrics{medianFragmentLength};
-    $insertLength=~s/\D.*//;  # remove everything that's not a digit and after
+    $insertLength=~s/[^0-9].*//;  # remove everything that's not a digit and after
+    # if it's not a number, treat it like zero
+    $insertLength=~s/^\s+$//;
+    $insertLength||=0; # force a false value to integer
 
     if($insertLength * 2 < $metrics{maxReadLength}){
       logmsg "$bam - low insert length ($metrics{medianFragmentLength}) when compared to the planned read length of $metrics{maxReadLength}";
