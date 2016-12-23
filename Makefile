@@ -121,30 +121,33 @@ clean-phispy:
 	rm -rvf $(PREFIX)/lib/phispy
 
 install-samtools:
-	wget 'https://github.com/samtools/samtools/releases/download/1.2/samtools-1.2.tar.bz2' -O $(TMPDIR)/samtools-1.2.tar.bz2
-	cd $(TMPDIR) && tar jxvf samtools-1.2.tar.bz2
-	mv $(TMPDIR)/samtools-1.2 $(PREFIX)/lib
-	cd $(PREFIX)/lib/samtools-1.2 && make DFLAGS="-D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -D_CURSES_LIB=0" LIBCURSES="" 
-	cd $(PREFIX)/lib/samtools-1.2/htslib-1.2.1 && make
-	ln -sf $(PREFIX)/lib/samtools-1.2/samtools $(PREFIX)/scripts/
-	ln -sf $(PREFIX)/lib/samtools-1.2/misc/wgsim $(PREFIX)/scripts/
-	ln -sf $(PREFIX)/lib/samtools-1.2/htslib-1.2.1/bgzip $(PREFIX)/scripts
-	ln -sf $(PREFIX)/lib/samtools-1.2/htslib-1.2.1/tabix $(PREFIX)/scripts
+	wget 'https://github.com/samtools/samtools/releases/download/1.3.1/samtools-1.3.1.tar.bz2' -O $(TMPDIR)/samtools-1.3.1.tar.bz2
+	wget 'https://github.com/samtools/htslib/releases/download/1.3.2/htslib-1.3.2.tar.bz2' -O $(TMPDIR)/htslib-1.3.2.tar.bz2
+	cd $(TMPDIR) && tar jxvf htslib-1.3.2.tar.bz2 && tar jxvf samtools-1.3.1.tar.bz2
+	mv $(TMPDIR)/htslib-1.3.2 $(TMPDIR)/samtools-1.3.1 $(PREFIX)/lib
+	cd $(PREFIX)/lib/htslib-1.3.2 && make
+	cd $(PREFIX)/lib/samtools-1.3.1 && make DFLAGS="-D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -D_CURSES_LIB=0" LIBCURSES="" 
+	ln -sf $(PREFIX)/lib/samtools-1.3.1/samtools $(PREFIX)/scripts/
+	ln -sf $(PREFIX)/lib/samtools-1.3.1/misc/wgsim $(PREFIX)/scripts/
+	ln -sf $(PREFIX)/lib/htslib-1.3.2/bgzip $(PREFIX)/scripts
+	ln -sf $(PREFIX)/lib/htslib-1.3.2/tabix $(PREFIX)/scripts
 
 clean-samtools:
 	rm -rvf $(PREFIX)/lib/samtools*
+	rm -rvf $(PREFIX)/lib/htslib*
+	rm -vf $(PREFIX)/scripts/{samtools,wgsim,bgzip,tabix}
 
 install-bcftools:
-	# bcftools-1.2.tar.bz2  htslib-1.2.1.tar.bz2  samtools-1.2.tar.bz2
-	wget 'https://github.com/samtools/bcftools/releases/download/1.2/bcftools-1.2.tar.bz2' -O $(TMPDIR)/bcftools-1.2.tar.bz2
-	cd $(TMPDIR) && tar jxvf bcftools-1.2.tar.bz2
-	mv $(TMPDIR)/bcftools-1.2 $(PREFIX)/lib/bcftools-1.2
-	cd $(PREFIX)/lib/bcftools-1.2 && make
-	ln -s $(PREFIX)/lib/bcftools-1.2/bcftools $(PREFIX)/scripts
-	ln -s $(PREFIX)/lib/bcftools-1.2/vcfutils.pl $(PREFIX)/scripts
+	wget 'https://github.com/samtools/bcftools/releases/download/1.3.1/bcftools-1.3.1.tar.bz2' -O $(TMPDIR)/bcftools-1.3.1.tar.bz2
+	cd $(TMPDIR) && tar jxvf bcftools-1.3.1.tar.bz2
+	mv $(TMPDIR)/bcftools-1.3.1 $(PREFIX)/lib/bcftools-1.3.1
+	cd $(PREFIX)/lib/bcftools-1.3.1 && make
+	ln -s $(PREFIX)/lib/bcftools-1.3.1/bcftools $(PREFIX)/scripts
+	ln -s $(PREFIX)/lib/bcftools-1.3.1/vcfutils.pl $(PREFIX)/scripts
 
 clean-bcftools:
-	rm -rfv $(PREFIX)/lib/bcftools-1.2/bcftools $(PREFIX)/lib/bcftools-1.2/vcfutils.pl $(PREFIX)/lib/bcftools*
+	rm -rfv $(PREFIX)/lib/bcftools*
+	rm -vf $(PREFIX)/scripts/vcfutils.pl $(PREFIX)/scripts/bcftools
 
 install-smalt:
 	wget --continue 'http://downloads.sourceforge.net/project/smalt/smalt-0.7.6-static.tar.gz' -O $(TMPDIR)/smalt-0.7.6-static.tar.gz
