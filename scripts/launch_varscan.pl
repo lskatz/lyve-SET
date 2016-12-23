@@ -422,3 +422,4 @@ sub usage{
   --exclude  file.bed  File of positions to mask    (conflicts with --region; default: don't exclude)
   "
 }
+
