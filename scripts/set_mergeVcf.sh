@@ -55,7 +55,7 @@ logmsg "temporary directory is $TEMPDIR";
 # Run makeRegions.pl based on how many cpus there are 
 # and really parallelize this script!
 logmsg "Dividing the genome into regions, making it easier to multithread"
-makeRegions.pl --numchunks $NUMCPUS $IN > $TEMPDIR/regions.txt
+makeRegions.pl --numchunks $NUMCPUS --numcpus $NUMCPUS $IN > $TEMPDIR/regions.txt
 if [ $? -gt 0 ]; then 
   logmsg "ERROR running makeRegions.pl!";
   exit 1;
