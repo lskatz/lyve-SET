@@ -11,15 +11,19 @@ use File::Temp qw/tempdir/;
 use Bio::Perl;
 use Bio::FeatureIO;
 
+use threads;
+use threads::shared;
+use Thread::Queue;
+
 use FindBin;
 use lib "$FindBin::RealBin/../lib/vcftools_0.1.12b/perl";
 use lib "$FindBin::RealBin/../lib";
 use Vcf;
-use LyveSET qw/@fastaExt @fastqExt @bamExt/;
+use LyveSET qw/@fastaExt @fastqExt @bamExt logmsg/;
 
 my $samplename="Sample1"; # to be changed later
+my $readBamStick :shared; # only one bam can be read at a time
 $0=fileparse $0;
-sub logmsg{print STDERR "$0: @_\n";}
 exit(main());
  
 
@@ -52,22 +56,142 @@ sub main{
   # Transform the sample name, e.g.,
   # NC001416.fasta.wgsim.fastq.gz-reference.sorted.bam => NC001416.fasta.wgsim
   # sample1.fastq.gz-reference.sorted.bam => sample1
-  $samplename=basename($bam,@bamExt);
-  $samplename=~s/\-$refname$//;
-  $samplename=basename($samplename,@fastqExt,@fastaExt);
-  $samplename=basename($samplename,@fastaExt);
+  $samplename=basename($bam,@bamExt);                    # remove bam extension
+  $samplename=~s/\-$refname$//;                          # remove reference genome name
+  $samplename=basename($samplename,@fastqExt,@fastaExt); # remove fast[aq] extension
+  $samplename=basename($samplename,@fastaExt);           # remove fasta extension
 
-  # To make varscan work, first do mpileup.
-  # Then, it reads from mpileup.
-  # Lyve-SET needs to alter some of the VCF in the third step, backfillVcfValues().
-  my $pileup=mpileup($bam,$reference,$settings);
-  my $vcf=varscan($pileup,$settings);
-  backfillVcfValues($vcf,$bam,$settings);
+  my $vcf=varscan2($bam,$reference, $settings);
+
+  # Print the vcf to stdout
+  open(VCF,$vcf) or die "ERROR: could not read $vcf: $!";
+  print while(<VCF>);
+  close VCF;
 
   # remove temporary files
-  unlink($_) for($pileup,$vcf);
+  #unlink($_) for($pileup,$vcf);
 
   return 0;
+}
+
+sub varscan2{
+  my($bam,$reference,$settings)=@_;
+  # I like to use the shorthand $b for basename, but it is a reserved
+  # variable name in sort{} and so I need to use 'local' instead of 'my'
+  local $b=fileparse($bam);
+  my $pileup="$$settings{tempdir}/$b.mpileup";
+  return $pileup if(-e $pileup && -s $pileup > 0);
+
+  # Make sure this whole operation is self-contained
+  # and that the temporary dir exists for this sample.
+  my $tmpdir="$$settings{tempdir}/$samplename";
+  system("rm -rf $tmpdir");
+  mkdir($tmpdir);
+  # Make sure that no other pileup file gets in the way.
+  system("rm -vf $$settings{tempdir}/$b*.mpileup $$settings{tempdir}/$b*.vcf.gz* >&2");
+
+  # Kick off multithreading
+  my $regionQueue=Thread::Queue->new();
+  my @thr;
+  for(0..$$settings{numcpus}-1){
+    $thr[$_]=threads->new(\&varscanWorker,$bam,$reference,$regionQueue,$settings);
+  }
+
+  # Figure out any regions
+  my @regions=`makeRegions.pl --numcpus $$settings{numcpus} --numchunks $$settings{numcpus} $bam`;
+  chomp(@regions);
+  # Add the regions and some thread-terminators to the queue
+  $regionQueue->enqueue(@regions);
+  $regionQueue->enqueue(undef) for(@thr);
+  # When each thread encounters an undef, it will terminate.
+  # When the threads are terminated and joined, we
+  # can continue past this line.
+  for(@thr){
+    $_->join;
+    die "ERROR with thread ".$_->tid if($_->error());
+  }
+
+  # Sort all subVCFs by their starting position since each one is 
+  # already internally sorted.
+  my @subVcf=glob("$tmpdir/*.vcf.gz");
+  my $subVcf=join(" ",@subVcf);
+
+  # Join all pieces of the sample's vcf. All pieces
+  # have been sorted at this point.
+  logmsg "Concatenating all the VCFs";
+  system("bcftools concat --allow-overlaps --remove-duplicates $subVcf > $$settings{tempdir}/$b.merged.vcf");
+  die if $?;
+
+  # Make sure everything is cleaned up whenever the script ends
+  system("rm -rf $tmpdir");
+
+  return "$$settings{tempdir}/$b.merged.vcf";
+}
+  
+
+sub varscanWorker{
+  my($bam,$reference,$regionQueue,$settings)=@_;
+
+  my $TID=threads->tid;
+
+  # Figure out mpileup options
+  my $mpileupxopts="";
+  $mpileupxopts.="-Q 0 -B "; # assume that all reads have been properly filtered at this point and that mappings are good
+  $mpileupxopts.="--positions $$settings{region} " if($$settings{region});
+
+  my $tmpdir=tempdir("$$settings{tempdir}/$samplename/varscanWorker.XXXXXX");
+
+  # Make a sample list for varscan so that it doesn't say "Sample1"
+  my $sampleList="$tmpdir/samples.txt";
+  open(SAMPLELIST,">",$sampleList) or die "ERROR: could not write to $sampleList: $!";
+  print SAMPLELIST $samplename;
+  close SAMPLELIST;
+
+  my $vcfCounter=0;
+  while(defined(my $region=$regionQueue->dequeue)){
+    my $pileup="$tmpdir/TID$TID.$vcfCounter.pileup";
+    my $vcf="$tmpdir/TID$TID.$vcfCounter.vcf";
+    # Avoid disk I/O problems by sleeping
+    # a bit of time, depending on the number of threads
+    #sleep ($TID % $$settings{numcpus});
+
+    # Avoid disk I/O problems by doing only one mpileup at a time
+    {
+      lock $readBamStick;
+
+      # Run mpileup on this one region
+      my $mpileupCommand="samtools mpileup -f $reference $mpileupxopts --region '$region' $bam > $pileup";
+      system($mpileupCommand);
+      die "ERROR running mpileup on region $region:\n  $mpileupCommand" if $?;
+    }
+
+    # Estimate the size of the pileup. If it's zero, then
+    # there will be no SNPs in it and should be skipped.
+    if( -s $pileup){
+      logmsg "There is a pileup in region $region and so I will run varscan";
+    } else {
+      logmsg "No pileup was formed in region $region and so there will be no SNPs. Skipping.";
+      next;
+    }
+
+    # Finally run varscan on the pileup. Bgzip and index the
+    # output file. Later it will be combined with bcftools concat.
+    my $varscanCommand="varscan.sh mpileup2cns $pileup --min-coverage $$settings{coverage} --min-var-freq $$settings{altFreq} --output-vcf 1 --min-avg-qual 0 --vcf-sample-list $sampleList > $vcf.tmp.vcf";
+    system($varscanCommand);
+    die "ERROR with varscan!\n  $varscanCommand" if $?;
+
+    # Fix the Vcf
+    my $fixedVcf=backfillVcfValues("$vcf.tmp.vcf",$settings);
+
+    my $newVcfLoc="$$settings{tempdir}/$samplename/".basename($vcf);
+    system("mv -v $fixedVcf $newVcfLoc >&2"); die if $?;
+    system("bgzip $newVcfLoc && tabix $newVcfLoc.gz");
+    die if $?;
+    $vcfCounter++;
+  }
+
+  # Some cleanup
+  system("rm -rf $tmpdir");
 }
 
 sub mpileup{
@@ -128,11 +252,14 @@ sub varscan{
 }
 
 sub backfillVcfValues{
-  my($vcfFile,$bam,$settings)=@_;
+  my($vcfFile,$settings)=@_;
 
   my $excludeSites=readBed($$settings{exclude},$settings) if($$settings{exclude});
 
-  logmsg "Backfilling values in $vcfFile and printing to stdout";
+  my $newVcf="$vcfFile.backfilled.vcf";
+
+  logmsg "Backfilling values in $vcfFile and printing to $newVcf";
+  open(my $vcfOut, ">", $newVcf) or die "ERROR: could not write to $newVcf";
   my $vcf=Vcf->new(file=>$vcfFile);
 
   # Reasons a SNP doesn't pass
@@ -142,25 +269,8 @@ sub backfillVcfValues{
   my $fail_indel      ="isIndel";
   my $fail_masked     ="masked";
 
-  # How was the bam generated?
-  my $mapper="unknown";
-  my $CL="unknown";
-  open(SAMTOOLS,"samtools view -H '$bam' | ") or die "ERROR: could not open $bam with samtools: $!";
-  while(<SAMTOOLS>){
-    next if(!/^\@PG/);
-    chomp;
-    my @F=split /\t/;
-    for(@F){
-      my($key,$value)=split /:/;
-      $mapper=$value if($key eq "ID");
-      $CL=$value if($key eq "CL");
-    }
-  }
-  
   # Add new headers
   $vcf->add_header_line({key=>'reference',value=>$$settings{reference}});
-  $vcf->add_header_line({key=>'mapper',value=>$mapper});
-  $vcf->add_header_line({key=>'mapperCL',value=>$CL});
   $vcf->add_header_line({key=>'FILTER', ID=>$fail_lowCoverage, Description=>"Depth is less than $$settings{coverage}, the user-set coverage threshold"});
   $vcf->add_header_line({key=>'FILTER', ID=>$fail_lowRefFreq, Description=>"Reference variant consensus is less than $$settings{altFreq}, the user-set threshold"});
   $vcf->add_header_line({key=>'FILTER', ID=>$fail_lowAltFreq, Description=>"Allele variant consensus is less than $$settings{altFreq}, the user-set threshold"});
@@ -171,30 +281,35 @@ sub backfillVcfValues{
   $vcf->add_header_line({key=>'FORMAT', ID=>'AF', Number=>'A', Type=>'Float', Description=>"Allele Frequency"});
   $vcf->add_header_line({key=>'FORMAT', ID=>'RF', Number=>'A', Type=>'Float', Description=>"Reference Frequency"});
   $vcf->add_header_line({key=>'FORMAT', ID=>'ADP', Number=>'A', Type=>'Integer', Description=>"Depth of bases with Phred score >= 15"});
+  $vcf->add_header_line({key=>'FORMAT', ID=>'FT', Number=>1, Type=>'String', Description=>"Genotype filters using the same codes as the FILTER data element"});
 
   # Remove unwanted headers
+  # ADP was removed as an info field but added as a format field
   $vcf->remove_header_line(key=>'INFO',ID=>'ADP');
-
-  # Figure out the coverage depth
-  my $depth=covDepth($bam,$settings);
 
   # Done with headers; parse them
   $vcf->parse_header();
 
+  # assume there is only one sample name
+  my $samplename=($vcf->get_samples)[0];
+
   # start printing
-  print $vcf->format_header();
+  print $vcfOut $vcf->format_header();
   while(my $x=$vcf->next_data_hash()){
     my $posId=$$x{CHROM}.':'.$$x{POS};
     my $pos=$$x{POS};
-    $$x{gtypes}{$samplename}{DP}=$$depth{$posId} || 0;
 
     # Only one call is allowed for ALT
     $$x{ALT}=[$$x{ALT}[0]];
     $$x{FILTER}=[$$x{FILTER}[0]];
 
-    # It's a SNP if it isn't the same as REF and isn't a dot
+    # We are just looking at homozygotes here. Strip
+    # out the heterozygote notation.
+    $$x{gtypes}{$samplename}{GT}=substr($$x{gtypes}{$samplename}{GT},0,1);
+
+    # It's a SNP if varscan filled in ALT
     my $is_snp=0;
-    if($$x{ALT}[0] ne $$x{REF} && $$x{ALT}[0] ne '.'){
+    if($$x{ALT}[0] ne '.'){
       $is_snp=1;
     }
 
@@ -202,10 +317,13 @@ sub backfillVcfValues{
     for(qw(ADP)){
       $$x{gtypes}{$samplename}{$_}=$$x{INFO}{$_};
     }
-    # I just don't think some fields even belong here
+    # I just don't think some fields even belong in the info field
     for(qw(ADP HET NC HOM WT)){
       delete($$x{INFO}{$_});
     }
+
+    # Some FORMAT fields need to be added
+    push(@{$$x{FORMAT}}, qw(ADP AF RF FT));
 
     # Put in allele frequency for the one accepted ALT
     # Alternate calls are in the AD field for varscan
@@ -218,77 +336,59 @@ sub backfillVcfValues{
       $$x{gtypes}{$samplename}{RF}=$$x{gtypes}{$samplename}{RD}/$$x{gtypes}{$samplename}{ADP};
     }
     # round the frequencies
-    $_=sprintf("%0.3f",$_) for($$x{gtypes}{$samplename}{AF},$$x{gtypes}{$samplename}{RF});
+    $_=sprintf("%0.2f",$_) for($$x{gtypes}{$samplename}{AF},$$x{gtypes}{$samplename}{RF});
 
     ###########
     # MASKING
     # Mask low coverage
-    if( $$depth{$posId} < $$settings{coverage} ){
-      vcf_markAmbiguous($x,$fail_lowCoverage,$settings);
+    $$x{gtypes}{$samplename}{DP} ||= 0;
+    if( $$x{gtypes}{$samplename}{DP} < $$settings{coverage} ){
+      vcf_markAmbiguous($x,$samplename,$fail_lowCoverage,$settings);
     }
 
     # Mask indels
     if(length($$x{ALT}[0]) > 1 || length($$x{REF}) > 1){
-      vcf_markAmbiguous($x,$fail_indel,$settings);
+      vcf_markAmbiguous($x,$samplename,$fail_indel,$settings);
     }
     # Mask sites that are outright masked
     if($$excludeSites{$$x{CHROM}}{$pos}){
-      vcf_markAmbiguous($x,$fail_masked,$settings);
+      vcf_markAmbiguous($x,$samplename,$fail_masked,$settings);
     }
 
     # Mask low frequency
     if($is_snp && $$x{gtypes}{$samplename}{AF} < $$settings{altFreq}){
-      vcf_markAmbiguous($x,$fail_lowRefFreq,$settings);
+      vcf_markAmbiguous($x,$samplename,$fail_lowRefFreq,$settings);
     }
     if(!$is_snp && $$x{gtypes}{$samplename}{RF} < $$settings{altFreq}){
-      vcf_markAmbiguous($x,$fail_lowAltFreq,$settings);
+      vcf_markAmbiguous($x,$samplename,$fail_lowAltFreq,$settings);
     }
     # END MASKING
     ###############
+    
+    # After all this masking or not masking, 
+    # the FT field should match the FILTER field.
+    $$x{gtypes}{$samplename}{FT}=join(";",@{$$x{FILTER}});
 
-    print $vcf->format_line($x);
+    print $vcfOut $vcf->format_line($x);
   }
+  close $vcfOut;
 
-  return 1;
-}
-
-sub covDepth{
-  my($bam,$settings)=@_;
-  my $depthFile="$bam.depth";
-  my %depth;
-  die if $?;
-  open(IN,"samtools depth '$bam' | ") or die "Could not open $bam in samtools:$!";
-  while(<IN>){
-    my($rseq,$pos,$depth)=split(/\t/);
-    chomp($depth);
-    $depth{$rseq.":".$pos}=$depth;
-  }
-  close IN;
-  return \%depth;
+  return $newVcf;
 }
 
 # VCF line manipulations
 sub vcf_markAmbiguous{
-  my($x,$reason,$settings)=@_;
-  my $ucRef=uc($$x{REF}); # uppercase reference, to make it easier for str comparison
+  my($x,$samplename,$reason,$settings)=@_;
 
-  # Figure out the alt allele (N) and the correct genotype integer
-  my $gtInt=0; # for the GT, e.g., 1/1 or 2/2
-  # Mark if it is the reference allele
-  if($ucRef eq $$x{ALT}[0] || $ucRef eq '.'){
-    #shift(@{ $$x{ALT} }); # unnecessary to mark the ref base in ALT
-    $gtInt=0;
-  } else {
-    $gtInt=1;
-  }
-  #push(@{ $$x{ALT} }, "N");
-  $$x{ALT}=["N"];
-  $$x{gtypes}{$samplename}{GT}="$gtInt/$gtInt";
-
-  # empty the filter and then put on the fail reason
+  # Empty the filter if it only says that it passes,
+  # because it does not pass anymore.
   @{$$x{FILTER}}=() if($$x{FILTER}[0] eq "PASS");
+  # Enter the reason why it fails
   push(@{$$x{FILTER}},$reason);
-  #$$x{FILTER}=[$reason];
+
+  # The site failed: GT is unknown. Mark it with
+  # a dot.
+  $$x{gtypes}{$samplename}{GT}=".";
 }
 
 # Get a hash of seqname->{pos} from a bed file
@@ -313,6 +413,7 @@ sub usage{
   local $0=fileparse $0;
   "$0: find SNPs using varscan
   Usage: $0 file.bam --reference ref.fasta > file.vcf
+  --reference          The reference fasta file
   --numcpus  1         How many cpus to use
   --tempdir  tmp/      A temporary directory to store files
   --coverage 10        Min coverage
