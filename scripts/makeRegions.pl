@@ -134,6 +134,7 @@ sub vcfLengths{
   # if this script can parse that fasta file for lengths.
   my $fasta;
   open(VCFGZ,"zgrep '^##reference' $vcf | ") or die "ERROR: could not open $vcf for reading: $!";
+  SEARCH_VCF_FOR_FASTA_PATH:
   while(<VCFGZ>){
     # VCFtools v0.1.14 filtering appends to fileformat=VCFv4.2 '##reference=file:///reference-path'
     if(/^##reference=file:\/\/(.+)/){
@@ -143,7 +144,17 @@ sub vcfLengths{
     elsif(/^##reference=(.+)/){
       $fasta=$1;
     }
-    last if(-e $fasta);
+
+    # Look for the fasta by going up about 99 directories
+    for my $i(0..99){
+      my $dirPrefix = "../" x $i;
+      if(-e "$dirPrefix$fasta"){
+        $fasta="$dirPrefix$fasta";
+        logmsg "Found reference genome at $fasta";
+        last SEARCH_VCF_FOR_FASTA_PATH;
+      }
+    }
+
     logmsg "Found reference genome $fasta in the vcf file but it does not exist where I expect it";
     $fasta="";
   }
