@@ -95,7 +95,7 @@ install-snpEff:
 	wget http://sourceforge.net/projects/snpeff/files/snpEff_latest_core.zip -O $(PREFIX)/lib/snpEff_latest_core.zip
 	cd $(PREFIX)/lib && unzip -o snpEff_latest_core.zip
 	mv $(PREFIX)/lib/snpEff/snpEff.jar $(PREFIX)/lib/.
-	mv $(PREFIX)/lib/snpEff/snpEff.config $(PREFIX)/config/original/snpEff.conf
+	mv $(PREFIX)/lib/snpEff/snpEff.config $(PREFIX)/config/snpEff.conf
 	rm -rf $(PREFIX)/lib/snpEff_latest_core.zip
 	rm -rf $(PREFIX)/lib/snpEff
 
