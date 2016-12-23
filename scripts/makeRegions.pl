@@ -227,6 +227,7 @@ sub usage{
   --numchunks  1  If chunksize is not set, how many chunks should there be?
                   NOTE: Despite what is requested, there will be at least 
                   one chunk per contig.
+  --numcpus    1
   --overlapby  0  How many bp each region should overlap by
   --minlength  1  The minimum number of base pairs allowed per chunk
   "
