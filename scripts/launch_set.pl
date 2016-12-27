@@ -43,7 +43,6 @@ sub logmsg {
   my $caller=(caller(1))[3];
   $caller=(caller(2))[3] if($caller=~/__ANON__/); # Don't care about __ANON__ subroutines
   $caller=~s/(main:*)+//;
-  #$caller=~s/^__ANON__//;  # Don't care about __ANON__ subroutines
   $caller=~s/^\s+|\s+$//g; # trim
   $caller="$caller:" if($caller ne "");
 
@@ -725,7 +724,7 @@ sub compareTaxa{
 
   if($$settings{msa} || $$settings{trees}){
     logmsg "Launching set_processPooledVcf.pl";
-    my $command="set_processPooledVcf.pl $pooled --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} 2>&1 | tee --append $$settings{logdir}/launch_set.log";
+    my $command="set_processPooledVcf.pl $pooled --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} > $$settings{logdir}/launch_processpooledVcf.log 2>&1";
     logmsg "Processing the pooled VCF\n  $command";
     $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"set_processPooledVcf.pl"});
     $sge->wrapItUp();
@@ -737,7 +736,7 @@ sub compareTaxa{
   # Make sure this gets printed to stdout
   logmsg "Running set_diagnose.pl";
   #my $diagnosis="$$settings{logdir}/diagnosis.txt";
-  $sge->pleaseExecute("set_diagnose.pl -p $project 2>&1 | tee --append $$settings{logdir}/launch_set.log",{jobname=>"set_diagnose",numcpus=>1});
+  $sge->pleaseExecute("set_diagnose.pl -p $project > $$settings{logdir}/set_diagnose.log 2>&1",{jobname=>"set_diagnose",numcpus=>1});
   $sge->wrapItUp();
 
   return 1;
