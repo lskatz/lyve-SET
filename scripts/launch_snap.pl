@@ -149,7 +149,7 @@ sub mapReads{
 
   # Sort/index
   my $sorted="$bam.sorted.bam";
-  system("samtools sort $tmpOut.bam $bam.sorted"); die "ERROR with samtools sort" if $?;
+  system("samtools sort -o $bam.sorted.bam $tmpOut.bam"); die "ERROR with samtools sort" if $?;
   system("samtools index $sorted"); die "ERROR with samtools index" if $?;
   system("rm -v $tmpOut.bam"); die "ERROR could not delete $tmpOut" if $?;
 
