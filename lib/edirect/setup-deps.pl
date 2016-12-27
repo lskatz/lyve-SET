@@ -1,5 +1,6 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 use strict;
+use warnings;
 use CPAN::MyConfig;
 use CPAN;
 use CPAN::HandleConfig;
@@ -28,7 +29,8 @@ BEGIN {
     CPAN::Index->reload;
 
     my $ll = CPAN::Shell->expandany('local::lib');
-    if ( ! $ll->inst_file  &&  ! -d "$root/aux/lib/perl5/local" ) {
+    if ( ( ! $ll->inst_file  ||  $ll->inst_version =~ /^1\./)
+        &&  ! -d "$root/aux/lib/perl5/local" ) {
         $ll->get;
         system('mkdir', '-p', "$root/aux/lib/perl5/local");
         system('cp', $ll->distribution->dir . "/lib/local/lib.pm",
@@ -41,8 +43,8 @@ use local::lib("$root/aux", '--no-create');
 my @lwp_deps = qw(Encode::Locale File::Listing
                   HTML::Parser HTML::Tagset HTML::Tree
                   HTTP:Cookies HTTP::Date HTTP::Message HTTP::Negotiate
-                  LWP::MediaTypes LWP::Protocol::HTTPS
-                  Net::HTTP URI WWW::RobotRules);
+                  LWP::MediaTypes LWP::Protocol::https
+                  Net::HTTP URI WWW::RobotRules Mozilla::CA);
 for my $module (@lwp_deps, 'Time::HiRes') {
     if ( ! CPAN::Shell->expandany($module)->inst_file ) {
         CPAN::Shell->install($module);

@@ -1,4 +1,4 @@
-#!/bin/sh
-sed 's/[^a-zA-Z0-9]/ /g' |
+#!/bin/bash -norc
+sed 's/[^a-zA-Z0-9]/ /g; s/^ *//' |
 tr 'A-Z' 'a-z' |
-xargs -n 1
+fmt -w 1

@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 # ===========================================================================
 #
@@ -87,12 +87,13 @@ use constant true  => 1;
 
 # EDirect version number
 
-$version = "2.30";
+$version = "5.90";
 
 # URL address components
 
-$base = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/";
+$base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/";
 
+$ecitmat  = "ecitmatch.cgi";
 $efetch   = "efetch.fcgi";
 $einfo    = "einfo.fcgi";
 $elink    = "elink.fcgi";
@@ -108,8 +109,11 @@ sub clearflags {
   %labels = ();
   %macros = ();
   $alias = "";
+  $author = "";
   $basx = "";
   $batch = false;
+  $chr_start = -1;
+  $chr_stop = -1;
   $clean = false;
   $cmd = "";
   $complexity = 0;
@@ -125,24 +129,38 @@ sub clearflags {
   $err = "";
   $extrafeat = -1;
   $field = "";
+  $fields = false;
+  $feature = "";
+  $gtype = "";
   $help = false;
   $holding = "";
   $http = "";
   $id = "";
+  $input = "";
+  $journal = "";
   $just_num = false;
   $key = "";
   $lbl = "";
+  $links = false;
+  $location = "";
   $log = false;
   $max = 0;
+  $meadow = "";
   $min = 0;
   $mndate = "";
   $mode = "";
+  $molecule = "";
   $mxdate = "";
   $name = "";
   $neighbor = false;
+  $nogi = false;
   $num = "";
+  $organism = "";
   $output = "";
+  $page = "";
+  $pair = "";
   $pipe = false;
+  $pub = "";
   $query = "";
   $related = false;
   $rldate = 0;
@@ -150,7 +168,9 @@ sub clearflags {
   $seq_stop = 0;
   $silent = false;
   $sort = "";
+  $source = "";
   $spell = false;
+  $status = "";
   $stp = "";
   $strand = "";
   $tool = "";
@@ -159,8 +179,10 @@ sub clearflags {
   $tuul = "";
   $type = "";
   $verbose = false;
+  $volume = "";
   $web = "";
   $word = false;
+  $year = "";
 }
 
 # gets a live UID for any database
@@ -173,15 +195,15 @@ sub get_zero_uid {
 
   %zeroUidHash = (
     'assembly'         =>  '443538',
-    'bioproject'       =>  '174115',
-    'biosample'        =>  '1001166',
-    'biosystems'       =>  '105909',
+    'bioproject'       =>  '146229',
+    'biosample'        =>  '3737421',
+    'biosystems'       =>  '1223165',
     'blastdbinfo'      =>  '1023214',
     'books'            =>  '1371014',
-    'cdd'              =>  '189363',
+    'cdd'              =>  '277499',
+    'clinvar'          =>  '10510',
     'clone'            =>  '18646800',
     'dbvar'            =>  '6173073',
-    'epigenomics'      =>  '13103',
     'gap'              =>  '872875',
     'gds'              =>  '200022309',
     'gencoll'          =>  '398148',
@@ -192,7 +214,6 @@ sub get_zero_uid {
     'homologene'       =>  '510',
     'medgen'           =>  '162753',
     'mesh'             =>  '68007328',
-    'ncbisearch'       =>  '15032',
     'nlmcatalog'       =>  '0404511',
     'nuccore'          =>  '1322283',
     'nucest'           =>  '338968657',
@@ -215,16 +236,16 @@ sub get_zero_uid {
     'sra'              =>  '190091',
     'structure'        =>  '61024',
     'taxonomy'         =>  '562',
-    'toolkit'          =>  '242011',
     'unigene'          =>  '1132160',
-    'unists'           =>  '40791'
-  ); 
+  );
 
   if ( defined $zeroUidHash{$db} ) {
     $val = $zeroUidHash{$db};
   }
 
-  return $val;
+# return $val below to restore debugging test
+
+  return 0;
 }
 
 # support for substitution of (#keyword) to full query phrase or URL component
@@ -302,21 +323,26 @@ sub adjust_base {
     # since history server data for EUtils does not copy between locations, by design
 
     if ( $web ne "" and $web =~ /NCID_\d+_\d+_(\d+)\.\d+\.\d+\.\d+_\d+_\d+_\d+/ ) {
-      if ( $1 == "130" ) {
-        $base = "http://eutils.be-md.ncbi.nlm.nih.gov/entrez/eutils/";
-      } elsif ( $1 == "165" ) {
-        $base = "http://eutils.st-va.ncbi.nlm.nih.gov/entrez/eutils/";
+      if ( $1 == 130 ) {
+        $base = "https://eutils.be-md.ncbi.nlm.nih.gov/entrez/eutils/";
+      } elsif ( $1 == 165 ) {
+        $base = "https://eutils.st-va.ncbi.nlm.nih.gov/entrez/eutils/";
       }
     }
     return;
+  }
+
+  # shortcut for eutilstest base
+  if ( $basx eq "test" ) {
+    $basx = "https://eutilstest.ncbi.nlm.nih.gov/entrez/eutils";
   }
 
   if ( $basx =~ /\(#/ ) {
     $basx = map_macros ($basx);
   }
 
-  if ( $basx !~ /^http:\/\// ) {
-    $basx = "http://" . $basx;
+  if ( $basx !~ /^https:\/\// ) {
+    $basx = "https://" . $basx;
   }
 
   if ( $basx !~ /\/$/ ) {
@@ -390,6 +416,27 @@ sub get_email {
   }
 
   return $addr;
+}
+
+# correct misspellings in query
+
+sub spell_check_query {
+
+  my $db = shift (@_);
+  my $qury = shift (@_);
+
+  my $url = $base . $espell;
+
+  my $enc = uri_escape($query);
+  $arg = "db=$db&term=$enc";
+
+  my $data = do_post ($url, $arg, $tool, $email, true);
+
+  Encode::_utf8_on($data);
+
+  $qury = $1 if ( $data =~ /<CorrectedQuery>(.+)<\/CorrectedQuery>/ );
+
+  return $qury;
 }
 
 # elink and epost currently need a separate ESearch to get the correct result count
@@ -579,6 +626,7 @@ sub do_post_yielding_ref {
   }
 
   $usragnt = new LWP::UserAgent (timeout => 300);
+  $usragnt->env_proxy;
 
   $req = new HTTP::Request POST => "$urlx";
   $req->content_type('application/x-www-form-urlencoded');
@@ -588,6 +636,8 @@ sub do_post_yielding_ref {
 
   if ( $res->is_success) {
     $rslt = $res->content_ref;
+  } else {
+    print STDERR $res->status_line . "\n";
   }
 
   if ( $$rslt eq "" ) {
@@ -879,13 +929,28 @@ sub write_edirect {
   print "</ENTREZ_DIRECT>\n";
 }
 
+# wrapper to detect command line errors
+
+sub MyGetOptions {
+
+  my $help_msg = shift @_;
+
+  if ( !GetOptions(@_) ) {
+    die $help_msg;
+  } elsif (@ARGV) {
+    die ("Entrez Direct does not support positional arguments.\n"
+         . "Please remember to quote parameter values containing\n"
+         . "whitespace or shell metacharacters.\n");
+  }
+}
+
 # subroutines for each -function
 
 # ecntc prepares the requested tool and email arguments for an EUtils pipe
 
 my $cntc_help = qq{
--email    Contact person's address
--tool     Name of script or program
+  -email    Contact person's address
+  -tool     Name of script or program
 
 };
 
@@ -895,7 +960,8 @@ sub ecntc {
 
   clearflags ();
 
-  GetOptions (
+  MyGetOptions(
+    $cntc_help,
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
     "help" => \$help,
@@ -904,6 +970,7 @@ sub ecntc {
     "debug" => \$debug,
     "log" => \$log,
     "http=s" => \$http,
+    "https=s" => \$http,
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
@@ -935,16 +1002,340 @@ sub ecntc {
 # efilt performs ESearch query refinement on the EUtils history server
 
 my $filt_help = qq{
--query       Query string
+Query Specification
 
--days        Number of days in the past
--datetype    Date field abbreviation
--mindate     Start of date range
--maxdate     End of date range
+  -query       Query string
 
--label       Alias for query step
+Document Order
+
+  -sort        Result presentation order
+
+Date Constraint
+
+  -days        Number of days in the past
+  -datetype    Date field abbreviation
+  -mindate     Start of date range
+  -maxdate     End of date range
+
+Spell Check
+
+  -spell       Correct misspellings in query
+
+Publication Filters
+
+  -pub         abstract, clinical, english, free, historical,
+               journal, last_week, last_month, last_year,
+               preprint, review, structured
+
+Sequence Filters
+
+  -feature     gene, mrna, cds, mat_peptide, ...
+  -location    mitochondrion, chloroplast, plasmid, plastid
+  -molecule    genomic, mrna, trna, rrna, ncrna
+  -organism    animals, archaea, bacteria, eukaryotes, fungi,
+               human, insects, mammals, plants, prokaryotes,
+               protists, rodents, viruses
+  -source      genbank, insd, pdb, pir, refseq, swissprot, tpa
+
+Gene Filters
+
+  -status      alive
+  -type        coding, pseudo
+
+Miscellaneous Arguments
+
+  -label       Alias for query step
 
 };
+
+sub process_extras {
+
+  my $frst = shift (@_);
+  my $publ = shift (@_);
+  my $fkey = shift (@_);
+  my $locn = shift (@_);
+  my $bmol = shift (@_);
+  my $orgn = shift (@_);
+  my $sorc = shift (@_);
+  my $stat = shift (@_);
+  my $gtyp = shift (@_);
+
+  $publ = lc($publ);
+  $fkey = lc($fkey);
+  $bmol = lc($bmol);
+  $locn = lc($locn);
+  $orgn = lc($orgn);
+  $sorc = lc($sorc);
+  $stat = lc($stat);
+  $gtyp = lc($gtyp);
+
+  %pubHash = (
+    'abstract'    =>  'has abstract [FILT]',
+    'clinical'    =>  'clinical trial [FILT]',
+    'english'     =>  'english [FILT]',
+    'free'        =>  'freetext [FILT]',
+    'historical'  =>  'historical article [FILT]',
+    'journal'     =>  'journal article [FILT]',
+    'last_month'  =>  'published last month [FILT]',
+    'last month'  =>  'published last month [FILT]',
+    'last_week'   =>  'published last week [FILT]',
+    'last week'   =>  'published last week [FILT]',
+    'last_year'   =>  'published last year [FILT]',
+    'last year'   =>  'published last year [FILT]',
+    'preprint'    =>  'ahead of print [FILT]',
+    'review'      =>  'review [FILT]',
+    'structured'  =>  'hasstructuredabstract [WORD]',
+    'trial'       =>  'clinical trial [FILT]',
+  );
+
+  @featureArray = (
+    "-10_signal",
+    "-35_signal",
+    "3'clip",
+    "3'utr",
+    "5'clip",
+    "5'utr",
+    "allele",
+    "assembly_gap",
+    "attenuator",
+    "c_region",
+    "caat_signal",
+    "cds",
+    "centromere",
+    "conflict",
+    "d_segment",
+    "d-loop",
+    "enhancer",
+    "exon",
+    "gap",
+    "gc_signal",
+    "gene",
+    "idna",
+    "intron",
+    "j_segment",
+    "ltr",
+    "mat_peptide",
+    "misc_binding",
+    "misc_difference",
+    "misc_feature",
+    "misc_recomb",
+    "misc_rna",
+    "misc_signal",
+    "misc_structure",
+    "mobile_element",
+    "modified_base",
+    "mrna",
+    "mutation",
+    "n_region",
+    "ncrna",
+    "old_sequence",
+    "operon",
+    "orit",
+    "polya_signal",
+    "polya_site",
+    "precursor_rna",
+    "prim_transcript",
+    "primer_bind",
+    "promoter",
+    "propeptide",
+    "protein_bind",
+    "rbs",
+    "regulatory",
+    "rep_origin",
+    "repeat_region",
+    "repeat_unit",
+    "rrna",
+    "s_region",
+    "satellite",
+    "scrna",
+    "sig_peptide",
+    "snorna",
+    "snrna",
+    "source",
+    "stem_loop",
+    "sts",
+    "tata_signal",
+    "telomere",
+    "terminator",
+    "tmrna",
+    "transit_peptide",
+    "trna",
+    "unsure",
+    "v_region",
+    "v_segment",
+    "variation"
+  );
+
+  %locationHash = (
+    'mitochondria'   =>  'mitochondrion [FILT]',
+    'mitochondrial'  =>  'mitochondrion [FILT]',
+    'mitochondrion'  =>  'mitochondrion [FILT]',
+    'chloroplast'    =>  'chloroplast [FILT]',
+    'plasmid'        =>  'plasmid [FILT]',
+    'plastid'        =>  'plastid [FILT]',
+  );
+
+  %moleculeHash = (
+    'genomic'  =>  'biomol genomic [PROP]',
+    'mrna'     =>  'biomol mrna [PROP]',
+    'trna'     =>  'biomol trna [PROP]',
+    'rrna'     =>  'biomol rrna [PROP]',
+    'ncrna'    =>  'biomol ncrna [PROP]',
+  );
+
+  %organismHash = (
+    'animal'           =>  'animals [FILT]',
+    'animals'          =>  'animals [FILT]',
+    'archaea'          =>  'archaea [FILT]',
+    'archaeal'         =>  'archaea [FILT]',
+    'archaean'         =>  'archaea [FILT]',
+    'archaebacteria'   =>  'archaea [FILT]',
+    'archaebacterial'  =>  'archaea [FILT]',
+    'bacteria'         =>  'bacteria [FILT]',
+    'bacterial'        =>  'bacteria [FILT]',
+    'bacterium'        =>  'bacteria [FILT]',
+    'eubacteria'       =>  'bacteria [FILT]',
+    'eubacterial'      =>  'bacteria [FILT]',
+    'eukaryota'        =>  'eukaryota [ORGN]',
+    'eukaryote'        =>  'eukaryota [ORGN]',
+    'eukaryotes'       =>  'eukaryota [ORGN]',
+    'fungal'           =>  'fungi [FILT]',
+    'fungi'            =>  'fungi [FILT]',
+    'fungus'           =>  'fungi [FILT]',
+    'human'            =>  'human [ORGN]',
+    'humans'           =>  'human [ORGN]',
+    'insect'           =>  'insecta [ORGN]',
+    'insecta'          =>  'insecta [ORGN]',
+    'insects'          =>  'insecta [ORGN]',
+    'mammal'           =>  'mammals [FILT]',
+    'mammalia'         =>  'mammals [FILT]',
+    'mammalian'        =>  'mammals [FILT]',
+    'mammals'          =>  'mammals [FILT]',
+    'man'              =>  'human [ORGN]',
+    'metaphyta'        =>  'plants [FILT]',
+    'metazoa'          =>  'animals [FILT]',
+    'monera'           =>  'prokaryota [ORGN]',
+    'plant'            =>  'plants [FILT]',
+    'plants'           =>  'plants [FILT]',
+    'prokaryota'       =>  'prokaryota [ORGN]',
+    'prokaryote'       =>  'prokaryota [ORGN]',
+    'prokaryotes'      =>  'prokaryota [ORGN]',
+    'protist'          =>  'protists [FILT]',
+    'protista'         =>  'protists [FILT]',
+    'protists'         =>  'protists [FILT]',
+    'rodent'           =>  'rodents [ORGN]',
+    'rodentia'         =>  'rodents [ORGN]',
+    'rodents'          =>  'rodents [ORGN]',
+    'viral'            =>  'viruses [FILT]',
+    'virus'            =>  'viruses [FILT]',
+    'viruses'          =>  'viruses [FILT]',
+  );
+
+  %sourceHash = (
+    'ddbj'       =>  'srcdb ddbj [PROP]',
+    'embl'       =>  'srcdb embl [PROP]',
+    'genbank'    =>  'srcdb genbank [PROP]',
+    'insd'       =>  'srcdb ddbj/embl/genbank [PROP]',
+    'pdb'        =>  'srcdb pdb [PROP]',
+    'pir'        =>  'srcdb pir [PROP]',
+    'refseq'     =>  'srcdb refseq [PROP]',
+    'swissprot'  =>  'srcdb swiss prot [PROP]',
+    'tpa'        =>  'srcdb tpa ddbj/embl/genbank [PROP]',
+  );
+
+  %statusHash = (
+    'alive'   =>  'alive [PROP]',
+    'live'    =>  'alive [PROP]',
+    'living'  =>  'alive [PROP]',
+  );
+
+  %typeHash = (
+    'coding'  =>  'genetype protein coding [PROP]',
+    'pseudo'  =>  'genetype pseudo [PROP]',
+  );
+
+  my @working = ();
+
+  if ( $frst ne "" ) {
+    push (@working, $frst);
+  }
+
+  if ( $publ ne "" ) {
+    if ( defined $pubHash{$publ} ) {
+      $val = $pubHash{$publ};
+      push (@working, $val);
+    } else {
+      die "\nUnrecognized -pub argument '$publ', use efilter -help to see available choices\n\n";
+    }
+  }
+
+  if ( $fkey ne "" ) {
+    if ( grep( /^$fkey$/, @featureArray ) ) {
+      $val = $fkey . " [FKEY]";
+      push (@working, $val);
+    } else {
+      die "\nUnrecognized -feature argument '$fkey', use efilter -help to see available choices\n\n";
+    }
+  }
+
+  if ( $locn ne "" ) {
+    if ( defined $locationHash{$locn} ) {
+      $val = $locationHash{$locn};
+      push (@working, $val);
+    } else {
+      die "\nUnrecognized -location argument '$locn', use efilter -help to see available choices\n\n";
+    }
+  }
+
+  if ( $bmol ne "" ) {
+    if ( defined $moleculeHash{$bmol} ) {
+      $val = $moleculeHash{$bmol};
+      push (@working, $val);
+    } else {
+      die "\nUnrecognized -molecule argument '$bmol', use efilter -help to see available choices\n\n";
+    }
+  }
+
+  if ( $orgn ne "" ) {
+    if ( defined $organismHash{$orgn} ) {
+      $val = $organismHash{$orgn};
+      push (@working, $val);
+    } else {
+      die "\nUnrecognized -organism argument '$orgn', use efilter -help to see available choices\n\n";
+    }
+  }
+
+  if ( $sorc ne "" ) {
+    if ( defined $sourceHash{$sorc} ) {
+      $val = $sourceHash{$sorc};
+      push (@working, $val);
+    } else {
+      die "\nUnrecognized -source argument '$sorc', use efilter -help to see available choices\n\n";
+    }
+  }
+
+  if ( $stat ne "" ) {
+    if ( defined $statusHash{$stat} ) {
+      $val = $statusHash{$stat};
+      push (@working, $val);
+    } else {
+      die "\nUnrecognized -status argument '$stat', use efilter -help to see available choices\n\n";
+    }
+  }
+
+  if ( $gtyp ne "" ) {
+    if ( defined $typeHash{$gtyp} ) {
+      $val = $typeHash{$gtyp};
+      push (@working, $val);
+    } else {
+      die "\nUnrecognized -type argument '$gtyp', use efilter -help to see available choices\n\n";
+    }
+  }
+
+  my $xtras = join (" AND ", @working);
+
+  return $xtras;
+}
 
 sub efilt {
 
@@ -952,13 +1343,24 @@ sub efilt {
 
   clearflags ();
 
-  GetOptions (
+  MyGetOptions(
+    $filt_help,
     "query=s" => \$query,
+    "sort=s" => \$sort,
     "days=i" => \$rldate,
     "mindate=s" => \$mndate,
     "maxdate=s" => \$mxdate,
     "datetype=s" => \$dttype,
     "label=s" => \$lbl,
+    "spell" => \$spell,
+    "pub=s" => \$pub,
+    "feature=s" => \$feature,
+    "location=s" => \$location,
+    "molecule=s" => \$molecule,
+    "organism=s" => \$organism,
+    "source=s" => \$source,
+    "status=s" => \$status,
+    "type=s" => \$gtype,
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
     "help" => \$help,
@@ -967,6 +1369,7 @@ sub efilt {
     "debug" => \$debug,
     "log" => \$log,
     "http=s" => \$http,
+    "https=s" => \$http,
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
@@ -977,8 +1380,15 @@ sub efilt {
     return;
   }
 
-  if ( $query eq "" && $rldate < 1 and $mndate eq "" and $mxdate eq "" ) {
-    die "Must supply -query or -days or -mindate and -maxdate arguments on command line\n";
+  # process special filter flags, add to query string
+  $query = process_extras ( $query, $pub, $feature, $location, $molecule, $organism, $source, $status, $gtype );
+
+  if ( -t STDIN ) {
+    if ( $query eq "" ) {
+      die "Must supply -query or -days or -mindate and -maxdate arguments on command line\n";
+    }
+    print "efilter -query \"$query\"\n";
+    return;
   }
 
   ( $dbase, $web, $key, $num, $stp, $err, $tool, $email, $just_num, @rest ) = read_edirect ();
@@ -1002,20 +1412,52 @@ sub efilt {
     $email = $emaddr;
   }
 
+  if ( $query eq "" && $rldate < 1 and $mndate eq "" and $mxdate eq "" ) {
+    die "Must supply -query or -days or -mindate and -maxdate arguments on command line\n";
+  }
+
   binmode STDOUT, ":utf8";
 
   if ( $dbase ne "" and $web ne "" and $key eq "" and $num eq "0" ) {
     write_edirect ( $dbase, $web, $key, $num, $stp, $err, $tool, $email );
-    # close (STDOUT);
-    # die "QueryKey value not found in filter input\n";
+    close (STDOUT);
+    die "QueryKey value not found in filter input\n";
     return;
+  }
+
+  # warn on mismatch between filter argument and database
+  if ( $dbase ne "pubmed" ) {
+    if ( $pub ne "" ) {
+      print STDERR "\nUnexpected use of pubmed filter argument\n\n";
+    }
+  }
+  if ( $dbase ne "nucleotide" and
+       $dbase ne "nuccore" and
+       $dbase ne "est" and
+       $dbase ne "gss" and
+       $dbase ne "protein" ) {
+    if ( $feature ne "" or
+         $location ne "" or
+         $molecule ne "" or
+         $organism ne "" or
+         $source ne "" ) {
+      print STDERR "\nUnexpected use of sequence filter argument\n\n";
+    }
   }
 
   test_edirect ( $dbase, $web, $key, $num, "filter" );
 
+  # spell check each query word
+  if ( $spell ) {
+    $query = spell_check_query ($dbase, $query);
+  }
+
   $url = $base . $esearch;
 
   $arg = "db=$dbase&query_key=$key&WebEnv=$web";
+  if ( $sort ne "" ) {
+    $arg .= "&sort=$sort";
+  }
   $arg .= "&retmax=0&usehistory=y";
   if ( $query ne "" ) {
     $query = map_labels ($query);
@@ -1025,13 +1467,13 @@ sub efilt {
   }
   if ( $rldate > 0 ) {
     $arg .= "&reldate=$rldate";
-    if ( $dttype ne "" ) {
+    if ( $dttype eq "" ) {
       $dttype = "PDAT";
     }
   }
   if ( $mndate ne "" and $mxdate ne "" ) {
     $arg .= "&mindate=$mndate&maxdate=$mxdate";
-    if ( $dttype ne "" ) {
+    if ( $dttype eq "" ) {
       $dttype = "PDAT";
     }
   }
@@ -1100,6 +1542,135 @@ sub efilt {
 
 # efetch -format docsum calls esmry to retrieve document summaries
 
+my %fields_to_fix = (
+  'biosample' => ['SampleData'],
+  'medgen'    => ['ConceptMeta'],
+  'sra'       => ['ExpXml', 'Runs']
+);
+
+sub fix_one_encoding {
+
+  my $dbase = shift (@_);
+  my $data = shift (@_);
+
+  if ( $dbase eq "gene" ) {
+    if ( $data =~ /<Summary>(.+?)<\/Summary>/ ) {
+      my $x = $1;
+      if ( $x =~ /\&amp\;/ ) {
+        HTML::Entities::decode_entities($x);
+        # Reencode any resulting less-than or greater-than entities to avoid breaking the XML.
+        $x =~ s/</&lt;/g;
+        $x =~ s/>/&gt;/g;
+        $data =~ s/<Summary>(.+?)<\/Summary>/<Summary>$x<\/Summary>/;
+      }
+    }
+    # $data =~ s/(\s+?)<ChrStart>(\d+)<\/ChrStart>/$1<ChrStart>$2<\/ChrStart>$1<SeqStart>${\($2 + 1)}<\/SeqStart>/g;
+    # $data =~ s/(\s+?)<ChrStop>(\d+)<\/ChrStop>/$1<ChrStop>$2<\/ChrStop>$1<SeqStop>${\($2 + 1)}<\/SeqStop>/g;
+  } elsif ( $dbase eq "assembly" ) {
+    if ( $data =~ /<Meta>(.+?)<\/Meta>/ ) {
+      my $x = $1;
+      if ( $x =~ /<!\[CDATA\[\s*(.+?)\s*\]\]>/ ) {
+        $x = $1;
+        if ( $x =~ /</ and $x =~ />/ ) {
+            # If CDATA contains embedded XML, simply remove CDATA wrapper
+          $data =~ s/<Meta>(.+?)<\/Meta>/<Meta>$x<\/Meta>/;
+        }
+      }
+    }
+  } elsif (defined $fields_to_fix{$dbase}) {
+    foreach $f (@{$fields_to_fix{$dbase}}) {
+      if ( $data =~ /<$f>(.+?)<\/$f>/ ) {
+        my $x = $1;
+        if ( $x =~ /\&lt\;/ and $x =~ /\&gt\;/ ) {
+          HTML::Entities::decode_entities($x);
+          $data =~ s/<$f>(.+?)<\/$f>/<$f>$x<\/$f>/;
+        }
+      }
+    }
+  }
+
+  return $data;
+}
+
+sub fix_bad_encoding {
+
+  my $dbase = shift (@_);
+  my $data = shift (@_);
+
+  if ( $dbase eq "gene" || $dbase eq "assembly" || defined $fields_to_fix{$dbase} ) {
+
+    my @accum = ();
+    my @working = ();
+    my $prefix = "";
+    my $suffix = "";
+    my $docsumset_attrs = '';
+
+    if ( $data =~ /(.+?)<DocumentSummarySet(\s+.+?)?>(.+)<\/DocumentSummarySet>(.+)/s ) {
+      $prefix = $1;
+      $docsumset_attrs = $2;
+      my $docset = $3;
+      $suffix = $4;
+      my @vals = ($docset =~ /<DocumentSummary>(.+?)<\/DocumentSummary>/sg);
+      foreach $val (@vals) {
+        push (@working, "<DocumentSummary>");
+        push (@working, fix_one_encoding ( $dbase, $val) );
+        push (@working, "</DocumentSummary>");
+      }
+    }
+
+    if ( scalar @working > 0 ) {
+      push (@accum, $prefix);
+      push (@accum, "<DocumentSummarySet$docsumset_attrs>");
+      push (@accum, @working);
+      push (@accum, "</DocumentSummarySet>");
+      push (@accum, $suffix);
+      $data = join ("\n", @accum);
+      $data =~ s/\n\n/\n/g;
+    }
+  }
+
+  return $data;
+}
+
+sub accn_to_gi {
+
+  my $dbsx = shift (@_);
+  my $accn = shift (@_);
+  my $nogi = shift (@_);
+
+  my $id = 0;
+
+  if ( $dbsx eq "" or $accn eq "" ) {
+    return 0;
+  }
+
+  if ( $nogi ) {
+    return $accn;
+  }
+
+  if ( $dbsx ne "nucleotide" and
+       $dbsx ne "nuccore" and
+       $dbsx ne "est" and
+       $dbsx ne "gss" and
+       $dbsx ne "protein" ) {
+    print STDERR "\nFor -db $dbsx, the -id argument must be numeric\n\n";
+    return 0;
+  }
+
+  $url = $base . $esearch;
+  $url .= "?db=$dbsx&&term=$accn%5bACCN%5d";
+
+  $output = get ($url);
+
+  if ( $output eq "" ) {
+    print STDERR "No get_count output returned from '$url'\n";
+  }
+
+  $id = $1 if ($output =~ /<Id>(\S+)<\/Id>/);
+
+  return $id;
+}
+
 sub esmry {
 
   my $dbase = shift (@_);
@@ -1119,6 +1690,9 @@ sub esmry {
   my $http = shift (@_);
   my $alias = shift (@_);
   my $basx = shift (@_);
+  my $nogi = shift (@_);
+
+  $dbase = lc($dbase);
 
   if ( $dbase ne "" and $id ne "" ) {
 
@@ -1127,6 +1701,27 @@ sub esmry {
       # id "0" returns a live UID for any database
 
       $id = get_zero_uid ($dbase);
+
+      if ( $id eq "0" ) {
+
+        # id "0" is an unrecognized accession
+
+        return;
+      }
+    }
+
+    if ($id !~ /^\d+$/ and $id !~ /,/) {
+
+      # convert single accession to GI number
+
+      $id = accn_to_gi ($dbase, $id, $nogi);
+
+      if ( $id eq "0" ) {
+
+        # id "0" is an unrecognized accession
+
+        return;
+      }
     }
 
     $url = $base . $esummary;
@@ -1151,8 +1746,7 @@ sub esmry {
 
       Encode::_utf8_on($data);
 
-      $data =~ s/&amp;/&/g;
-      HTML::Entities::decode_entities($data);
+      $data = fix_bad_encoding($dbase, $data);
 
       print "$data";
     }
@@ -1161,7 +1755,7 @@ sub esmry {
   }
 
   if ( $dbase ne "" and $web ne "" and $key eq "" and $num eq "0" ) {
-    # die "QueryKey value not found in summary input\n";
+    die "QueryKey value not found in summary input\n";
     return;
   }
 
@@ -1266,8 +1860,7 @@ sub esmry {
 
       Encode::_utf8_on($data);
 
-      $data =~ s/&amp;/&/g;
-      HTML::Entities::decode_entities($data);
+      $data = fix_bad_encoding($dbase, $data);
 
       print "$data";
     }
@@ -1279,18 +1872,150 @@ sub esmry {
 # eftch can read all arguments from the command line or participate in an EUtils pipe
 
 my $ftch_help = qq{
--format        Format of record or report
--mode          text, xml, asn.1, json
+Format Selection
 
--db            Database name
--id            Unique identifier or accession number
+  -format        Format of record or report
+  -mode          text, xml, asn.1, json
 
--seq_start     First sequence position to retrieve
--seq_stop      Last sequence position to retrieve
--strand        Strand of DNA to retrieve
--complexity    0 = default, 1 = bioseq, 3 = nuc-prot set
+Direct Record Selection
+
+  -db            Database name
+  -id            Unique identifier or accession number
+
+Sequence Range
+
+  -seq_start     First sequence position to retrieve
+  -seq_stop      Last sequence position to retrieve
+  -strand        Strand of DNA to retrieve
+  -complexity    0 = default, 1 = bioseq, 3 = nuc-prot set
+
+Gene Range
+
+  -chr_start     Sequence range from 0-based coordinates
+  -chr_stop        in gene docsum GenomicInfoType object
+
+Format Examples
+
+  -db            -format            -mode    Report Type
+  ___            _______            _____    ___________
+
+  (all)
+                 docsum                      DocumentSummarySet XML
+                 docsum             json     DocumentSummarySet JSON
+                 full                        Same as native except for mesh
+                 uid                         Unique Identifier List
+                 url                         Entrez URL
+                 xml                         Same as -format full -mode xml
+
+  bioproject
+                 native                      BioProject Report
+                 native             xml      RecordSet XML
+
+  biosample
+                 native                      BioSample Report
+                 native             xml      BioSampleSet XML
+
+  biosystems
+                 native             xml      Sys-set XML
+
+  gds
+                 native             xml      RecordSet XML
+                 summary                     Summary
+
+  gene
+                 gene_table                  Gene Table
+                 native                      Gene Report
+                 native             asn.1    Entrezgene ASN.1
+                 native             xml      Entrezgene-Set XML
+                 tabular                     Tabular Report
+
+  homologene
+                 alignmentscores             Alignment Scores
+                 fasta                       FASTA
+                 homologene                  Homologene Report
+                 native                      Homologene List
+                 native             asn.1    HG-Entry ASN.1
+                 native             xml      Entrez-Homologene-Set XML
+
+  mesh
+                 full                        Full Record
+                 native                      MeSH Report
+                 native             xml      RecordSet XML
+
+  nlmcatalog
+                 native                      Full Record
+                 native             xml      NLMCatalogRecordSet XML
+
+  pmc
+                 medline                     MEDLINE
+                 native             xml      pmc-articleset XML
+
+  pubmed
+                 abstract                    Abstract
+                 medline                     MEDLINE
+                 native             asn.1    Pubmed-entry ASN.1
+                 native             xml      PubmedArticleSet XML
+
+  (sequences)
+                 acc                         Accession Number
+                 est                         EST Report
+                 fasta                       FASTA
+                 fasta              xml      TinySeq XML
+                 fasta_cds_aa                FASTA of CDS Products
+                 fasta_cds_na                FASTA of Coding Regions
+                 ft                          Feature Table
+                 gb                          GenBank Flatfile
+                 gb                 xml      GBSet XML
+                 gbc                xml      INSDSet XML
+                 gbwithparts                 GenBank with Contig Sequences
+                 gene_fasta                  FASTA of Gene
+                 gp                          GenPept Flatfile
+                 gp                 xml      GBSet XML
+                 gpc                xml      INSDSet XML
+                 gss                         GSS Report
+                 ipg                         Identical Protein Report
+                 ipg                xml      IPGReportSet XML
+                 native             text     Seq-entry ASN.1
+                 native             xml      Bioseq-set XML
+                 seqid                       Seq-id ASN.1
+
+  snp
+                 chr                         Chromosome Report
+                 docset                      Summary
+                 fasta                       FASTA
+                 flt                         Flat File
+                 native             asn.1    Rs ASN.1
+                 native             xml      ExchangeSet XML
+                 rsr                         RS Cluster Report
+                 ssexemplar                  SS Exemplar List
+
+  sra
+                 native             xml      EXPERIMENT_PACKAGE_SET XML
+                 runinfo            xml      SraRunInfo XML
+
+  structure
+                 mmdb                        Ncbi-mime-asn1 strucseq ASN.1
+                 native                      MMDB Report
+                 native             xml      RecordSet XML
+
+  taxonomy
+                 native                      Taxonomy List
+                 native             xml      TaxaSet XML
 
 };
+
+sub fix_sra_xml_encoding {
+
+  my $dbase = shift (@_);
+  my $data = shift (@_);
+
+  if ( $dbase eq "sra" ) {
+    $data =~ s/<!--[^<]+</</g;
+    $data =~ s/>\s*-->/>/g;
+  }
+
+  return $data;
+}
 
 sub eftch {
 
@@ -1298,7 +2023,8 @@ sub eftch {
 
   clearflags ();
 
-  GetOptions (
+  MyGetOptions(
+    $ftch_help,
     "db=s" => \$db,
     "id=s" => \$id,
     "format=s" => \$type,
@@ -1307,9 +2033,12 @@ sub eftch {
     "seq_stop=i" => \$seq_stop,
     "strand=s" => \$strand,
     "complexity=i" => \$complexity,
+    "chr_start=i" => \$chr_start,
+    "chr_stop=i" => \$chr_stop,
     "extrafeat=i" => \$extrafeat,
     "start=i" => \$min,
     "stop=i" => \$max,
+    "nogi" => \$nogi,
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
     "pipe" => \$pipe,
@@ -1319,6 +2048,7 @@ sub eftch {
     "debug" => \$debug,
     "log" => \$log,
     "http=s" => \$http,
+    "https=s" => \$http,
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
@@ -1361,8 +2091,10 @@ sub eftch {
     $dbase = $db;
   }
 
-  if ( $type eq "" and $dbase ne "" ) {
-    if ( get_zero_uid ($dbase) eq "" ) {
+  $dbase = lc($dbase);
+
+  if ( $type eq "" and $db ne "" ) {
+    if ( get_zero_uid ($db) eq "" ) {
       die "Must supply -format report type on command line\n";
     }
     $type = "native";
@@ -1400,7 +2132,7 @@ sub eftch {
   if ( $type eq "docsum" or $fnc eq "-summary" ) {
 
     esmry ( $dbase, $web, $key, $num, $id, $mode, $min, $max, $tool, $email,
-            $silent, $verbose, $debug, $log, $http, $alias, $basx );
+            $silent, $verbose, $debug, $log, $http, $alias, $basx, $nogi );
 
     return;
   }
@@ -1415,6 +2147,20 @@ sub eftch {
   if ( $dbase ne "" and ( $type eq "UID" or $type eq "uid" ) ) {
 
     if ( $id ne "" ) {
+
+      if ($id !~ /^\d+$/ and $id !~ /,/) {
+
+        # convert single accession to GI number
+
+        $id = accn_to_gi ($dbase, $id, $nogi);
+
+        if ( $id eq "0" ) {
+
+          # id "0" is an unrecognized accession
+
+          return;
+        }
+      }
 
       my @ids = split (',', $id);
       foreach $uid (@ids) {
@@ -1456,7 +2202,7 @@ sub eftch {
     if ( $id ne "" ) {
 
       my @ids = split (',', $id);
-      $url = "http://www.ncbi.nlm.nih.gov/";
+      $url = "https://www.ncbi.nlm.nih.gov/";
       $url .= "$dbase/";
       my $pfx = "";
       foreach $uid (@ids) {
@@ -1487,7 +2233,7 @@ sub eftch {
     for ( $start = $min; $start < $max; $start += $chunk ) {
 
       my @ids = get_uids ( $dbase, $web, $key, $start, $chunk, $max, $tool, $email );
-      $url = "http://www.ncbi.nlm.nih.gov/";
+      $url = "https://www.ncbi.nlm.nih.gov/";
       $url .= "$dbase/";
       my $pfx = "";
       foreach $uid (@ids) {
@@ -1506,7 +2252,7 @@ sub eftch {
 
       my @ids = split (',', $id);
       foreach $uid (@ids) {
-        print "http://www.ncbi.nlm.nih.gov/$dbase/$uid\n";
+        print "https://www.ncbi.nlm.nih.gov/$dbase/$uid\n";
       }
 
       return;
@@ -1532,7 +2278,7 @@ sub eftch {
 
       my @ids = get_uids ( $dbase, $web, $key, $start, $chunk, $max, $tool, $email );
       foreach $uid (@ids) {
-        print "http://www.ncbi.nlm.nih.gov/$dbase/$uid\n";
+        print "https://www.ncbi.nlm.nih.gov/$dbase/$uid\n";
       }
     }
 
@@ -1546,12 +2292,36 @@ sub eftch {
       # id "0" returns a live UID for any database
 
       $id = get_zero_uid ($dbase);
+
+      if ( $id eq "0" ) {
+
+        # id "0" is an unrecognized accession
+
+        return;
+      }
     }
 
     $url = $base . $efetch;
 
     $arg = "db=$dbase&id=$id";
     $arg .= "&rettype=$type&retmode=$mode";
+
+    # -chr_start and -chr_stop are for 0-based sequence coordinates from EntrezGene
+    if ( $chr_start > -1 && $chr_stop > -1 ) {
+      $seq_start = $chr_start + 1;
+      $seq_stop = $chr_stop + 1;
+    }
+
+    # if -seq_start > -seq_stop, swap values to normalize, indicate minus strand with -strand 2
+    if ( $seq_start > 0 && $seq_stop > 0 ) {
+      if ( $seq_start > $seq_stop ) {
+        my $tmp = $seq_start;
+        $seq_start = $seq_stop;
+        $seq_stop = $tmp;
+        $strand = "2";
+      }
+    }
+
     if ( $strand ne "" ) {
       $arg .= "&strand=$strand";
     }
@@ -1581,13 +2351,22 @@ sub eftch {
 
     Encode::_utf8_on($$data);
 
+    if ( $dbase eq "sra" and $type eq "full" and $mode eq "xml" ) {
+      $$data = fix_sra_xml_encoding($dbase, $$data);
+    }
+
+    if ( $type eq "fasta" or $type eq "fasta_cds_aa" or $type eq "fasta_cds_na" or $type eq "gene_fasta" ) {
+      # remove blank lines in FASTA format
+      $$data =~ s/\n+/\n/g;
+    }
+
     print $$data;
 
     return;
   }
 
   if ( $dbase ne "" and $web ne "" and $key eq "" and $num eq "0" ) {
-    # die "QueryKey value not found in fetch input\n";
+    die "QueryKey value not found in fetch input\n";
     return;
   }
 
@@ -1711,6 +2490,15 @@ sub eftch {
 
       Encode::_utf8_on($$data);
 
+      if ( $dbase eq "sra" and $type eq "full" and $mode eq "xml" ) {
+        $$data = fix_sra_xml_encoding($dbase, $$data);
+      }
+
+      if ( $type eq "fasta" or $type eq "fasta_cds_aa" or $type eq "fasta_cds_na" or $type eq "gene_fasta" ) {
+        # remove blank lines in FASTA format
+        $$data =~ s/\n+/\n/g;
+      }
+
       print $$data;
     }
 
@@ -1721,8 +2509,46 @@ sub eftch {
 # einfo obtains names of databases or names of fields and links per database
 
 my $info_help = qq{
--db     Database name
--dbs    Get all database names
+Database Selection
+
+  -db        Database name
+  -dbs       Get all database names
+
+Data Summaries
+
+  -fields    Print field names
+  -links     Print link names
+
+Field Example
+
+  <Field>
+    <Name>ALL</Name>
+    <FullName>All Fields</FullName>
+    <Description>All terms from all searchable fields</Description>
+    <TermCount>138982028</TermCount>
+    <IsDate>N</IsDate>
+    <IsNumerical>N</IsNumerical>
+    <SingleToken>N</SingleToken>
+    <Hierarchy>N</Hierarchy>
+    <IsHidden>N</IsHidden>
+    <IsTruncatable>Y</IsTruncatable>
+    <IsRangable>N</IsRangable>
+  </Field>
+
+Link Example
+
+  <Link>
+    <Name>pubmed_protein</Name>
+    <Menu>Protein Links</Menu>
+    <Description>Published protein sequences</Description>
+    <DbTo>protein</DbTo>
+  </Link>
+  <Link>
+    <Name>pubmed_protein_refseq</Name>
+    <Menu>Protein (RefSeq) Links</Menu>
+    <Description>Link to Protein RefSeqs</Description>
+    <DbTo>protein</DbTo>
+  </Link>
 
 };
 
@@ -1732,9 +2558,12 @@ sub einfo {
 
   clearflags ();
 
-  GetOptions (
+  MyGetOptions(
+    $info_help,
     "db=s" => \$db,
     "dbs" => \$dbs,
+    "fields" => \$fields,
+    "links" => \$links,
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
     "help" => \$help,
@@ -1743,6 +2572,7 @@ sub einfo {
     "debug" => \$debug,
     "log" => \$log,
     "http=s" => \$http,
+    "https=s" => \$http,
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
@@ -1766,6 +2596,8 @@ sub einfo {
   if ( $dbase eq "" ) {
     $dbase = $db;
   }
+
+  $dbase = lc($dbase);
 
   if ( $dbase eq "" and (! $dbs) ) {
     die "Must supply -db or -dbs on command line\n";
@@ -1824,6 +2656,75 @@ sub einfo {
 
   if ( $debug ) {
     print STDERR "$output\n";
+  }
+
+  if ( $dbs and $output =~ /<DbName>/ ) {
+
+    # -dbs now extracts database names from XML
+
+    $output =~ s/\r//g;
+    $output =~ s/\n//g;
+    $output =~ s/\t//g;
+    $output =~ s/ +/ /g;
+    $output =~ s/> +</></g;
+
+    my @databases = ($output =~ /<DbName>(.+?)<\/DbName>/g);
+    foreach $dtbs (@databases) {
+      print "$dtbs\n";
+    }
+
+    return;
+  }
+
+  if ( ( $fields or $links ) and $output =~ /<DbInfo>/ ) {
+
+    # -db can print information directly without need to process XML with xtract
+
+    $output =~ s/\r//g;
+    $output =~ s/\n//g;
+    $output =~ s/\t//g;
+    $output =~ s/ +/ /g;
+    $output =~ s/> +</></g;
+
+    my $name = "";
+    my $full = "";
+    my $menu = "";
+
+    if ( $fields ) {
+      my @flds = ($output =~ /<Field>(.+?)<\/Field>/g);
+      foreach $fld (@flds) {
+        $name = "";
+        $full = "_";
+        if ( $fld =~ /<Name>(.+?)<\/Name>/ ) {
+          $name = $1;
+        }
+        if ( $fld =~ /<FullName>(.+?)<\/FullName>/ ) {
+          $full = $1;
+        }
+        if ( $name ne "" and $full ne "" ) {
+          print "$name\t$full\n";
+        }
+      }
+    }
+
+    if ( $links ) {
+      my @lnks = ($output =~ /<Link>(.+?)<\/Link>/g);
+      foreach $lnk (@lnks) {
+        $name = "";
+        $menu = "_";
+        if ( $lnk =~ /<Name>(.+?)<\/Name>/ ) {
+          $name = $1;
+        }
+        if ( $lnk =~ /<Menu>(.+?)<\/Menu>/ ) {
+          $menu = $1;
+        }
+        if ( $name ne "" and $menu ne "" ) {
+          print "$name\t$menu\n";
+        }
+      }
+    }
+
+    return;
   }
 
   print "$output";
@@ -1920,7 +2821,10 @@ sub process_history_link {
   }
   if ( $key eq "" ) {
     write_edirect ( $dbto, $wb, $key, "0", $stp, $err, $tool, $email );
-    # close (STDOUT);
+    close (STDOUT);
+    # no neighbors or links can be a normal response,
+    # e.g., elink -db gene -id 496376 -target medgen
+    # so suppress this message
     # die "QueryKey value not found in link output - WebEnv1 $wb\n";
     return;
   }
@@ -2051,6 +2955,8 @@ sub batch_elink {
 
   $dbase = $dbto;
 
+  $dbase = lc($dbase);
+
   $num = scalar @uniq;
 
   if ( $num == 0 ) {
@@ -2102,20 +3008,52 @@ sub batch_elink {
 # elink without a target uses the source database for neighboring
 
 my $link_help = qq{
--related    Neighbors in same database
--target     Links in different database
--name       Link name (e.g., pubmed_protein_refseq)
+Destination Database
 
--db         Database name
--id         Unique identifier(s)
+  -related    Neighbors in same database
+  -target     Links in different database
+  -name       Link name (e.g., pubmed_protein_refseq)
 
--cmd        Command type (returns eLinkResult XML)
--mode       "ref" uses LinkOut provider's web site
--holding    Name of LinkOut provider
+Direct Record Selection
 
--batch      Bypass Entrez history mechanism
+  -db         Database name
+  -id         Unique identifier(s)
 
--label      Alias for query step
+Advanced Control
+
+  -cmd        Command type (returns eLinkResult XML)
+  -mode       "ref" uses LinkOut provider's web site
+  -holding    Name of LinkOut provider
+
+Batch Processing
+
+  -batch      Bypass Entrez history mechanism
+
+Miscellaneous Arguments
+
+  -label      Alias for query step
+
+Command Option Examples
+
+  -cmd              Result
+  ____              ______
+
+  neighbor          Neighbors or links
+
+  neighbor_score    Neighbors with computed similarity scores
+
+  acheck            All links available
+
+  ncheck            Existence of neighbors
+
+  lcheck            Existence of external links (LinkOuts)
+
+  llinks            Non-library LinkOut providers
+
+  llinkslib         All LinkOut providers
+
+  prlinks           Primary LinkOut provider,
+                    or URL for single UID with -mode ref
 
 };
 
@@ -2125,7 +3063,8 @@ sub elink {
 
   clearflags ();
 
-  GetOptions (
+  MyGetOptions(
+    $link_help,
     "db=s" => \$db,
     "id=s" => \$id,
     "target=s" => \$dbto,
@@ -2137,6 +3076,7 @@ sub elink {
     "batch" => \$batch,
     "holding=s" => \$holding,
     "label=s" => \$lbl,
+    "nogi" => \$nogi,
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
     "help" => \$help,
@@ -2145,6 +3085,7 @@ sub elink {
     "debug" => \$debug,
     "log" => \$log,
     "http=s" => \$http,
+    "https=s" => \$http,
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
@@ -2182,6 +3123,9 @@ sub elink {
     $dbase = $db;
   }
 
+  $dbase = lc($dbase);
+
+  my $adddbto = true;
   if ( $dbto eq "" ) {
     if ( $cmd eq "acheck" or
          $cmd eq "ncheck" or
@@ -2190,6 +3134,7 @@ sub elink {
          $cmd eq "llinkslib" or
          $cmd eq "prlinks" ) {
       $dbto = $dbase;
+      $adddbto = false;
     }
   }
 
@@ -2217,13 +3162,35 @@ sub elink {
     $cmd = "neighbor_history";
   }
 
+  if ( $dbase eq "nlmcatalog" ) {
+    die "Entrez Direct does not support links for the nlmcatalog database\n";
+  }
+
   if ( $dbase ne "" and $id ne "" ) {
+
+    if ($id !~ /^\d+$/ and $id !~ /,/) {
+
+      # convert single accession to GI number
+
+      $id = accn_to_gi ($dbase, $id, $nogi);
+
+      if ( $id eq "0" ) {
+
+        # id "0" is an unrecognized accession
+
+        return;
+      }
+    }
 
     # process db and id command-line arguments instead of getting from history
 
     $url = $base . $elink;
 
-    $arg = "dbfrom=$dbase&db=$dbto&cmd=$cmd&linkname=$name";
+    $arg = "dbfrom=$dbase";
+    if ( $adddbto ) {
+      $arg .= "&db=$dbto";
+    }
+    $arg .= "&cmd=$cmd&linkname=$name";
     if ( $mode ne "" ) {
       $arg .= "&retmode=$mode";
     }
@@ -2276,7 +3243,11 @@ sub elink {
 
       $url = $base . $elink;
 
-      $arg = "dbfrom=$dbase&db=$dbto&cmd=$cmd&linkname=$name";
+      $arg = "dbfrom=$dbase";
+      if ( $adddbto ) {
+        $arg .= "&db=$dbto";
+      }
+      $arg .= "&cmd=$cmd&linkname=$name";
       if ( $mode ne "" ) {
         $arg .= "&retmode=$mode";
       }
@@ -2303,7 +3274,11 @@ sub elink {
 
   $url = $base . $elink;
 
-  $arg = "dbfrom=$dbase&db=$dbto&query_key=$key&WebEnv=$web";
+  $arg = "dbfrom=$dbase";
+  if ( $adddbto ) {
+    $arg .= "&db=$dbto";
+  }
+  $arg .= "&query_key=$key&WebEnv=$web";
   $arg .= "&cmd=$cmd&linkname=$name";
   if ( $mode ne "" ) {
     $arg .= "&retmode=$mode";
@@ -2393,7 +3368,7 @@ sub emmdb {
     die "ERROR in mmdb input: $err\n\n";
   }
 
-  $mbase = "http://www.ncbi.nlm.nih.gov/Structure/mmdb/";
+  $mbase = "https://www.ncbi.nlm.nih.gov/Structure/mmdb/";
   $mprog = "mmdbsrv.cgi";
 
   if ( $id ne "" ) {
@@ -2436,8 +3411,8 @@ sub emmdb {
 # entfy sends e-mail
 
 my $ntfy_help = qq{
--email    Contact person's address
--tool     Name of script or program
+  -email    Contact person's address
+  -tool     Name of script or program
 
 };
 
@@ -2447,7 +3422,8 @@ sub entfy {
 
   clearflags ();
 
-  GetOptions (
+  MyGetOptions(
+    $ntfy_help,
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
     "help" => \$help,
@@ -2456,6 +3432,7 @@ sub entfy {
     "debug" => \$debug,
     "log" => \$log,
     "http=s" => \$http,
+    "https=s" => \$http,
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
@@ -2499,7 +3476,7 @@ sub entfy {
       my @ids = get_uids ( $dbase, $web, $key, $start, $chunk, $num, $tool, $email );
 
       foreach $uid (@ids) {
-        $txt = "echo \"http://www.ncbi.nlm.nih.gov/$dbase/$uid\n\"";
+        $txt = "echo \"https://www.ncbi.nlm.nih.gov/$dbase/$uid\n\"";
         $str = "mail -s \"A new $dbase record is in Entrez\" $email";
         system "$txt | $str";
       }
@@ -2548,13 +3525,13 @@ sub post_chunk {
     $arg .= "&retmax=0&usehistory=y";
     if ( $rldate > 0 ) {
       $arg .= "&reldate=$rldate";
-      if ( $dttype ne "" ) {
+      if ( $dttype eq "" ) {
         $dttype = "PDAT";
       }
     }
     if ( $mndate ne "" and $mxdate ne "" ) {
       $arg .= "&mindate=$mndate&maxdate=$mxdate";
-      if ( $dttype ne "" ) {
+      if ( $dttype eq "" ) {
         $dttype = "PDAT";
       }
     }
@@ -2597,10 +3574,11 @@ sub post_chunk {
 }
 
 my $post_help = qq{
--db        Database name
--id        Unique identifier(s) or accession number(s)
--format    uid or acc
--label     Alias for query step
+  -db        Database name
+  -id        Unique identifier(s) or accession number(s)
+  -format    uid or acc
+  -input     Read from file instead of stdin
+  -label     Alias for query step
 
 };
 
@@ -2610,10 +3588,12 @@ sub epost {
 
   clearflags ();
 
-  GetOptions (
+  MyGetOptions(
+    $post_help,
     "db=s" => \$db,
     "id=s" => \$id,
     "format=s" => \$field,
+    "input=s" => \$input,
     "label=s" => \$lbl,
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
@@ -2623,6 +3603,7 @@ sub epost {
     "debug" => \$debug,
     "log" => \$log,
     "http=s" => \$http,
+    "https=s" => \$http,
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
@@ -2654,6 +3635,8 @@ sub epost {
     $dbase = $db;
   }
 
+  $dbase = lc($dbase);
+
   if ( $dbase eq "" ) {
     die "Must supply -db database on command line\n";
   }
@@ -2671,16 +3654,41 @@ sub epost {
     $field = "UID";
   }
 
+  # read data from input file instead of piping from stdin
+  if ( $input ne "" ) {
+    if (open (my $FILE_IN, $input)) {
+      $has_num = false;
+      $all_num = true;
+      while ( $thisline = <$FILE_IN> ) {
+        $thisline =~ s/\r//;
+        $thisline =~ s/\n//;
+        $thisline =~ s/^\s+//;
+        $thisline =~ s/\s+$//;
+
+        if ( $thisline =~ /^(\d+)$/ ) {
+          push (@rest, $1);
+          $has_num = true;
+        } elsif ( $thisline =~ /^(.+)$/ ) {
+          push (@rest, $1);
+          $all_num = false;
+        }
+      }
+      close ($FILE_IN);
+      if ( $has_num && $all_num ) {
+        $just_num = true;
+      }
+    } else {
+      print STDERR "Unable to open input file '$input'\n";
+    }
+  }
+
   my $combo = "";
   my $pfx = "";
   my $loops = 0;
 
   my $accession_mode = false;
   if ( $field eq "ACCN" or $field eq "accn" or $field eq "ACC" or $field eq "acc" ) {
-    if ( $dbase eq "nucleotide" or $dbase eq "nuccore" or $dbase eq "est" or
-         $dbase eq "gss" or $dbase eq "protein" ) {
-      $accession_mode = true;
-    }
+    $accession_mode = true;
   }
 
   if ( $field eq "UID" or $field eq "uid" ) {
@@ -2727,6 +3735,10 @@ sub epost {
         $query .= " [$field]";
       }
 
+      if ( $accession_mode and $dbase eq "assembly" ) {
+        $query =~ s/\[ACCN\]/[ASAC]/g;
+      }
+
       ( $web, $key ) = post_chunk ( $dbase, $web, $key, $tool, $email, "", $query );
 
       $combo .= $pfx . "#" . $key;
@@ -2758,6 +3770,10 @@ sub epost {
           $query =~ s/\./_/g;
         } else {
           $query .= " [$field]";
+        }
+
+        if ( $accession_mode and $dbase eq "assembly" ) {
+          $query =~ s/\[ACCN\]/[ASAC]/g;
         }
 
         ( $web, $key ) = post_chunk ( $dbase, $web, $key, $tool, $email, "", $query );
@@ -2807,8 +3823,8 @@ sub epost {
 # espel performs an ESpell search
 
 my $spell_help = qq{
--db       Database name
--query    Query string
+  -db       Database name
+  -query    Query string
 
 };
 
@@ -2818,7 +3834,8 @@ sub espel {
 
   clearflags ();
 
-  GetOptions (
+  MyGetOptions(
+    $spell_help,
     "db=s" => \$db,
     "query=s" => \$query,
     "email=s" => \$emaddr,
@@ -2829,6 +3846,7 @@ sub espel {
     "debug" => \$debug,
     "log" => \$log,
     "http=s" => \$http,
+    "https=s" => \$http,
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
@@ -2860,6 +3878,8 @@ sub espel {
     $dbase = $db;
   }
 
+  $dbase = lc($dbase);
+
   if ( $dbase eq "" ) {
     die "Must supply -db database on command line\n";
   }
@@ -2886,17 +3906,136 @@ sub espel {
 
   Encode::_utf8_on($data);
 
-  $data =~ s/&amp;/&/g;
-  HTML::Entities::decode_entities($data);
-
   print "$data";
+}
+
+# ecitmtch performs an ECitMatch search
+
+my $citmatch_help = qq{
+  -journal    Journal Title
+  -year       Year
+  -volume     Volume
+  -page       First Page
+  -author     Author Name
+
+};
+
+sub ecitmtch {
+
+  # ... | edirect.pl -citmatch -journal "proc natl acad sci u s a" -year 2005 ...
+
+  clearflags ();
+
+  MyGetOptions(
+    $citmatch_help,
+    "journal=s" => \$journal,
+    "year=s" => \$year,
+    "volume=s" => \$volume,
+    "page=s" => \$page,
+    "author=s" => \$author,
+    "email=s" => \$emaddr,
+    "tool=s" => \$tuul,
+    "help" => \$help,
+    "silent" => \$silent,
+    "verbose" => \$verbose,
+    "debug" => \$debug,
+    "log" => \$log,
+    "http=s" => \$http,
+    "https=s" => \$http,
+    "alias=s" => \$alias,
+    "base=s" => \$basx
+  );
+
+  if ( $help ) {
+    print "ecitmatch $version\n";
+    print $citmatch_help;
+    return;
+  }
+
+  # convert spaces between UIDs to commas
+
+  $id =~ s/ /,/g;
+  $id =~ s/,,/,/g;
+
+  if ( -t STDIN and not @ARGV ) {
+  } else {
+    ( $dbase, $web, $key, $num, $stp, $err, $tool, $email, $just_num, @rest ) = read_edirect ();
+  }
+
+  read_aliases ();
+  adjust_base ();
+
+  if ( $err ne "" ) {
+    die "ERROR in citation match input: $err\n\n";
+  }
+
+  if ( $tuul ne "" ) {
+    $tool = $tuul;
+  }
+  if ( $emaddr ne "" ) {
+    $email = $emaddr;
+  }
+
+  binmode STDOUT, ":utf8";
+
+  $url = $base . $ecitmat;
+
+  $query = "";
+
+  if ( $journal ne "" ) {
+    $query .= $journal;
+  }
+  $query .= "|";
+  if ( $year ne "" ) {
+    $query .= $year;
+  }
+  $query .= "|";
+  if ( $volume ne "" ) {
+    $query .= $volume;
+  }
+  $query .= "|";
+  if ( $page ne "" ) {
+    $query .= $page;
+  }
+  $query .= "|";
+  if ( $author ne "" ) {
+    $query .= $author;
+  }
+  $query .= "||";
+
+  $enc = uri_escape($query);
+  $arg = "db=pubmed&retmode=xml&bdata=$enc";
+
+  $data = do_post ($url, $arg, $tool, $email, true);
+
+  Encode::_utf8_on($data);
+
+  if ( $data =~ "NOT_FOUND" ) {
+    return;
+  }
+
+  if ( $data =~ /.+\|AMBIGUOUS (.+)$/ ) {
+    my $my_uids = $1;
+    my @ids = split (',', $my_uids);
+
+    foreach $uid (@ids) {
+      print "$uid\n";
+    }
+
+    return;
+  }
+
+  if ( $data =~ /.+\|(\d+)$/ ) {
+    my $my_uid = $1;
+    print "$my_uid\n";
+  }
 }
 
 # eprxy reads a file of query proxies, can also pipe from stdin
 
 my $prxy_help = qq{
--alias    File of aliases
--pipe     Read aliases from stdin
+  -alias    File of aliases
+  -pipe     Read aliases from stdin
 
 };
 
@@ -2906,7 +4045,8 @@ sub eprxy {
 
   clearflags ();
 
-  GetOptions (
+  MyGetOptions(
+    $prxy_help,
     "pipe" => \$pipe,
     "help" => \$help,
     "silent" => \$silent,
@@ -2914,6 +4054,7 @@ sub eprxy {
     "debug" => \$debug,
     "log" => \$log,
     "http=s" => \$http,
+    "https=s" => \$http,
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
@@ -2954,58 +4095,74 @@ sub eprxy {
 # esrch performs a new EUtils search, but can read a previous web environment value
 
 my $srch_help = qq{
--db          Database name
--query       Query string
+Query Specification
 
--sort        Result presentation order
+  -db          Database name
+  -query       Query string
 
--days        Number of days in the past
--datetype    Date field abbreviation
--mindate     Start of date range
--maxdate     End of date range
+Document Order
 
--label       Alias for query step
+  -sort        Result presentation order
+
+Date Constraint
+
+  -days        Number of days in the past
+  -datetype    Date field abbreviation
+  -mindate     Start of date range
+  -maxdate     End of date range
+
+Spell Check
+
+  -spell       Correct misspellings in query
+
+Miscellaneous Arguments
+
+  -label       Alias for query step
+
+Sort Order Examples
+
+  -db            -sort
+  ___            _____
+
+  gene
+                 Chromosome
+                 Gene Weight
+                 Name
+                 Relevance
+
+  geoprofiles
+                 Default Order
+                 Deviation
+                 Mean Value
+                 Outliers
+                 Subgroup Effect
+
+  pubmed
+                 First Author
+                 Journal
+                 Last Author
+                 Pub Date
+                 Recently Added
+                 Relevance
+                 Title
+
+  (sequences)
+                 Accession
+                 Date Modified
+                 Date Released
+                 Default Order
+                 Organism Name
+                 Taxonomy ID
+
+  snp
+                 Chromosome Base Position
+                 Default Order
+                 Heterozygosity
+                 Organism
+                 SNP_ID
+                 Success Rate
 
 };
-
-sub field_each_word {
-
-  my $fld = shift (@_);
-  my $qury = shift (@_);
-
-  my @words = split (' ', $qury);
-  $qury = "";
-  my $pfx = "";
-
-  foreach $term (@words) {
-    $qury .= "$pfx$term [$fld]";
-    $pfx = " AND ";
-  }
-
-  return $qury;
-}
-
-sub spell_check_query {
-
-  my $db = shift (@_);
-  my $qury = shift (@_);
-
-  my $url = $base . $espell;
-
-  my $enc = uri_escape($query);
-  $arg = "db=$db&term=$enc";
-
-  my $data = do_post ($url, $arg, $tool, $email, true);
-
-  Encode::_utf8_on($data);
-
-  $data =~ s/&amp;/&/g;
-  HTML::Entities::decode_entities($data);
-
-  $qury = $1 if ( $data =~ /<CorrectedQuery>(.+)<\/CorrectedQuery>/ );
-
-  return $qury;
-}
 
 sub remove_punctuation {
 
@@ -3021,160 +4178,99 @@ sub remove_stop_words {
 
   my $qury = shift (@_);
 
-  my @stop_word_array = (
-    "a",
-    "about",
-    "again",
-    "all",
-    "almost",
-    "also",
-    "although",
-    "always",
-    "among",
-    "an",
-    "and",
-    "another",
-    "any",
-    "are",
-    "as",
-    "at",
-    "be",
-    "because",
-    "been",
-    "before",
-    "being",
-    "between",
-    "both",
-    "but",
-    "by",
-    "can",
-    "could",
-    "did",
-    "do",
-    "does",
-    "done",
-    "due",
-    "during",
-    "each",
-    "either",
-    "enough",
-    "especially",
-    "etc",
-    "for",
-    "found",
-    "from",
-    "further",
-    "had",
-    "has",
-    "have",
-    "having",
-    "here",
-    "how",
-    "however",
-    "i",
-    "if",
-    "in",
-    "into",
-    "is",
-    "it",
-    "its",
-    "itself",
-    "just",
-    "kg",
-    "km",
-    "made",
-    "mainly",
-    "make",
-    "may",
-    "mg",
-    "might",
-    "ml",
-    "mm",
-    "most",
-    "mostly",
-    "must",
-    "nearly",
-    "neither",
-    "no",
-    "nor",
-    "obtained",
-    "of",
-    "often",
-    "on",
-    "our",
-    "overall",
-    "perhaps",
-    "pmid",
-    "quite",
-    "rather",
-    "really",
-    "regarding",
-    "seem",
-    "seen",
-    "several",
-    "should",
-    "show",
-    "showed",
-    "shown",
-    "shows",
-    "significantly",
-    "since",
-    "so",
-    "some",
-    "such",
-    "than",
-    "that",
-    "the",
-    "their",
-    "theirs",
-    "them",
-    "then",
-    "there",
-    "therefore",
-    "these",
-    "they",
-    "this",
-    "those",
-    "through",
-    "thus",
-    "to",
-    "upon",
-    "use",
-    "used",
-    "using",
-    "various",
-    "very",
-    "was",
-    "we",
-    "were",
-    "what",
-    "when",
-    "which",
-    "while",
-    "with",
-    "within",
-    "without",
-    "would"
-  );
+  my $stop_words="#a#about#again#all#almost#also#although#always#among#an#and#" .
+  "another#any#are#as#at#be#because#been#before#being#between#both#but#by#can#" .
+  "could#did#do#does#done#due#during#each#either#enough#especially#etc#for#" .
+  "found#from#further#had#has#have#having#here#how#however#i#if#in#into#is#it#" .
+  "its#itself#just#kg#km#made#mainly#make#may#mg#might#ml#mm#most#mostly#" .
+  "must#nearly#neither#no#nor#obtained#of#often#on#our#overall#perhaps#pmid#" .
+  "quite#rather#really#regarding#seem#seen#several#should#show#showed#shown#" .
+  "shows#significantly#since#so#some#such#than#that#the#their#theirs#them#" .
+  "then#there#therefore#these#they#this#those#through#thus#to#upon#use#used#" .
+  "using#various#very#was#we#were#what#when#which#while#with#within#without#would#";
 
   # split to protect against regular expression artifacts
   $qury =~ s/[^a-zA-Z0-9]/ /g;
   $qury =~ s/ +/ /g;
 
   my @words = split (' ', $qury);
-  my $dropped = "";
+  my $kept = "";
   my $pfx = "";
 
   foreach $term (@words) {
 
-    if ( ! grep( /^$term$/, @stop_word_array ) ) {
-      $dropped .= "$pfx$term";
+    my $trm = lc($term);
+    $trm = "#$trm#";
+
+    if ($stop_words !~ /$trm/) {
+      $kept .= "$pfx$term";
       $pfx = " ";
     }
   }
 
-  if ( $dropped ne "" ) {
-    $qury = $dropped;
+  if ( $kept ne "" ) {
+    $qury = $kept;
+  }
+
+  return $qury;
+}
+
+sub field_each_word {
+
+  my $fld = shift (@_);
+  my $qury = shift (@_);
+
+  $qury =~ s/,/ /g;
+  $qury =~ s/ +/ /g;
+
+  my @words = split (' ', $qury);
+  $qury = "";
+  my $pfx = "";
+
+  foreach $term (@words) {
+    $qury .= "$pfx$term [$fld]";
+    $pfx = " AND ";
+  }
+
+  return $qury;
+}
+
+sub merge_each_word {
+
+  my $fld = shift (@_);
+  my $qury = shift (@_);
+
+  $qury =~ s/,/ /g;
+  $qury =~ s/ +/ /g;
+
+  my @words = split (' ', $qury);
+  $qury = "";
+  my $pfx = "";
+
+  foreach $term (@words) {
+    $qury .= "$pfx$term [$fld]";
+    $pfx = " OR ";
+  }
+
+  return $qury;
+}
+
+sub field_each_pair {
+
+  my $fld = shift (@_);
+  my $qury = shift (@_);
+
+  my @words = split (' ', $qury);
+  $qury = "";
+  my $pfx = "";
+
+  my $prev = "";
+  foreach $term (@words) {
+    if ( $prev ne "" ) {
+      $qury .= "$pfx\"$prev $term\" [$fld]";
+      $pfx = " AND ";
+    }
+    $prev = $term;
   }
 
   return $qury;
@@ -3186,7 +4282,8 @@ sub esrch {
 
   clearflags ();
 
-  GetOptions (
+  MyGetOptions(
+    $srch_help,
     "db=s" => \$db,
     "query=s" => \$query,
     "sort=s" => \$sort,
@@ -3195,6 +4292,14 @@ sub esrch {
     "maxdate=s" => \$mxdate,
     "datetype=s" => \$dttype,
     "label=s" => \$lbl,
+    "pub=s" => \$pub,
+    "feature=s" => \$feature,
+    "location=s" => \$location,
+    "molecule=s" => \$molecule,
+    "organism=s" => \$organism,
+    "source=s" => \$source,
+    "status=s" => \$status,
+    "type=s" => \$gtype,
     "clean" => \$clean,
     "word" => \$word,
     "drop" => \$drop,
@@ -3202,6 +4307,8 @@ sub esrch {
     "trunc" => \$trunc,
     "spell" => \$spell,
     "split=s" => \$field,
+    "merge=s" => \$meadow,
+    "pair=s" => \$pair,
     "email=s" => \$emaddr,
     "tool=s" => \$tuul,
     "help" => \$help,
@@ -3210,6 +4317,7 @@ sub esrch {
     "debug" => \$debug,
     "log" => \$log,
     "http=s" => \$http,
+    "https=s" => \$http,
     "alias=s" => \$alias,
     "base=s" => \$basx
   );
@@ -3236,6 +4344,8 @@ sub esrch {
     $dbase = $db;
   }
 
+  $dbase = lc($dbase);
+
   if ( $dbase eq "" ) {
     die "Must supply -db database on command line\n";
   }
@@ -3248,6 +4358,9 @@ sub esrch {
   }
 
   binmode STDOUT, ":utf8";
+
+  # support all efilter shortcut flags in esearch (undocumented)
+  $query = process_extras ( $query, $pub, $feature, $location, $molecule, $organism, $source, $status, $gtype );
 
   if ( $query eq "" ) {
     die "Must supply -query search expression on command line\n";
@@ -3307,14 +4420,32 @@ sub esrch {
   }
   $query =~ s/ +/ /g;
 
-  # spell check each query word (undocumented)
+  # spell check each query word
   if ( $spell ) {
     $query = spell_check_query ($dbase, $query);
   }
 
-  # force each query word to be separately fielded (undocumented)
+  # force each query word to be separately fielded, combined with AND (undocumented)
   if ( $field ne "" ) {
     $query = field_each_word ($field, $query);
+  }
+
+  # force each query word to be separately fielded, combined with OR (undocumented)
+  if ( $meadow ne "" ) {
+    $query = merge_each_word ($meadow, $query);
+  }
+
+  # separately field query word pairs in future experimental bigram index (undocumented)
+  if ( $pair ne "" ) {
+    $query = remove_punctuation ($query);
+    if ( $query =~ /^ +(.+)$/ ) {
+      $query = $1;
+    }
+    if ( $query =~ /^(.+) +$/ ) {
+      $query = $1;
+    }
+    $query =~ s/ +/ /g;
+    $query = field_each_pair ($pair, $query);
   }
 
   $enc = uri_escape($query);
@@ -3330,13 +4461,13 @@ sub esrch {
 
   if ( $rldate > 0 ) {
     $arg .= "&reldate=$rldate";
-    if ( $dttype ne "" ) {
+    if ( $dttype eq "" ) {
       $dttype = "PDAT";
     }
   }
   if ( $mndate ne "" and $mxdate ne "" ) {
     $arg .= "&mindate=$mndate&maxdate=$mxdate";
-    if ( $dttype ne "" ) {
+    if ( $dttype eq "" ) {
       $dttype = "PDAT";
     }
   }
@@ -3423,6 +4554,8 @@ if ( scalar @ARGV > 0 and $ARGV[0] eq "-version" ) {
   epost ();
 } elsif ( $fnc eq "-spell" ) {
   espel ();
+} elsif ( $fnc eq "-citmatch" ) {
+  ecitmtch ();
 } elsif ( $fnc eq "-proxy" ) {
   eprxy ();
 } elsif ( $fnc eq "-contact" ) {

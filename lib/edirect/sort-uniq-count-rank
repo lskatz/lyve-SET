@@ -1,5 +1,15 @@
 #!/bin/sh
-sort -f |
+TAB='	' # The text between the quotes should contain a single tab character.
+flags="f"
+if [ -n "$*" ]
+then
+  flags=`echo " $*" | sed 's/[^bfinrs]//g'`
+  if [ -z "$flags" ]
+  then
+    flags="s"
+  fi
+fi
+sort "-$flags" |
 uniq -i -c |
 perl -pe 's/\s*(\d+)\s(.+)/$1\t$2/' |
-sort -t '	' -k 1,1nr -k 2f
+sort -t "$TAB" -k 1,1nr "-k 2$flags"

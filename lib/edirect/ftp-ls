@@ -1,18 +1,27 @@
-#!/bin/sh
-
+#!/usr/bin/env perl
 # Usage: ftp-ls SERVER PATH
 
-mydir=`dirname "$0"`
-addr=`"$mydir"/eaddress`
+use strict;
+use warnings;
 
-list_file_names()
-{
-ftp -n -V -i "$1" <<EOF
-user anonymous "$addr"
-cd "$2"
-ls *
-exit
-EOF
+use Net::FTP;
+
+my $server = shift;
+my $dir    = shift;
+my $ftp    = new Net::FTP($server, Passive => 1)
+  or die "Unable to connect to FTP server: $!";
+
+$ftp->login or die "Unable to log in to FTP server";
+$ftp->cwd($dir) or die "Unable to change to $dir";
+my $contents = $ftp->dir;
+die "Unable to list contents" unless defined $contents;
+
+for (@$contents) {
+    if (/^-.*?(\S*)$/) {
+        print "$1\n";
+    } elsif (/^d.*?(\S*)$/) {
+        print "$1/\n";
+    } elsif (/^l.*?(\S*) -> \S*$/) {
+        print "$1@\n";
+    }
 }
-
-list_file_names "$@" | sed -ne 's,^-.*[ 	],,p; s,^d.*[ 	]\(.*\),\1/,p'

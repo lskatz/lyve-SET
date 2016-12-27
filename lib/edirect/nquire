@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 # ===========================================================================
 #
@@ -37,7 +37,28 @@
 # use strict;
 use warnings;
 
-use LWP::Simple;
+my ($LibDir, $ScriptName);
+
+use File::Spec;
+
+BEGIN
+{
+  my $Volume;
+  ($Volume, $LibDir, $ScriptName) = File::Spec->splitpath($0);
+  $LibDir = File::Spec->catpath($Volume, $LibDir, '');
+  if (my $RealPathname = eval {readlink $0}) {
+    do {
+      $RealPathname = File::Spec->rel2abs($RealPathname, $LibDir);
+      ($Volume, $LibDir, undef) = File::Spec->splitpath($RealPathname);
+      $LibDir = File::Spec->catpath($Volume, $LibDir, '')
+    } while ($RealPathname = eval {readlink $RealPathname});
+  } else {
+    $LibDir = File::Spec->rel2abs($LibDir)
+  }
+  $LibDir .= '/aux/lib/perl5';
+}
+use lib $LibDir;
+
 use LWP::UserAgent;
 use POSIX;
 use URI::Escape;
@@ -47,14 +68,11 @@ use URI::Escape;
 use constant false => 0;
 use constant true  => 1;
 
-# nquire version number
-
-$version = "2.30";
-
 # utility subroutines
 
 sub clearflags {
   %macros = ();
+  $agent = "Nquire/1.0";
   $alias = "";
   $debug = false;
   $http = "";
@@ -123,7 +141,16 @@ sub do_post {
       $urlx .= "$argx";
     }
 
-    $rslt = get ($urlx);
+    $usragnt = new LWP::UserAgent (timeout => 300);
+    $usragnt->agent( "$agent" );
+
+    $res = $usragnt->get ( $urlx );
+
+    if ( $res->is_success) {
+      $rslt = $res->content;
+    } else {
+      print STDERR $res->status_line . "\n";
+    }
 
     if ( $rslt eq "" ) {
       print STDERR "No do_get output returned from '$urlx'\n";
@@ -137,6 +164,7 @@ sub do_post {
   }
 
   $usragnt = new LWP::UserAgent (timeout => 300);
+  $usragnt->agent( "$agent" );
 
   $req = new HTTP::Request POST => "$urlx";
   $req->content_type('application/x-www-form-urlencoded');
@@ -146,6 +174,8 @@ sub do_post {
 
   if ( $res->is_success) {
     $rslt = $res->content;
+  } else {
+    print STDERR $res->status_line . "\n";
   }
 
   if ( $rslt eq "" ) {
@@ -193,8 +223,25 @@ sub do_uri_escape {
 # nquire executes an external URL query from command line arguments
 
 my $nquire_help = qq{
--url     Base URL for external search
--http    "get" uses HTTP GET instead of POST
+Query Commands
+
+  -get    Uses HTTP GET instead of POST
+  -url    Base URL for external search
+
+Examples
+
+  nquire -get -url "http://collections.mnh.si.edu/services/resolver/resolver.php" \\
+    -voucher "Birds:625456" |
+  xtract -pattern Result -element ScientificName Country
+
+  nquire -get -url http://w1.weather.gov/xml/current_obs/KSFO.xml |
+  xtract -pattern current_observation -tab "\\n" \\
+    -element weather temp_f wind_dir wind_mph
+
+  nquire -eutils efetch.fcgi -db pubmed -id 2539356 -rettype medline -retmode text
+
+  nquire -url "https://eutils.ncbi.nlm.nih.gov/entrez/eutils" elink.fcgi \\
+    -dbfrom protein -db protein -cmd neighbor -linkname protein_protein -id NP_476532.1
 
 };
 
@@ -212,13 +259,7 @@ sub nquire {
   $max = scalar @args;
 
   if ( $max > 0 and $ARGV[0] eq "-help" ) {
-    print "nquire $version\n";
     print $nquire_help;
-    return;
-  }
-
-  if ( $max > 0 and $ARGV[0] eq "-version" ) {
-    print "$version\n";
     return;
   }
 
@@ -228,7 +269,7 @@ sub nquire {
 
   $i = 0;
 
-  # if present, -debug must be first argument
+  # if present, -debug must be first argument, only prints generated URL (undocumented)
 
   if ( $i < $max ) {
     $pat = $args[$i];
@@ -238,7 +279,9 @@ sub nquire {
     }
   }
 
-  # if present, -http get must be first argument
+  # if present, -http get or -get must be next
+
+  # nquire -get -url "http://collections.mnh.si.edu/services/resolver/resolver.php" -voucher "Birds:625456"
 
   if ( $i < $max ) {
     $pat = $args[$i];
@@ -246,6 +289,22 @@ sub nquire {
       $i++;
       if ( $i < $max ) {
         $http = $args[$i];
+        $i++;
+      }
+    } elsif ( $pat eq "-get" ) {
+      $i++;
+      $http = "get";
+    }
+  }
+
+  # if present, -agent must be next argument (undocumented)
+
+  if ( $i < $max ) {
+    $pat = $args[$i];
+    if ( $pat eq "-agent" ) {
+      $i++;
+      if ( $i < $max ) {
+        $agent = $args[$i];
         $i++;
       }
     }
@@ -278,15 +337,43 @@ sub nquire {
         $url = map_macros ($url);
         $i++;
       }
+    } elsif ( $pat eq "-ncbi" ) {
+      # shortcut for ncbi base (undocumented)
+      $i++;
+      if ( $i < $max ) {
+        $url = "https://www.ncbi.nlm.nih.gov";
+      }
+    } elsif ( $pat eq "-eutils" ) {
+      # shortcut for eutils base (undocumented)
+      $i++;
+      if ( $i < $max ) {
+        $url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
+      }
+    } elsif ( $pat eq "-test" ) {
+      # shortcut for eutilstest base (undocumented)
+      $i++;
+      if ( $i < $max ) {
+        $url = "https://eutilstest.ncbi.nlm.nih.gov/entrez/eutils";
+      }
     } elsif ( $pat eq "-hydra" ) {
       # internal citation match request (undocumented)
       $i++;
       if ( $i < $max ) {
-        $url = "http://intranet.ncbi.nlm.nih.gov/projects/hydra/hydra_search.cgi";
+        $url = "https://www.ncbi.nlm.nih.gov/projects/hydra/hydra_search.cgi";
         $pat = $args[$i];
         $pat = map_macros ($pat);
         $enc = do_uri_escape ($pat);
         $arg="search=pubmed_search_citation_top_20.1&query=$enc";
+        $amp = "&";
+        $i++;
+      }
+    } elsif ( $pat eq "-revhist" ) {
+      # internal sequence revision history request (undocumented)
+      $i++;
+      if ( $i < $max ) {
+        $url = "https://www.ncbi.nlm.nih.gov/sviewer/girevhist.cgi";
+        $pat = $args[$i];
+        $arg="cmd=seqid&txt=on&seqid=asntext&os=PUBSEQ_OS&val=$pat";
         $amp = "&";
         $i++;
       }
@@ -303,13 +390,13 @@ sub nquire {
 
     $ky = "ncbi_url";
     if ( $url =~ /\(#$ky\)/ ) {
-      $vl = "http://www.ncbi.nlm.nih.gov";
+      $vl = "https://www.ncbi.nlm.nih.gov";
       $url =~ s/\((\#$ky)\)/$vl/g;
     }
 
     $ky = "eutils_url";
     if ( $url =~ /\(#$ky\)/ ) {
-      $vl = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils";
+      $vl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
       $url =~ s/\((\#$ky)\)/$vl/g;
     }
   }

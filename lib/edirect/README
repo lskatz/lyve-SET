@@ -10,16 +10,16 @@ EDirect consists of a set of scripts that are downloaded to the user's computer.
 
 in a terminal window to temporarily add EDirect functions to the PATH environment variable so they can be run by name. You can then try EDirect by copying the sample query below and pasting it into the terminal window for execution:
 
-  esearch -db pubmed -query "Beadle AND Tatum AND Neurospora" | \
-  elink -related | \
-  efilter -query "NOT historical article [FILT]" | \
-  efetch -format docsum | \
-  xtract -pattern DocumentSummary -present Author -and Title \
-    -element Id -first "Author/Name" -element Title | \
-  grep -i -e enzyme -e synthesis | \
-  sort -t $'\t' -k 2,3f | \
-  column -s $'\t' -t | \
-  head -n 10 | \
+  esearch -db pubmed -query "Beadle AND Tatum AND Neurospora" |
+  elink -related |
+  efilter -query "NOT historical article [FILT]" |
+  efetch -format docsum |
+  xtract -pattern DocumentSummary -if Author -and Title \
+    -element Id -first "Author/Name" -element Title |
+  grep -i -e enzyme -e synthesis |
+  sort -t $'\t' -k 2,3f |
+  column -s $'\t' -t |
+  head -n 10 |
   cut -c 1-80
 
 This query returns the PubMed ID, first author name, and article title for PubMed "neighbors" (related citations) of the original publications. It then requires specific words in the resulting rows, sorts alphabetically by author name and title, aligns the columns, and truncates the lines for easier viewing:

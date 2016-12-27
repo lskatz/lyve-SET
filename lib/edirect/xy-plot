@@ -1,0 +1,50 @@
+#!/bin/sh
+# For Mac, please obtain command-line-enabled Plot2x from http://apps.micw.org/apps/plot2/downloads.php
+# For Unix or PC/Cygwin, please obtain gnuplot from http://gnuplot.sourceforge.net/download.html
+plot2x=
+p2x_path=/Applications/Plot2x.app/Contents/MacOS/Plot2x
+for pfx in "$HOME" ''
+do
+  if [ -x "$pfx$p2x_path" ]
+  then
+    plot2x=$pfx$p2x_path
+    break
+  fi
+done
+
+if [ -n "$plot2x" ]
+then
+  cat > "$HOME/Desktop/edirect.dat"
+  outfile="$HOME/Desktop/edirect.png"
+  if [ -n "$*" ]
+  then
+    outfile="$*"
+  fi
+  cat > "$HOME/Desktop/edirect.macro" <<EOF
+import $HOME/Desktop/edirect.dat 0
+savepng $outfile
+EOF
+  eval "$plot2x -m $HOME/Desktop/edirect.macro -q yes -h yes"
+  rm "$HOME/Desktop/edirect.dat"
+  rm "$HOME/Desktop/edirect.macro"
+elif hash gnuplot 2>/dev/null
+then
+  cat > "edirect.dat"
+  outfile="edirect.png"
+  if [ -n "$*" ]
+  then
+    outfile="$*"
+  fi
+  gnuplot -e "set terminal png; set output '$outfile'; unset key; plot 'edirect.dat' with lines"
+  rm "edirect.dat"
+else
+  echo "To generate .png output please install either gnuplot or Plot2x" >&2
+fi
+if [ -f "$outfile" ]
+then
+  case "`uname -s`" in
+    Darwin     ) open "$outfile" ;;
+    CYGWIN_NT* ) cygstart "$outfile" ;;
+    *          ) xdg-open "$outfile" 2>/dev/null ;;
+  esac
+fi
