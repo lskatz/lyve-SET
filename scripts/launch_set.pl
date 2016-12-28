@@ -784,7 +784,7 @@ sub usage{
   my @dir=qw(asmdir msadir readsdir bamdir vcfdir tmpdir logdir);
   $$settings{$_}=abs2rel($_).'/' for(@dir);
   # right padding for some options
-  $$settings{$_}=reverse(sprintf("%15s","".reverse($$settings{$_}))) for(qw(mapper snpcaller allowedFlanking min_alt_frac min_coverage),@dir);
+  $$settings{$_}=reverse(sprintf("%15s","".reverse($$settings{$_}))) for(qw(mapper snpcaller allowedFlanking min_alt_frac min_coverage numcpus),@dir);
   local $0=fileparse $0;
 
   # The help menu
