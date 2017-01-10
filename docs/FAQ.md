@@ -14,6 +14,9 @@ High-quality-ness
 
 What are the different ways that SNPs in Lyve-SET have high confidence?
 -----------------------------------------------------------------------
+
+High quality for SNPs indicates that the resulting phylogeny will be high-fidelity.  Although some SNPs are discarded that we are less sure about, the SNPs that we _are_ most sure about are retained, and the resulting phylogeny is the best inference.
+
 * **Detection of troublesome regions** such that they are not considered in hqSNP analysis.  Currently in v1.0, only phage genes are detected; however other databases could be added in the future, and also I am open to other suggestions.  Users can also specify a BED-formatted file to describe regions to mask.
 * Only **unambiguous mapping** allowed
 * Default **75% consensus** and **10x** coverage thresholds.  These options can be changed when you launch Lyve-SET.
