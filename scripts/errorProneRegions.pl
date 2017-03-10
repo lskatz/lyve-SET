@@ -28,38 +28,38 @@ local $0=basename($0);
 # TODO: would it be faster if I put the /g into these regex declarations?
 my %regionRegex=(
   GAII        => {
-                   qr/CGG/i      => [qw(90 snp R1)],
-                   qr/GGG/i      => [qw(90 snp R1R2)],
-                   qr/GCG/i      => [qw(90 snp R1)],
-                   qr/CGG/i      => [qw(90 snp R2)],
-                   qr/CCG/i      => [qw(90 snp R2)],
+                   qr/(CGG)/i      => [qw(90 snp R1)],
+                   qr/(GGG)/i      => [qw(90 snp R1R2)],
+                   qr/(GCG)/i      => [qw(90 snp R1)],
+                   qr/(CGG)/i      => [qw(90 snp R2)],
+                   qr/(CCG)/i      => [qw(90 snp R2)],
                  },
   MiSeq       => {
-                   qr/GGG/i      => [qw(90 snp R1R2)],
-                   qr/CGG/i      => [qw(90 snp R1R2)],
-                   qr/TGG/i      => [qw(90 snp R1)],
-                   qr/GCG/i      => [qw(90 snp R2)],
+                   qr/(GGG)/i      => [qw(90 snp R1R2)],
+                   qr/(CGG)/i      => [qw(90 snp R1R2)],
+                   qr/(TGG)/i      => [qw(90 snp R1)],
+                   qr/(GCG)/i      => [qw(90 snp R2)],
                  },
   HiSeq       => {
-                   qr/GGG/i      => [qw(90 snp R1R2)],
-                   qr/CGG/i      => [qw(90 snp R1R2)],
-                   qr/AGG/i      => [qw(90 snp R1R2)],
+                   qr/(GGG)/i      => [qw(90 snp R1R2)],
+                   qr/(CGG)/i      => [qw(90 snp R1R2)],
+                   qr/(AGG)/i      => [qw(90 snp R1R2)],
                  },
   iontorrent  => {
-                   qr/A{5,}/i    => [qw(90 indel S)],
-                   qr/C{5,}/i    => [qw(90 indel S)],
-                   qr/G{5,}/i    => [qw(90 indel S)],
-                   qr/T{5,}/i    => [qw(90 indel S)],
+                   qr/(A{5,})/i    => [qw(90 indel S)],
+                   qr/(C{5,})/i    => [qw(90 indel S)],
+                   qr/(G{5,})/i    => [qw(90 indel S)],
+                   qr/(T{5,})/i    => [qw(90 indel S)],
                    # Give homopolymers of 4 moderate importance
-                   qr/A{4}/i    => [qw(50 indel S)],
-                   qr/C{4}/i    => [qw(50 indel S)],
-                   qr/G{4}/i    => [qw(50 indel S)],
-                   qr/T{4}/i    => [qw(50 indel S)],
+                   qr/(A{4})/i    => [qw(50 indel S)],
+                   qr/(C{4})/i    => [qw(50 indel S)],
+                   qr/(G{4})/i    => [qw(50 indel S)],
+                   qr/(T{4})/i    => [qw(50 indel S)],
                    # homopolymers of three might have errors but are less important
-                   qr/A{3}/i     => [qw(10 indel S)],
-                   qr/C{3}/i     => [qw(10 indel S)],
-                   qr/G{3}/i     => [qw(10 indel S)],
-                   qr/T{3}/i     => [qw(10 indel S)],
+                   qr/(A{3})/i     => [qw(10 indel S)],
+                   qr/(C{3})/i     => [qw(10 indel S)],
+                   qr/(G{3})/i     => [qw(10 indel S)],
+                   qr/(T{3})/i     => [qw(10 indel S)],
                  },
 );
 
@@ -130,7 +130,7 @@ sub searchForPositions{
     for my $regex(keys(%{ $regionRegex{$platform} })){
       my $regexValue=$regionRegex{$platform}{$regex};
       next if($$regexValue[0] < $$settings{'min-score'});
-      while($seq=~/($regex)/g){
+      while($seq=~/$regex/g){
         my($start,$end)=($-[0]+1,$+[0]); # 1-based
         my $match = $1;
         my $feat=Bio::SeqFeature::Annotated->new(
