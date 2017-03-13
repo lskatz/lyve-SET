@@ -21,6 +21,9 @@ local $0=basename($0);
 #   1. A score 1 to 100 representing how sure we are this is an error prone region
 #   2. type - snp or indel
 #   3. read - R1 or R2.  Use S for single-end
+# Capturing parentheses:
+#   $1 - the motif
+#   $2 - the error-prone base
 #
 # References:
 #   https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-016-0976-y
@@ -28,38 +31,39 @@ local $0=basename($0);
 # TODO: would it be faster if I put the /g into these regex declarations?
 my %regionRegex=(
   GAII        => {
-                   qr/(CGG)/i      => [qw(90 snp R1)],
-                   qr/(GGG)/i      => [qw(90 snp R1R2)],
-                   qr/(GCG)/i      => [qw(90 snp R1)],
-                   qr/(CGG)/i      => [qw(90 snp R2)],
-                   qr/(CCG)/i      => [qw(90 snp R2)],
+                   qr/(CG(G))/i      => [qw(90 snp R1)],
+                   qr/(GG(G))/i      => [qw(90 snp R1R2)],
+                   qr/(GC(G))/i      => [qw(90 snp R1)],
+                   qr/(CG(G))/i      => [qw(90 snp R2)],
+                   qr/(CC(G))/i      => [qw(90 snp R2)],
                  },
   MiSeq       => {
-                   qr/(GGG)/i      => [qw(90 snp R1R2)],
-                   qr/(CGG)/i      => [qw(90 snp R1R2)],
-                   qr/(TGG)/i      => [qw(90 snp R1)],
-                   qr/(GCG)/i      => [qw(90 snp R2)],
+                   qr/(GG(G))/i      => [qw(90 snp R1R2)],
+                   qr/(CG(G))/i      => [qw(90 snp R1R2)],
+                   qr/(TG(G))/i      => [qw(90 snp R1)],
+                   qr/(GC(G))/i      => [qw(90 snp R2)],
                  },
   HiSeq       => {
-                   qr/(GGG)/i      => [qw(90 snp R1R2)],
-                   qr/(CGG)/i      => [qw(90 snp R1R2)],
-                   qr/(AGG)/i      => [qw(90 snp R1R2)],
+                   qr/(GG(G))/i      => [qw(90 snp R1R2)],
+                   qr/(CG(G))/i      => [qw(90 snp R1R2)],
+                   qr/(AG(G))/i      => [qw(90 snp R1R2)],
                  },
   iontorrent  => {
-                   qr/(A{5,})/i    => [qw(90 indel S)],
-                   qr/(C{5,})/i    => [qw(90 indel S)],
-                   qr/(G{5,})/i    => [qw(90 indel S)],
-                   qr/(T{5,})/i    => [qw(90 indel S)],
+                   # Homopolymers of 5+ are important
+                   qr/(A{4,}(A))/i    => [qw(90 indel S)],
+                   qr/(C{4,}(C))/i    => [qw(90 indel S)],
+                   qr/(G{4,}(G))/i    => [qw(90 indel S)],
+                   qr/(T{4,}(T))/i    => [qw(90 indel S)],
                    # Give homopolymers of 4 moderate importance
-                   qr/(A{4})/i    => [qw(50 indel S)],
-                   qr/(C{4})/i    => [qw(50 indel S)],
-                   qr/(G{4})/i    => [qw(50 indel S)],
-                   qr/(T{4})/i    => [qw(50 indel S)],
+#                  qr/(A{3}(A))/i    => [qw(50 indel S)],
+#                  qr/(C{3}(C))/i    => [qw(50 indel S)],
+#                  qr/(G{3}(G))/i    => [qw(50 indel S)],
+#                  qr/(T{3}(T))/i    => [qw(50 indel S)],
                    # homopolymers of three might have errors but are less important
-                   qr/(A{3})/i     => [qw(10 indel S)],
-                   qr/(C{3})/i     => [qw(10 indel S)],
-                   qr/(G{3})/i     => [qw(10 indel S)],
-                   qr/(T{3})/i     => [qw(10 indel S)],
+#                  qr/(A{2}(A))/i     => [qw(10 indel S)],
+#                  qr/(C{2}(C))/i     => [qw(10 indel S)],
+#                  qr/(G{2}(G))/i     => [qw(10 indel S)],
+#                  qr/(T{2}(T))/i     => [qw(10 indel S)],
                  },
 );
 
@@ -67,7 +71,7 @@ exit main();
 
 sub main{
   my $settings={};
-  GetOptions($settings,qw(platform=s format=s min-score=i help)) or die $!;
+  GetOptions($settings,qw(platform=s format=s min-score=i help motifs)) or die $!;
   die usage($settings) if($$settings{help} || !@ARGV);
 
   $$settings{'min-score'}||=1;
@@ -131,23 +135,46 @@ sub searchForPositions{
       my $regexValue=$regionRegex{$platform}{$regex};
       next if($$regexValue[0] < $$settings{'min-score'});
       while($seq=~/$regex/g){
-        my($start,$end)=($-[0]+1,$+[0]); # 1-based
-        my $match = $1;
-        my $feat=Bio::SeqFeature::Annotated->new(
+        my($motifStart,$motifEnd)=($-[1]+1,$+[1]); # 1-based
+        my($errorStart,$errorEnd)=($-[2]+1,$+[2]); # 1-based
+        my $motif = $1;
+        my $match = $2;
+
+        # Add the match
+        my $errorFeat=Bio::SeqFeature::Annotated->new(
             -seq_id  => $seqname,
-            -start   => $start,
-            -end     => $end,
+            -start   => $errorStart,
+            -end     => $errorEnd,
             -primary => "errorProne_$platform",
             -score   => $$regexValue[0],
             -source  => $source_tag,
             # http://song.cvs.sourceforge.net/viewvc/song/ontology/sofa.obo?revision=1.217
             -type    =>"possible_base_call_error",
         );
-        $feat->add_Annotation(Bio::Annotation::SimpleValue->new(
+        $errorFeat->add_Annotation(Bio::Annotation::SimpleValue->new(
           -tagname=>"Name",
-          -value  => sprintf("Platform:%s;match:%s,type:%s,read:%s",$platform,$match,$$regexValue[1],$$regexValue[2]),
+          -value  => sprintf("error-prone:%s",$match),
         ));
-        push(@feat,$feat);
+        push(@feat,$errorFeat);
+
+        # Add the motif if requested
+        if($$settings{motifs}){
+          my $motifFeat=Bio::SeqFeature::Annotated->new(
+              -seq_id  => $seqname,
+              -start   => $motifStart,
+              -end     => $motifEnd,
+              -primary => "errorProne_$platform",
+              -score   => $$regexValue[0],
+              -source  => $source_tag,
+              # http://song.cvs.sourceforge.net/viewvc/song/ontology/sofa.obo?revision=1.217
+              -type    =>"nucleotide_motif",
+          );
+          $motifFeat->add_Annotation(Bio::Annotation::SimpleValue->new(
+            -tagname=>"Name",
+            -value  => sprintf("Platform:%s;motif:%s,type:%s,read:%s",$platform,$motif,$$regexValue[1],$$regexValue[2]),
+          ));
+          push(@feat,$motifFeat);
+        }
       }
     }
   }
@@ -177,6 +204,8 @@ sub usage{
                      Use no value to include all regions
   --min-score   1    Minimum score to accept (1-100)
   --format    bed    Output format.  E.g., bed, gff
+  --motifs           Output motif regions in addition to
+                     error-prone sites
   "
 }
 
