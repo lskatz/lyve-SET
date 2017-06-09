@@ -21,7 +21,6 @@ Output files
 ||`maskedRegions.bed` | Regions of the reference genome that is masked for analysis. | |
 |project/reference/maskedRegions|| BED-formatted files that describe regions that should be masked in the reference genome.|  You may also create your own file that can have any filename with extension `.bed`. This file can describe your manually-chosen regions that should be masked.  These regions will be incorporated into `project/reference/maskedRegions.bed`.|
 ||`project/reference/maskedRegions/phages.bed`| BED-formatted file describing predicted phage sites||
-|project/reference/maskedRegions || BED-formatted files that describe the regions to mask in the reference genome| Custom bed files with a `.bed` extension can also be placed here|
 |project/bam|| Output bam files are here|
 ||`*.sorted.bam` | sorted bam files | The query and reference name are encoded in the filename; many times the reference name will just be called "reference." |
 ||`*.sorted.bam.bai` | samtools index file || 
