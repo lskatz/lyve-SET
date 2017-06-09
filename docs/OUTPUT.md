@@ -1,7 +1,7 @@
 Output files
 ============
 | File    |   Description  | Notes |
-|:------:|----------------|-------|
+|:--------|:---------------|:------|
 |project/msa | The multiple sequence alignment directory | Most of the output files you want are here like the multiple sequence alignment and the phylogeny|
 |`project/msa/out.pooled.vcf.gz` | the pooled VCF file created from `bcftools merge` | |
 |`project/msa/out.pooled.snps.vcf.gz` | SNPs vcf | The same data as `out.pooled.vcf.gz` but filtered to SNPs only. |
