@@ -14,17 +14,18 @@ Output files
 || `tree.dnd` | Symlink to `out.RAxML_bipartitions`| |
 || `out.pairwise.tsv` | Pairwise distances file | Format: tab-delimited with three columns: genome1, genome2, hqSNP distance |
 || `out.pairwiseMatrix.tsv` | Pairwise distances matrix | The same data as `out.pairwise.tsv`, but in a 2-d matrix. Generated with `pairwiseTo2d.pl`. |
-|project/log| Log files||
-|| `launch_set.log`    | The SET log files are here | |
-|project/asm, project/reads, project/reference || The assemblies, reads, and reference directories | These input directories are described elsewhere. |
+|project/log| | Log files||
+|| `launch_set.log`    | The main log file | |
+|project/asm, project/reads || The input assemblies and reads. | |
+|project/reference|| Where the reference fasta file is||
+||`maskedRegions.bed` | Regions of the reference genome that is masked for analysis. | |
+|project/reference/maskedRegions|| BED-formatted files that describe regions that should be masked in the reference genome.|  You may also create your own file that can have any filename with extension `.bed`. This file can describe your manually-chosen regions that should be masked.  These regions will be incorporated into `project/reference/maskedRegions.bed`.|
+||`project/reference/maskedRegions/phages.bed`| BED-formatted file describing predicted phage sites||
 |project/reference/maskedRegions || BED-formatted files that describe the regions to mask in the reference genome| Custom bed files with a `.bed` extension can also be placed here|
 |project/bam|| Output bam files are here|
 ||`*.sorted.bam` | sorted bam files | The query and reference name are encoded in the filename; many times the reference name will just be called "reference." |
 ||`*.sorted.bam.bai` | samtools index file || 
-||`*.sorted.bam.depth` | samtools depth output | It is a three-column format: seqname, pos, depth. Sites with zero-depth have been filled in using Lyve-SET. |
-|project/vcf/unfiltered|| Output VCF files|These filtered VCF files are deprecated in favor of `project/vcf/*.vcf` and will probably not be continued in future versions of Lyve-SET|
-||`*.vcf.gz`|VCF files |Filtered VCF files||
-||`*.vcf.gz.tbi`| Tabix index files||
+||`*.sorted.bam.cliffs.bed` | Files describing genome depth cliffs | These are only present if you specified `--mask-cliffs` |
 |project/vcf||VCF files|Have the same file format as the `*.sorted.bam` files, so that they can be matched easily when running Lyve-SET. These files are sorted with vcftools and compressed with bgzip.|
 ||`*.vcf.gz`|VCF files |Filtered VCF files||
 ||`*.vcf.gz.tbi`| Tabix index files||
