@@ -23,17 +23,17 @@ default: install
 help:
 	@echo "Please see README.md for additional help"
 
-all: install env clean
+all: install env
 
 install: install-prerequisites
 	@echo "Don't forget to set up update PATH and PERL5LIB to $(PREFIX)/scripts and $(PREFIX)/lib"
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-samtools install-bcftools install-smalt install-snap install-raxml install-perlModules install-config install-snpEff
+install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-samtools install-bcftools install-smalt install-snap install-raxml install-perlModules install-config install-snpEff install-eutils
 	@echo DONE installing prerequisites
 
-clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-perlModules clean-config clean-snpEff
+clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-perlModules clean-config clean-snpEff clean-eutils
 	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
 
 install-mkdir:
@@ -210,6 +210,17 @@ install-config:
 
 clean-config:
 	rm -vf $(PREFIX)/config/*.conf
+
+# https://www.ncbi.nlm.nih.gov/books/NBK179288/
+install-eutils:
+	wget ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/edirect.zip -O build/edirect.zip
+	unzip -d build build/edirect.zip
+	mv build/edirect lib/edirect
+	rm build/edirect.zip
+	lib/edirect/setup.sh
+
+clean-eutils:
+	rm -rvf lib/edirect
 
 env:
 	echo "#Lyve-SET" >> $(PROFILE)

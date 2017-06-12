@@ -1,4 +1,0 @@
-#!/bin/sh
-sed 's/[^a-zA-Z0-9]/ /g' |
-tr 'A-Z' 'a-z' |
-xargs -n 1
