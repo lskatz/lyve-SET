@@ -154,7 +154,7 @@ Output files
 ------------
 Most output files that you will want to see are under project/msa.  However for more details please see [docs/output.md](docs/OUTPUT.md).
 
-TO visualize the results, please see [docs/VIZ.md](docs/VIZ.md).
+To visualize the results, please see [docs/VIZ.md](docs/VIZ.md).
 
 Getting help
 ------------
