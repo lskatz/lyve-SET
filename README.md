@@ -120,7 +120,7 @@ Examples
 
 See: [examples.md](docs/EXAMPLES.md) for more details.
 
-The script `set_manage.pl` sets up the project directory and adds reads, and you should use the following syntax. Note that paired end reads should be in interleaved format. Scripts that interleave reads include `run_assembly_shuffleReads.pl` in the CG-Pipeline package (included with `make install`) and also `shuffleSequences_fastq.pl` in the Velvet package.
+The script `set_manage.pl` sets up the project directory and adds reads, and you should use the following syntax. Note that paired end reads should be in interleaved format. Scripts that interleave reads include `run_assembly_shuffleReads.pl` in the CG-Pipeline package (included with `make install`) and also `shuffleSequences_fastq.pl` in the Velvet package.  Lyve-SET also has a special script `shuffleSplitReads.pl` that will shuffle many reads at once as shown below in the example.
     
     # Shuffle your reads if they are not already. This command
     # creates a folder interleaved and creates interleaved files
