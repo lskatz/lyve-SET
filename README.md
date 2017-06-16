@@ -122,13 +122,9 @@ See: [examples.md](docs/EXAMPLES.md) for more details.
 
 The script `set_manage.pl` sets up the project directory and adds reads, and you should use the following syntax. Note that paired end reads should be in interleaved format. Scripts that interleave reads include `run_assembly_shuffleReads.pl` in the CG-Pipeline package (included with `make install`) and also `shuffleSequences_fastq.pl` in the Velvet package.
     
-    # Shuffle your reads if they are not already.
-    $ mkdir interleaved
-    $ for f in *_R1.fastq.gz; do
-    >   b=$(basename $i _R1.fastq.gz)  # getting the basename of the file
-    >   r=${b}_R2.fastq.gz             # Reverse reads filename
-    >   run_assembly_shuffleReads.pl $f $r | gzip -c > interleaved/$b.fastq.gz
-    > done;
+    # Shuffle your reads if they are not already. This command
+    # creates a folder interleaved and creates interleaved files
+    $ shuffleSplitReads.pl --numcpus 8 -o interleaved *.fastq.gz
     # Create the project directory `setTest`
     $ set_manage.pl --create setTest
     # Add reads
