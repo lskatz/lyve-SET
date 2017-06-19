@@ -18,7 +18,7 @@ Unfortunately if you are not on a cluster, then Lyve-SET will only work on a sin
 
 In the case where you want to generate all the pileups on one node using SNAP using 24 cores
 
-    ls reads/*.fastq.gz | xargs -n 1 -I {} basename {} | xargs -P 24 -n 1 -I {} launch_snap.pl -f reads/{} -b bam/{}-2010EL-1786.sorted.bam -t tmp -r reference/2010EL-1786.fasta --numcpus 1
+    ls reads/*.fastq.gz | xargs -n 1 -I {} basename {} | xargs -P 24 -n 1 -I {} launch_smalt.pl -f reads/{} -b bam/{}-2010EL-1786.sorted.bam -t tmp -r reference/2010EL-1786.fasta --numcpus 1
 
 ###Calling SNPs
 

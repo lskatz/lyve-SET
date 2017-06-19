@@ -1,5 +1,0 @@
-#!/bin/sh
-sort -f |
-uniq -i -c |
-perl -pe 's/\s*(\d+)\s(.+)/$1\t$2/' |
-sort -t '	' -k 1,1nr -k 2f
