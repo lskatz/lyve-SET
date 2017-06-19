@@ -10,6 +10,8 @@ You can visualize the tree in many different tree drawing programs out there.  S
 
 SNP positions are encoded in the vcf files under the vcf directory.  You can view them in any standard viewer such as [IGV](http://software.broadinstitute.org/software/igv).  On the command line, although difficult to visualize, you can use `bcftools` which is redistributed in Lyve-SET.
 
+To get started on IGV, first load the reference genome assembly. Second, load the bam and vcf files.  You will immediately be able to browse the genome with these bam and vcf tracks.  However for the advanced features, there is a learning curve (but it is worth it).
+
 ## Read alignments
 
 Read alignments are encoded in bam files under the bam directory. These can be viewed with [IGV](http://software.broadinstitute.org/software/igv) and many commercial software packages such as CLC and Geneious.  Additionally if you are command-line-inclined, you can view them with `samtools tview` which is redistributed with Lyve-SET.
