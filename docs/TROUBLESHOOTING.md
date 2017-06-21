@@ -1,4 +1,4 @@
-#Troubleshooting
+# Troubleshooting
 
 Things do not always go smoothly.  Here is a list of things to try out if things go wrong.
 
@@ -25,7 +25,7 @@ First, check to see if your reference genome is intact.
 
 You can also see if your fastq files are intact which is a little more tricky.
 
-* Are your files in the interleaved format? See [# Interleaved reads].
+* Are your files in the interleaved format? See [Interleaved reads](# Interleaved reads).
 * Are your files gzipped?  Use the Linux command `file` to see that it says 'gzip' in the description of your files.  For example, `file reads/*.fastq.gz`.  It is not necessary to have gzipped files, but it _is_ necessary for the extension to match the type. For example you do not want to have compressed files that end in `.fastq.gz` or uncompressed files that end in `.fastq`.
 * Are the actual files intact?  
 ** You can use the [lskScript](https://github.com/lskatz/lskScripts) tool `validateFastq.pl` to find common mistakes.  For example: `zcat reads/genome.fastq.gz | validateFastq.pl --pe --min-length 1 --verbose`.
