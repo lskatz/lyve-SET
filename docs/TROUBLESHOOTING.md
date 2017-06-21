@@ -28,9 +28,9 @@ You can also see if your fastq files are intact which is a little more tricky.
 * Are your files in the interleaved format? See [Interleaved reads](#interleaved-reads).
 * Are your files gzipped?  Use the Linux command `file` to see that it says 'gzip' in the description of your files.  For example, `file reads/*.fastq.gz`.  It is not necessary to have gzipped files, but it _is_ necessary for the extension to match the type. For example you do not want to have compressed files that end in `.fastq.gz` or uncompressed files that end in `.fastq`.
 * Are the actual files intact?  
-** You can use the [lskScript](https://github.com/lskatz/lskScripts) tool `validateFastq.pl` to find common mistakes.  For example: `zcat reads/genome.fastq.gz | validateFastq.pl --pe --min-length 1 --verbose`.
-** Is the interleaved file line count the number of lines of both R1 and R2? Example command: `zcat R1.fastq.gz | wc -l`.
-** Simply reshuffle: `shuffleSplitReads.pl -o shuffled --numcpus 1 split/*.fastq.gz`
+ * You can use the [lskScript](https://github.com/lskatz/lskScripts) tool `validateFastq.pl` to find common mistakes.  For example: `zcat reads/genome.fastq.gz | validateFastq.pl --pe --min-length 1 --verbose`.
+ * Is the interleaved file line count the number of lines of both R1 and R2? Example command: `zcat R1.fastq.gz | wc -l`.
+ * Simply reshuffle: `shuffleSplitReads.pl -o shuffled --numcpus 1 split/*.fastq.gz`
 
 ## BCFtools merge
 
