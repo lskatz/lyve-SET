@@ -36,5 +36,5 @@ You can also see if your fastq files are intact which is a little more tricky.
 
 ### cannot read fastq header; error with bcftools merge
 
-This is likely due to [# Fastq integrity]
+This is likely due to [Fastq integrity](#fastq-integrity)
 
