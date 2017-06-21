@@ -1,9 +1,7 @@
 Lyve-SET
 ========
 
-LYVE version of the Snp Extraction Tool (SET), a method of using hqSNPs to create a phylogeny.  Lyve-SET is meant to be run on a cluster but will just run system calls if qsub is not present.
-
-NML, part of PHAC, has the original version of SET (https://github.com/apetkau).  However, I have been updating it since inception and so the results might differ slightly.
+LYVE version of the Snp Extraction Tool (SET), a method of using hqSNPs to create a phylogeny.
 
 Installation
 ------------
@@ -120,7 +118,8 @@ Examples
 
 See: [examples.md](docs/EXAMPLES.md) for more details.
 
-The script `set_manage.pl` sets up the project directory and adds reads, and you should use the following syntax. Note that paired end reads should be in interleaved format. Scripts that interleave reads include `run_assembly_shuffleReads.pl` in the CG-Pipeline package (included with `make install`) and also `shuffleSequences_fastq.pl` in the Velvet package.  Lyve-SET also has a special script `shuffleSplitReads.pl` that will shuffle many reads at once as shown below in the example.
+The script `set_manage.pl` sets up the project directory and adds reads, and you should use the following syntax. Note that paired end reads should be in interleaved format. Scripts that interleave reads include `run_assembly_shuffleReads.pl` in the CG-Pipeline package (included with `make install`) and also `shuffleSequences_fastq.pl` in the Velvet package.
+Lyve-SET also has a special script `shuffleSplitReads.pl` that will shuffle many reads at once as shown below in the example.
     
     # Shuffle your reads if they are not already. This command
     # creates a folder interleaved and creates interleaved files
@@ -163,4 +162,13 @@ Citing lyve-SET
     
     https://github.com/lskatz/lyve-SET
     Katz LS, Griswold T, Williams-Newkirk AJ, Wagner D, Petkau A, et al. (2017) A Comparative Analysis of the Lyve-SET Phylogenomics Pipeline for Genomic Epidemiology of Foodborne Pathogens. Frontiers in Microbiology 8.
-    
+
+See Also
+--------
+
+###Other SNP Pipelines
+
+[SNVPhyl](https://snvphyl.readthedocs.io/en/latest/)
+[SNP-Pipeline](http://snp-pipeline.readthedocs.io/en/latest/)
+[REALPHY](http://realphy.unibas.ch/fcgi/realphy)
+
