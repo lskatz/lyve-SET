@@ -43,7 +43,6 @@ sub logmsg {
   my $caller=(caller(1))[3];
   $caller=(caller(2))[3] if($caller=~/__ANON__/); # Don't care about __ANON__ subroutines
   $caller=~s/(main:*)+//;
-  #$caller=~s/^__ANON__//;  # Don't care about __ANON__ subroutines
   $caller=~s/^\s+|\s+$//g; # trim
   $caller="$caller:" if($caller ne "");
 
@@ -69,7 +68,7 @@ sub main{
   # Initialize settings by reading the global configuration
   # file, LyveSET.conf
   my $settings=readGlobalSettings(1);
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s qsub!)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help help2 numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s qsub!)) or die $!;
 
   # What options change when --fast is used?
   if($$settings{fast}){
@@ -99,6 +98,7 @@ sub main{
   ### Other defaults: reference genome; default directories #
   ###########################################################
   my $project=shift(@ARGV) || '.'; # by default the user is in the project directory
+  $$settings{help}=1 if($$settings{help2}); # if help2 is set, then set help
   die usage($settings) if($$settings{help});
   logmsg "Project was defined as $project";
   # Checks to make sure that this is a project
@@ -725,7 +725,7 @@ sub compareTaxa{
 
   if($$settings{msa} || $$settings{trees}){
     logmsg "Launching set_processPooledVcf.pl";
-    my $command="set_processPooledVcf.pl $pooled --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} 2>&1 | tee --append $$settings{logdir}/launch_set.log";
+    my $command="set_processPooledVcf.pl $pooled --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} > $$settings{logdir}/launch_processpooledVcf.log 2>&1";
     logmsg "Processing the pooled VCF\n  $command";
     $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"set_processPooledVcf.pl"});
     $sge->wrapItUp();
@@ -737,7 +737,7 @@ sub compareTaxa{
   # Make sure this gets printed to stdout
   logmsg "Running set_diagnose.pl";
   #my $diagnosis="$$settings{logdir}/diagnosis.txt";
-  $sge->pleaseExecute("set_diagnose.pl -p $project 2>&1 | tee --append $$settings{logdir}/launch_set.log",{jobname=>"set_diagnose",numcpus=>1});
+  $sge->pleaseExecute("set_diagnose.pl -p $project > $$settings{logdir}/set_diagnose.log 2>&1",{jobname=>"set_diagnose",numcpus=>1});
   $sge->wrapItUp();
 
   return 1;
@@ -768,7 +768,7 @@ sub variantsToMatrix{
 
   my $mergexopts="";
   $mergexopts.="-r $ref.regions.txt" if(-e "$ref.regions.txt" && -s "$ref.regions.txt" > 0);
-  my $mergeCommand="mergeVcf.sh $mergexopts -s -n $$settings{numcpus} -t $tmpdir -o $pooled $inVcf >&2";
+  my $mergeCommand="set_mergeVcf.sh $mergexopts -s -n $$settings{numcpus} -t $tmpdir -o $pooled $inVcf >&2";
   logmsg $mergeCommand;
   $sge->pleaseExecute($mergeCommand,{jobname=>"poolVcfs",numcpus=>$$settings{numcpus}});
   $sge->wrapItUp();
@@ -784,7 +784,7 @@ sub usage{
   my @dir=qw(asmdir msadir readsdir bamdir vcfdir tmpdir logdir);
   $$settings{$_}=abs2rel($_).'/' for(@dir);
   # right padding for some options
-  $$settings{$_}=reverse(sprintf("%15s","".reverse($$settings{$_}))) for(qw(mapper snpcaller allowedFlanking),@dir);
+  $$settings{$_}=reverse(sprintf("%15s","".reverse($$settings{$_}))) for(qw(mapper snpcaller allowedFlanking min_alt_frac min_coverage numcpus),@dir);
   local $0=fileparse $0;
 
   # The help menu
@@ -794,34 +794,30 @@ sub usage{
     Usage: $0 [project] [-ref reference.fasta|reference.gbk]
 
     If project is not given, then it is assumed to be the current working directory.
-    If reference is not given, then it is assumed to be proj/reference/reference.fasta
-    -ref      proj/reference/reference.fasta   The reference genome assembly. If it is 
-                                               a genbank or embl file, then it will be 
-                                               converted to reference.gbk.fasta and will
-                                               be used for SNP annotation. If a fasta
-                                               is given, then no SNP annotation will
-                                               happen. Using a gbk or embl file is currently
-                                               experimental.
 
-    SNP FILTER OPTIONS
-    --allowedFlanking  $$settings{allowedFlanking}allowed flanking distance in bp. Nucleotides this close together cannot be considered as high-quality.
-    --min_alt_frac     $$settings{min_alt_frac}        The percent consensus that needs to be reached before a SNP is called. Otherwise, 'N'
-    --min_coverage     $$settings{min_coverage}          Minimum coverage needed before a SNP is called. Otherwise, 'N'
+    -ref               ref.fasta      The reference genome assembly. If it is 
+                                      a genbank or embl file, then it will be 
+                                      converted to reference.gbk.fasta and will
+                                      be used for SNP annotation. If a fasta
+                                      is given, then no SNP annotation will
+                                      happen.
+                                      Default: project/reference/reference.fasta
+
+    COMMON OPTIONS
+    --allowedFlanking  $$settings{allowedFlanking}allowed flanking distance in bp. 
+                                      Nucleotides this close together cannot be 
+                                      considered as high-quality.
+    --min_alt_frac     $$settings{min_alt_frac}The percent consensus that needs 
+                                      to be reached before a SNP is called. 
+                                      Otherwise, 'N'
+    --min_coverage     $$settings{min_coverage}Minimum coverage needed before a 
+                                      SNP is called. Otherwise, 'N'
+    --presets          \"\"             See presets.conf for more information
+    --numcpus          $$settings{numcpus}number of cpus
     ";
-    return "$help\n  --help To view more help\n\n" if(!$$settings{help});
+    return "$help\n  --help To view more help  or --help2 for the complete set of options\n\n" if(!$$settings{help});
 
     $help.="
-    Where parameters with a / are directories
-    LOCATIONS OF FILE DIRECTORIES
-    -reads      $$settings{readsdir}    where fastq and fastq.gz files are located
-    --bamdir    $$settings{bamdir}    where to put bams
-    --vcfdir    $$settings{vcfdir}    where to put vcfs
-    --tmpdir    $$settings{tmpdir}    tmp/ Where to put temporary files
-    --msadir    $$settings{msadir}    multiple sequence alignment and tree files (final output)
-    --logdir    $$settings{logdir}    Where to put log files. Qsub commands are also stored here.
-    --asmdir    $$settings{asmdir}    directory of assemblies. Copy or symlink the reference genome assembly 
-                                   to use it if it is not already in the raw reads directory
-
     PERFORM CERTAIN STEPS
     --mask-phages                  Search for and mask phages in the reference genome
     --mask-cliffs                  Search for and mask 'Cliffs' in pileups
@@ -830,30 +826,44 @@ sub usage{
     --nomatrix                     Do not create an hqSNP matrix
     --nomsa                        Do not make a multiple sequence alignment
     --notrees                      Do not make phylogenies
-    --singleend                    Treat everything like single-end. Useful for 
-                                   when you think there is a single-end/paired-end bias.
+    --singleend                    Treat everything like single-end. Useful 
+                                   for when you think there is a single-
+                                   end/paired-end bias.
     OTHER SHORTCUTS
     --fast                         Shorthand for --downsample --mapper snap --nomask-phages 
                                                  --nomask-cliffs --sample-sites
-    --presets \"\"                   See presets.conf for more information
     --downsample                   Downsample all reads to 50x. Approximated according 
                                    to the ref genome assembly
     --sample-sites                 Randomly choose a genome and find SNPs in a quick 
                                    and dirty way. Then on the SNP-calling stage, 
                                    only interrogate those sites for SNPs for each 
                                    genome (including the randomly-sampled genome).
+  ";
+  return "$help\n  --help2 To view the complete set of options\n\n" if(!$$settings{help2});
+
+  $help.="
     MODULES
     --read_cleaner none            Which read cleaner? Choices: none, CGP, BayesHammer
-    --mapper       $$settings{mapper} Which mapper? Choices: smalt, snap, stampy, bowtie2, bwa
+    --mapper       $$settings{mapper} Which mapper? Choices: smalt, snap
     --snpcaller    $$settings{snpcaller} Which SNP caller? Choices: varscan, vcftools
 
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue        $$settings{queue}           default queue to use
     --numnodes     $$settings{numnodes}              maximum number of nodes
-    --numcpus      $$settings{numcpus}               number of cpus
     --qsubxopts    '-N lyve-set'   Extra options to pass to qsub. This is not 
                                    sanitized; internal options might overwrite yours.
     --noqsub                       Do not use the scheduler, even if it exists
+
+    LOCATIONS OF FILE DIRECTORIES
+    --readsdir  $$settings{readsdir}    where fastq and fastq.gz files are located
+    --bamdir    $$settings{bamdir}    where to put bams
+    --vcfdir    $$settings{vcfdir}    where to put vcfs
+    --tmpdir    $$settings{tmpdir}    tmp/ Where to put temporary files
+    --msadir    $$settings{msadir}    multiple sequence alignment and tree files (final output)
+    --logdir    $$settings{logdir}    Where to put log files. Qsub commands are also stored here.
+    --asmdir    $$settings{asmdir}    directory of assemblies. Copy or symlink the reference genome assembly 
+                                   to use it if it is not already in the raw reads directory
+
   ";
   return $help;
 }

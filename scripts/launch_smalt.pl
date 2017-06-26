@@ -118,7 +118,8 @@ sub mapReads{
   my $sorted="$sPrefix.bam"; # samtools adds the bam later, so I want to keep track of it
 
   logmsg "Sorting the temporary bam file into $sorted";
-  system("samtools sort $tmpOut $sPrefix 2>&1"); die "ERROR with 'samtools sort $tmpOut $sPrefix'" if $?;
+  my $sortCommand="samtools sort -o $sorted $tmpOut";
+  system("$sortCommand 2>&1"); die "ERROR with '$sortCommand'" if $?;
   system("samtools index $sorted 2>&1"); die "ERROR with 'samtools index $sorted'" if $?;
 
   system("set_samtools_depth.pl $sorted 2>&1");

@@ -74,9 +74,9 @@ sub main{
 
   # Process a resulting VCF: make an MSA; remove uninformative sites; find pairwise distances;
   # find Fst; make a tree; calculate the eigenvector
-  my $indexCase="$$settings{prefix}.eigen.tsv";
-  system("set_indexCase.pl $pairwise | sort -k2,2n > $indexCase");
-  die "ERROR with set_indexCase.pl" if $?;
+  #my $indexCase="$$settings{prefix}.eigen.tsv";
+  #system("set_indexCase.pl $pairwise | sort -k2,2n > $indexCase");
+  #die "ERROR with set_indexCase.pl" if $?;
 
   # TODO Fst
 
