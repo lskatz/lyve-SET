@@ -10,27 +10,9 @@ Quickie Installation
 
 Requirements
 ------------
-* **Must-have** and not installed with `make install`
-  * **Perl, multithreaded**
-  * **BLAST+**
-  * **GIT**, **SVN** (for installation and updating)
-* **Requirements installed with `make install`**
-  * CG-Pipeline
-  * Schedule::SGELK
-  * VCF Tools and Vcf.pm
-  * Samtools v1.1 or newer
-    * bcftools
-    * wgsim if you are simulating reads
-    * bgzip
-    * tabix
-  * PHAST
-  * Varscan
-  * SNAP
-  * RAxML
-  * Smalt
-* Optional "requirements"
-  * PhyML
-  * FreeBayes
+* **Perl, multithreaded**
+* **BLAST+**
+* **GIT**, **SVN** (for installation and updating)
 
 Installation
 ------------
