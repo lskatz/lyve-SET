@@ -1,6 +1,13 @@
 Installation
 ============
 
+Requirements
+------------
+
+* **Perl, multithreaded**
+* **BLAST+**
+* **GIT**, **SVN** (for installation and updating)
+
 Quickie Installation
 --------------------
 
@@ -8,13 +15,17 @@ Quickie Installation
 2. Update the path to include the scripts subdirectory. You can do this yourself if you are comfortable or run `make env`.
 3. Update your current session's path: `source ~/.bashrc`
 
-Requirements
-------------
-* **Perl, multithreaded**
-* **BLAST+**
-* **GIT**, **SVN** (for installation and updating)
+In-depth Installation
+---------------------
 
-Installation
+Download the latest stable version from https://github.com/lskatz/lyve-SET/releases.  You can also roll the dice by getting the cutting edge version with git.
+
+    tar -zxvf lyve-SET-1.1.4f.tar.gz
+    cd lyve-SET-1.1.4f.tar.gz
+    make install
+    make env
+
+Other Installation Options
 ------------
 * `make install`
 * `make env` - update `PATH` and `PERL5LIB` in the `~/.bashrc` file.
@@ -31,11 +42,12 @@ Installation
 
 Upgrading
 ---------
+
 ### By stable releases
 Unfortunately the best way to get the next stable release is to download the full version like usual, followed by `make install`.  If successful, then delete the directory containing the older version.
 
     cd ~/tmp
-    wget http://latest/release.tar.gz
+    wget https://github.com/lskatz/lyve-SET/archive/v1.1.4f.tar.gz
     tar zxvf release.tar.gz
     cd Lyve-SET
     make install # takes 10-20 minutes to download packages on broadband; install
