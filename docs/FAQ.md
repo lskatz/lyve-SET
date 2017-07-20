@@ -22,3 +22,5 @@ High quality for SNPs indicates that the resulting phylogeny will be high-fideli
 * Default **75% consensus** and **10x** coverage thresholds.  These options can be changed when you launch Lyve-SET.
 * Mechanisms to **remove clustered SNPs** -- not on by default however.
 * **Maximum likelihood** phylogeny reconstruction. Ascertainment bias is also considered through RAxML v8.
+* Both **forward and reverse reads** must support each SNP.
+* Each read must have **95% identity** to the reference genome.  In other words, if the read is 100bp, then only 5 differences in the read can be tolerated before the read is discarded.
