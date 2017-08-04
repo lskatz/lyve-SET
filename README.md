@@ -167,9 +167,9 @@ Citing lyve-SET
 See Also
 --------
 
-###Other SNP Pipelines
+### Other SNP Pipelines
 
-[SNVPhyl](https://snvphyl.readthedocs.io/en/latest/)
-[SNP-Pipeline](http://snp-pipeline.readthedocs.io/en/latest/)
-[REALPHY](http://realphy.unibas.ch/fcgi/realphy)
+* [SNVPhyl](https://snvphyl.readthedocs.io/en/latest/)  
+* [SNP-Pipeline](http://snp-pipeline.readthedocs.io/en/latest/)  
+* [REALPHY](http://realphy.unibas.ch/fcgi/realphy)  
 
