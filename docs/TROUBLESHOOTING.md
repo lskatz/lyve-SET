@@ -53,8 +53,22 @@ RAxML requires at least four genomes to create a tree.  If you have few genomes 
 
 ### Not enough variable sites
 
+#### Best case scenario
+
 This isn't a huge problem but it's not immediately obvious that this is the case always.  If all of your genomes have the exact same SNP profile, then the multiple sequence alignment will have zero variable sites, and RAxML will fail.  This is a result in itself because it says that all your genomes have the same genomic profile.
 
 How do you detect this?  You can view `out.snpmatrix.tsv` to see if there are many sites without majority ambiguous allele calls.  You can see if `out.snpmatrix.tsv` has many sites.  Therefore you can do a simple calculation to show that you have many high-quality sites but few or no variable sites.
 
 How do you avoid this situation?  If you have a good outgroup, then there will be variable sites, and it won't matter if your clade of interest has no variation between them.  RAxML can build a tree when there are a few guaranteed variable sites introduced by the outgroup.  This outgroup by definition is a genome that is phylogenetically related but is not the same profile as your clade of interest.
+
+#### Worst case scenario
+
+What if they are *supposed* to have different SNP profiles?
+
+1. Check to see if the **number of masked sites is huge** in the multiple sequence alignment.  `launch_set.log` in the log directory should inform you of huge percentages of masked sites.
+2. Check to see if there are weird read mappings.  See the [visualization guide](VIZ.md) for more details.  Or some basic commands
+  * `samtools depth bam/somegenome.bam | less`
+  * `samtools flagstat bam/somegenome.bam`
+  * `bam stats --basic --in bam/somegenome.bam`
+3. Check to see if there are a ton of **failed sites** in the VCF files.  This is more complicated but it will give you a trend.  For example, do you see a lot of low coverage sites?  Low consensus sites?
+  *  Example command to view the number of sites passing, or number of sites failed per reason `bcftools view --no-header somegenome.vcf.gz | cut -f 7 | sort | uniq -c`
