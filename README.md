@@ -155,7 +155,7 @@ To visualize the results, please see [docs/VIZ.md](docs/VIZ.md).
 Getting help
 ------------
 * Check out the [FAQ](docs/FAQ.md) first to see if your question has already been asked
-* Join the [Google Group](https://groups.google.com/forum/#!forum/lyve-set) at https://groups.google.com/forum/#!forum/lyve-set 
+* Join the [Google Group](https://groups.google.com/forum/#!forum/lyve-set) at https://groups.google.com/forum/#!forum/lyve-set.  This is sometimes the only way I can count the number of people/institutions using Lyve-SET and so I appreciate the head count.
 * [Tips and tricks](docs/TIPS.md)
 
 Citing lyve-SET
@@ -171,5 +171,14 @@ See Also
 
 * [SNVPhyl](https://snvphyl.readthedocs.io/en/latest/)  
 * [SNP-Pipeline](http://snp-pipeline.readthedocs.io/en/latest/)  
-* [REALPHY](http://realphy.unibas.ch/fcgi/realphy)  
+* [REALPHY](http://realphy.unibas.ch/fcgi/realphy) 
+
+### Lyve-SET sites
+
+* Please register for my head count at https://groups.google.com/forum/#!forum/lyve-set
+
+### Sites or organizations that use Lyve-SET
+
+* PathoBacTyper http://halst.nhri.org.tw/PathoBacTyper/
+* PulseNet https://www.cdc.gov/pulsenet/
 
