@@ -30,7 +30,7 @@ In the case where you have all pileups finished and want to call SNPs on a singl
     cd vcf; 
     ls *.vcf| xargs -I {} -P 24 -n 1 sh -c "vcf-sort < {} > {}.tmp && mv -v {}.tmp {} && bgzip {} && tabix {}.gz"
 
-## Counting SNPs
+## SNP interrogation
 
 ### SNP counting
 
@@ -40,6 +40,52 @@ How many SNPs are in the Lyve-SET analysis? Count the number of lines in `out.fi
 header.
 
 I want to count the number of sites as defined as X.  Use `out.snpmatrix.tsv` and `filterMatrix.pl` to filter it your way. If you are an advanced user, you can use `bcftools query` on `out.pooled.vcf.gz`.
+
+### Why did a SNP fail?
+
+To see why any SNP failed, view the vcf files in the VCF directory.  Parse them with `bcftools`.
+
+#### View the FILTER column
+
+    $ bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%FILTER\n' sample1.fastq.gz-reference.vcf.gz | head
+    gi|9626243|ref|NC_001416.1|     1       G       N       DP10;AF0.75
+    gi|9626243|ref|NC_001416.1|     2       G       N       DP10;AF0.75
+    gi|9626243|ref|NC_001416.1|     3       G       N       DP10;AF0.75
+    gi|9626243|ref|NC_001416.1|     4       C       N       DP10;AF0.75
+    gi|9626243|ref|NC_001416.1|     5       G       N       DP10;AF0.75
+    gi|9626243|ref|NC_001416.1|     6       G       N       DP10;AF0.75
+    gi|9626243|ref|NC_001416.1|     7       C       N       DP10;AF0.75
+    gi|9626243|ref|NC_001416.1|     8       G       N       DP10;AF0.75
+    gi|9626243|ref|NC_001416.1|     9       A       N       DP10;AF0.75
+    gi|9626243|ref|NC_001416.1|     10      C       N       DP10;AF0.75
+
+#### View MORE information with bcftools
+
+    $ bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%FILTER[\t%TGT\t%DP]\n' sample1.fastq.gz-reference.vcf.gz | head
+    gi|9626243|ref|NC_001416.1|     1       G       N       DP10;AF0.75     N/N     2
+    gi|9626243|ref|NC_001416.1|     2       G       N       DP10;AF0.75     N/N     4
+    gi|9626243|ref|NC_001416.1|     3       G       N       DP10;AF0.75     N/N     4
+    gi|9626243|ref|NC_001416.1|     4       C       N       DP10;AF0.75     N/N     4
+    gi|9626243|ref|NC_001416.1|     5       G       N       DP10;AF0.75     N/N     4
+    gi|9626243|ref|NC_001416.1|     6       G       N       DP10;AF0.75     N/N     5
+    gi|9626243|ref|NC_001416.1|     7       C       N       DP10;AF0.75     N/N     5
+    gi|9626243|ref|NC_001416.1|     8       G       N       DP10;AF0.75     N/N     6
+    gi|9626243|ref|NC_001416.1|     9       A       N       DP10;AF0.75     N/N     6
+    gi|9626243|ref|NC_001416.1|     10      C       N       DP10;AF0.75     N/N     6
+
+#### View the definitions for FILTER codes
+
+For example, `DP10` indicates that the user set 10x as a threshold and the site has less than 10x coverage.
+    
+    $ zgrep "##FILTER" sample1.fastq.gz-reference.vcf.gz
+    ##FILTER=<ID=DP10,Description="Depth is less than 10, the user-set coverage threshold">
+    ##FILTER=<ID=RF0.75,Description="Reference variant consensus is less than 0.75, the user-set threshold">
+    ##FILTER=<ID=AF0.75,Description="Allele variant consensus is less than 0.75, the user-set threshold">
+    ##FILTER=<ID=isIndel,Description="Indels are not used for analysis in Lyve-SET">
+    ##FILTER=<ID=masked,Description="This site was masked using a bed file or other means">
+    ##FILTER=<ID=str10,Description="Less than 10% or more than 90% of variant supporting reads on one strand">
+    ##FILTER=<ID=indelError,Description="Likely artifact due to indel reads at this position">
+
 
 Other manual steps in Lyve-SET
 -------------------------------------------------
