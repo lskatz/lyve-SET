@@ -29,10 +29,10 @@ install: install-prerequisites
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-samtools install-bcftools install-smalt install-snap install-raxml install-perlModules install-config install-snpEff install-eutils
+install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-samtools install-bcftools install-smalt install-snap install-bwa install-raxml install-perlModules install-config install-snpEff install-eutils
 	@echo DONE installing prerequisites
 
-clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-samtools clean-bcftools clean-smalt clean-snap clean-raxml clean-perlModules clean-config clean-snpEff clean-eutils
+clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-samtools clean-bcftools clean-smalt clean-bwa clean-snap clean-raxml clean-perlModules clean-config clean-snpEff clean-eutils
 	@echo "Remember to remove the line with PATH and Lyve-SET from $(PROFILE)"
 
 install-mkdir:
@@ -150,6 +150,17 @@ install-smalt:
 clean-smalt:
 	rm -rvf lib/smalt*
 	rm -vf scripts/smalt
+
+install-bwa:
+	wget --max-redirect 50 --continue 'https://astuteinternet.dl.sourceforge.net/project/bio-bwa/bwa-0.7.17.tar.bz2' -O $(TMPDIR)/bwa-0.7.17.tar.bz2
+	cd $(TMPDIR) && tar jxvf bwa-0.7.17.tar.bz2
+	mv $(TMPDIR)/bwa-0.7.17 lib/
+	$(MAKE) --directory lib/bwa-0.7.17
+	ln -sv ../lib/bwa-0.7.17/bwa scripts/
+
+clean-bwa:
+	rm -rvf lib/bwa*
+	rm -vf scripts/bwa
 
 install-snap:
 	git clone https://github.com/amplab/snap.git lib/snap -b v1.0beta.18
