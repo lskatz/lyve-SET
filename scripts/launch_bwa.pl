@@ -44,7 +44,7 @@ sub main{
   # I think it has to die and not index the genome just in case other
   # instances of this script are trying to do the same thing.
   for my $indexFile("$reference.bwt","$reference.amb","$reference.ann", "$reference.pac"){
-    die "ERROR: Could not find $indexFile, which makes me think that the reference genome has not been indexed with `smalt index`." if(!-e $indexFile);
+    die "ERROR: Could not find $indexFile, which makes me think that the reference genome has not been indexed with `bwa index`." if(!-e $indexFile);
   }
 
   mapReads($fastq,$bam,$reference,$settings);
@@ -97,7 +97,7 @@ sub mapReads{
     }
 
     # Mapping
-    system("bwa mem $$settings{smaltxopts} $ref '$prefix.SE.fastq' > $tmpSamOut"); 
+    system("bwa mem $$settings{bwaxopts} $ref '$prefix.SE.fastq' > $tmpSamOut"); 
     die if $?;
     system("rm -v '$prefix.SE.fastq'"); die if $?;
   }
@@ -154,7 +154,7 @@ sub usage{
   Usage: $0 -f file.fastq -b file.bam -t tmp/ -r reference.fasta
   -t tmp to set the temporary directory as 'tmp'
   --numcpus 1 number of cpus to use
-  -s '' Extra smalt map options (not validated). Default: $$settings{smaltxopts} 
+  -s '' Extra bwa map options (not validated). Default: $$settings{bwaxopts} 
   --pairedend <0|1|2> For 'auto', single-end, or paired-end respectively. Default: auto (0).
   --minPercentIdentity 95  The percent identity between a read and its match before it can be mapped
   "
