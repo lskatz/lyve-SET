@@ -467,7 +467,7 @@ sub mapReads{
     }
     elsif($$settings{mapper} eq 'bwa'){
       my $bwadir=tempdir("$tmpdir/bwaXXXXXX",CLEANUP=>1);
-      $sge->pleaseExecute("$scriptsdir/launch_bwa.sh $bwaxopts -r $ref -f $fastq -b $bamPrefix.sorted.bam -t $bwadir --numcpus $$settings{numcpus} ",{jobname=>"bwa$b"});
+      $sge->pleaseExecute("$scriptsdir/launch_bwa.pl $bwaxopts --reference $ref -f $fastq --bam $bamPrefix.sorted.bam -t $bwadir --numcpus $$settings{numcpus} ",{jobname=>"bwa$b"});
     }
     else {
       die "ERROR: I do not understand the mapper $$settings{mapper}";
