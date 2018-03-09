@@ -3,9 +3,11 @@ before_install:
   - sudo apt-get install ncbi-blast+
   - export PATH=$PATH:$(pwd)/scripts
   - export PERL5LIB=PERL5LIB:$HOME/lib/perl5
-  - yes no | sudo apt-get install bioperl
+  - yes no | cpanm -l ~ Bio::Perl
+  - yes no | cpanm -l ~ Bio::FeatureIO
+  - yes no | cpanm -l ~ Bio::TreeIO
   - make install
 script: true
 install:
-  - set_test.pl lambda lambda --numcpus 2
+  - bash scripts/testInstallation.sh
 language: shell
