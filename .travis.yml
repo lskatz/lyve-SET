@@ -1,0 +1,11 @@
+before_install:
+  - perl -Mthreads -e 'print "this perl is multithreaded\n";'
+  - sudo apt-get install ncbi-blast+
+  - export PATH=$PATH:$(pwd)/scripts
+  - export PERL5LIB=PERL5LIB:$HOME/lib/perl5
+  - yes no | sudo apt-get install bioperl
+  - make install
+script: true
+install:
+  - set_test.pl lambda lambda --numcpus 2
+language: shell
