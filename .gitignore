@@ -63,3 +63,13 @@ scripts/vcfutils.pl
 scripts/wgsim
 config/LyveSET.conf
 config/presets.conf
+config/snpEff.conf
+lib/bcftools-1.3.1/
+lib/bwa-0.7.17/
+lib/htslib-1.3.2/
+lib/samtools-1.3.1/
+lib/snpEff.jar
+scripts/bwa
+scripts/run_assembly_metrics.pl
+scripts/run_assembly_readMetrics.pl
+
