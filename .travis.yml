@@ -6,6 +6,8 @@ before_install:
   - yes no | cpanm -l ~ Bio::Perl
   - yes no | cpanm -l ~ Bio::FeatureIO
   - yes no | cpanm -l ~ Bio::TreeIO
+  - cpanm -l ~ File::Slurp
+  - cpanm -l ~ String::Escape
   - make install
 script: true
 install:
