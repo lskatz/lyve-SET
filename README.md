@@ -182,3 +182,4 @@ See Also
 * PathoBacTyper http://halst.nhri.org.tw/PathoBacTyper/
 * PulseNet https://www.cdc.gov/pulsenet/
 
+[![Build Status](https://travis-ci.org/lskatz/lyve-SET.svg?branch=master)](https://travis-ci.org/lskatz/lyve-SET)
