@@ -1,4 +1,5 @@
 before_install:
+  - sudo apt-get install default-jre
   - perl -Mthreads -e 'print "this perl is multithreaded\n";'
   - sudo apt-get install ncbi-blast+
   - export PATH=$PATH:$(pwd)/scripts
