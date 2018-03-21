@@ -25,7 +25,7 @@ help:
 all: install env
 
 install: install-prerequisites
-	@echo "Don't forget to set up update PATH to $(PWD)/scripts";
+	@echo "Don't forget to set up update PATH to $(PREFIX)/scripts";
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET complete."
 
@@ -57,12 +57,12 @@ clean-SGELK:
 install-CGP:
 	# CGP scripts that are needed and that don't depend on CGP libraries
 	git clone https://github.com/lskatz/cg-pipeline lib/cg-pipeline
-	ln -s $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_isFastqPE.pl scripts/
-	ln -s $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_trimClean.pl scripts/
-	ln -s $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_shuffleReads.pl scripts/
-	ln -s $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_removeDuplicateReads.pl scripts/
-	ln -s $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_readMetrics.pl scripts/
-	ln -s $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_metrics.pl scripts/
+	ln -rs $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_isFastqPE.pl scripts/
+	ln -rs $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_trimClean.pl scripts/
+	ln -rs $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_shuffleReads.pl scripts/
+	ln -rs $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_removeDuplicateReads.pl scripts/
+	ln -rs $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_readMetrics.pl scripts/
+	ln -rs $(PREFIX)/lib/cg-pipeline/scripts/run_assembly_metrics.pl scripts/
 
 clean-CGP:
 	rm -rvf lib/cg-pipeline
@@ -116,10 +116,10 @@ install-samtools:
 	mv $(TMPDIR)/htslib-1.3.2 $(TMPDIR)/samtools-1.3.1 lib
 	cd lib/htslib-1.3.2 && $(MAKE)
 	cd lib/samtools-1.3.1 && $(MAKE) DFLAGS="-D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -D_CURSES_LIB=0" LIBCURSES="" 
-	ln -sf $(PREFIX)/lib/samtools-1.3.1/samtools scripts/
-	ln -sf $(PREFIX)/lib/samtools-1.3.1/misc/wgsim scripts/
-	ln -sf $(PREFIX)/lib/htslib-1.3.2/bgzip scripts
-	ln -sf $(PREFIX)/lib/htslib-1.3.2/tabix scripts
+	ln -rsf $(PREFIX)/lib/samtools-1.3.1/samtools scripts/
+	ln -rsf $(PREFIX)/lib/samtools-1.3.1/misc/wgsim scripts/
+	ln -rsf $(PREFIX)/lib/htslib-1.3.2/bgzip scripts
+	ln -rsf $(PREFIX)/lib/htslib-1.3.2/tabix scripts
 
 clean-samtools:
 	rm -rvf lib/samtools*
@@ -131,8 +131,8 @@ install-bcftools:
 	cd $(TMPDIR) && tar jxvf bcftools-1.3.1.tar.bz2
 	mv $(TMPDIR)/bcftools-1.3.1 lib/bcftools-1.3.1
 	cd lib/bcftools-1.3.1 && $(MAKE)
-	ln -s $(PREFIX)/lib/bcftools-1.3.1/bcftools scripts
-	ln -s $(PREFIX)/lib/bcftools-1.3.1/vcfutils.pl scripts
+	ln -rs $(PREFIX)/lib/bcftools-1.3.1/bcftools scripts
+	ln -rs $(PREFIX)/lib/bcftools-1.3.1/vcfutils.pl scripts
 
 clean-bcftools:
 	rm -rfv $(PREFIX)/lib/bcftools*
@@ -142,10 +142,10 @@ install-smalt:
 	wget --max-redirect 50 --continue 'https://downloads.sourceforge.net/project/smalt/smalt-0.7.6-static.tar.gz' -O $(TMPDIR)/smalt-0.7.6-static.tar.gz
 	cd $(TMPDIR) && tar zxvf smalt-0.7.6-static.tar.gz
 	mv $(TMPDIR)/smalt-0.7.6 lib/
-	cd lib/smalt-0.7.6 && ./configure --prefix $(PWD)/lib/smalt-0.7.6
+	cd lib/smalt-0.7.6 && ./configure --prefix $(PREFIX)/lib/smalt-0.7.6
 	$(MAKE) --directory lib/smalt-0.7.6
 	$(MAKE) --directory lib/smalt-0.7.6 install
-	ln -sv $(PREFIX)/lib/smalt-0.7.6/bin/smalt scripts/
+	ln -rsv $(PREFIX)/lib/smalt-0.7.6/bin/smalt scripts/
 
 clean-smalt:
 	rm -rvf lib/smalt*
@@ -156,7 +156,7 @@ install-bwa:
 	cd $(TMPDIR) && tar jxvf bwa-0.7.17.tar.bz2
 	mv $(TMPDIR)/bwa-0.7.17 lib/
 	$(MAKE) --directory lib/bwa-0.7.17
-	ln -sv ../lib/bwa-0.7.17/bwa scripts/
+	ln -rsv $(PREFIX)/lib/bwa-0.7.17/bwa scripts/
 
 clean-bwa:
 	rm -rvf lib/bwa*
@@ -179,10 +179,10 @@ lib/standard-RAxML-8.1.16/raxmlHPC:
 	cd $(TMPDIR) && tar zxvf raxml_v8.1.16.tar.gz
 	mv $(TMPDIR)/standard-RAxML-8.1.16 lib
 	$(MAKE) --directory lib/standard-RAxML-8.1.16 -f Makefile.gcc
-	ln -sv ../$@ scripts/
+	ln -rsv $(PREFIX)/$@ scripts/
 lib/standard-RAxML-8.1.16/raxmlHPC-PTHREADS: lib/standard-RAxML-8.1.16/raxmlHPC
 	$(MAKE) --directory lib/standard-RAxML-8.1.16 -f Makefile.PTHREADS.gcc
-	ln -sv ../$@ scripts/
+	ln -rsv $(PREFIX)/$@ scripts/
 
 clean-raxml:
 	rm -rvf lib/standard-RAxML-8.1.16
@@ -233,7 +233,7 @@ clean-eutils:
 test:
 	set_test.pl lambda lambda --numcpus $(NUMCPUS) 
 
-check: check-sys check-Lyve-SET-PATH check-CGP-assembly check-Lyve-SET check-PERL check-smalt check-freebayes check-raxml check-freebayes check-phyml check-blast
+check: check-sys check-Lyve-SET-PATH check-CGP-assembly check-Lyve-SET check-PERL check-smalt check-raxml check-phyml check-blast
 	@echo --OK
 check-sys:
 	@F=$$(which cat) && echo "Found $$F"
@@ -241,8 +241,6 @@ check-sys:
 	@F=$$(which perl) && echo "Found $$F"
 check-smalt:
 	@F=$$(which smalt 2>/dev/null) && echo "Found smalt at $$F"
-check-freebayes:
-	@F=$$(which freebayes 2>/dev/null) && echo "Found freebayes at $$F"
 check-raxml:
 	@ RAXML=$$((which raxml || which raxmlHPC-PTHREADS) 2>/dev/null) && echo "Found raxml at $$RAXML"
 check-phyml:
