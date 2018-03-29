@@ -40,7 +40,7 @@ sub main{
   my $printer=threads->new(\&printer,$printQueue,$settings);
   my $pwQueue=Thread::Queue->new;
   my @thr;
-  $thr[$_]=threads->new(\&pairwiseDistanceWorker,\%seq,$pwQueue,$printQueue,$settings) for(1..$$settings{numcpus});
+  $thr[$_]=threads->new(\&pairwiseDistanceWorker,\%seq,$pwQueue,$printQueue,$settings) for(0..$$settings{numcpus});
   my @dist;
   # TODO loop based on the seqid
   for(my $i=0;$i<$numSeq;$i++){
