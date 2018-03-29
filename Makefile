@@ -75,8 +75,8 @@ install-vcftools:
 	mv $(TMPDIR)/vcftools_0.1.12b lib/
 	cd lib/vcftools_0.1.12b &&\
     $(MAKE) --directory=. MAKEFLAGS=""
-	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/vcf-sort scripts/
-	ln -s $(PREFIX)/lib/vcftools_0.1.12b/perl/Vcf.pm lib/
+	ln -rs $(PREFIX)/lib/vcftools_0.1.12b/perl/vcf-sort scripts/
+	ln -rs $(PREFIX)/lib/vcftools_0.1.12b/perl/Vcf.pm lib/
 
 clean-vcftools:
 	rm -rvf lib/vcftools_0.1.12b
