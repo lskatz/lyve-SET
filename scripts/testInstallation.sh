@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set_test.pl --numcpus 2 lambda lambda
+set_test.pl --numcpus 2 lambda lambda -- --noqsub
 min_snps=$(sort -k3,3n lambda/msa/out.pairwise.tsv | head -n 1 | cut -f 3)
 max_snps=$(sort -k3,3n lambda/msa/out.pairwise.tsv | tail -n 1 | cut -f 3)
 
