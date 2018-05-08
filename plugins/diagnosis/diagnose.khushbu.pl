@@ -1,129 +1,81 @@
 #!/usr/bin/env perl  
-# Khushbu Patel 3-16-18
-# hqSNP diagnose script / QC lyve-SET/1.1.4f
-# Run this script from your main Lyve-SET folder
+# Authors: Khushbu Patel and Lori Gladney 3-16-18
+# Lyve-SET diagnosis/QC script
 # Edited, Lee Katz 2018-05-08
 
 use warnings;
 use strict;
 use Bio::SeqIO;
-use Data::Dumper;
+use Data::Dumper qw/Dumper/;
+use Getopt::Long qw/GetOptions/;
+use File::Basename qw/basename dirname/;
 
+use FindBin qw/$RealBin/;
+use lib "$RealBin/../../lib";
+use LyveSET qw/logmsg/;
 
-#----------------------------------------------------------------------------------------------------------------------------------------------------#
+$ENV{PATH} = "$ENV{PATH}:$RealBin/../../scripts";
 
-my $usage = "\nUsage: ./hqSNP_diagnose.pl projectdir/\n\nPlease set the working directory to the main Lyve-SET folder and supply a reference genome!\n\nMake sure you have loaded modules - samtools/1.4.1 and perl/5.16.1-MT!\n";
-my $project = $ARGV[0] or die $usage;
+exit(main());
 
-               
-# variable declarations
+sub main{
+  my $settings={};
+  GetOptions($settings,qw(help)) or die $!;
+  die usage() if($$settings{help});
+  my $project = $ARGV[0];
+  die "ERROR: need project directory\n".usage() if(!$project);
 
-               my $basename;
-               my $mapped_reads;
-               my $total_mapped_reads;
-               my $mapped_reads_lt_30;
-               my $not_mapped;
-               my $tot_reads;
-               my $perc_mapped_reads_gt_30;
-               my $perc_mapped_reads;
-               my $file;
-               my $line_count;
-               my $proper_paired;
-               my $perc_proper_paired;
-               my $total_ref_bases;
-			   my $str5;
-			   my $perc_reference_coverage;
-			   my $average_coverage;
-			   my $vcf_out;
-               
+  #.....Setting the paths to fetch files!.........#
+  my $path_cleaned_reads = "$project/reads";
+  my $vcf_path           = "$project/vcf";
+  my $bam_path           = "$project/bam";
+  my $out_aln_path       = "$project/msa/out.aln.fasta";
+  my $out_info_path      = "$project/msa/out.informative.fasta";
+  my $reference          = "$project/reference/reference.fasta";
 
-
-#.....Setting the paths to fetch files!.........#
-my $path_cleaned_reads = "$project/reads";
-my $vcf_path           = "$project/vcf";
-my $out_aln_path       = "$project/msa/out.aln.fasta";
-my $out_info_path      = "$project/msa/out.informative.fasta";
-my $reference          = "$project/reference/reference.fasta";
-
-
-
-
-
-#Get total number of bases in the Reference
-
-sub gsize()  #Subroutine to calculate size of Genome
-{
-               #create one SeqIO object to read in
-               my $seq_in = Bio::SeqIO->new(
-                             -file   => "<$reference",
-                             -format => 'fasta',
-                             );
-
-                                                                                                         
-               
-               my $id;        #scalar to hold sequence identifier    
-               my $string;    #scalar to hold the sequence
-               my $length =0;
-                              
-               #write each entry in the input file to STDOUT, while the condition is true
-               #seq_in is the object that holds the file
-               #next seq passes each contig to the sequence object $seq
-               while (my $seq = $seq_in->next_seq ()) 
-                              { 
-               
-               #Initialize variables; start the counter at 0 for each contig that comes through the loop  
-               
-               $id= $seq->id; #Get the header Id of each contig
-               $length +=$seq->length;  #Declare variable for finding the length of each contig sequence
-               
-               $string = $seq->seq;   #Each contig seq is treated as a string
-               
-               
-               }
-
-               $total_ref_bases = $length;
-               print "\nGenome Size: $total_ref_bases\n";
-
-
-               }
+  # variable declarations
+  my $mapped_reads;
+  my $total_mapped_reads;
+  my $mapped_reads_lt_30;
+  my $not_mapped;
+  my $tot_reads;
+  my $perc_mapped_reads_gt_30;
+  my $perc_mapped_reads;
+  my $file;
+  my $line_count;
+  my $proper_paired;
+  my $perc_proper_paired;
+  my $str5;
+  my $perc_reference_coverage;
+  my $average_coverage;
+  my $vcf_out;
 
                
-#Printing the reference size         
-gsize();
+  # the reference size         
+  my $total_ref_bases = gsize($reference);
+  # Masking information on both pseudo alignments
+  my $maskingInfoHash = masking($out_info_path);
+  my $maskingAlnHash  = masking($out_aln_path);
 
+  print "\n\n\n============================== MASKING INFORMATION ==========================================\n";
 
-chdir("./bam/");
+  print "\n\n#......Overall masking.....#\n";
+  print "-------------------------------------\n";
+  for my $masking (@$maskingAlnHash) {
+    print ">". $$masking{full_id} ."\n";
+  }
 
- #-------------------------------------------------------------------------------------------------------------------------------#
-               sub masking;      #function declaration to prevent error: "too early to prototype"
-               
-               
-               
-               print "\n\n\n================================================== MASKING INFORMATION ==============================================================\n";
-               
-               print "\n\n#......Overall masking.....#\n";
-               print "-------------------------------------\n";
-               
-               masking($out_aln_path);              #calling subroutine masking and passing out.aln file as a parameter
-               
-               print "\n\n#......Masking in informative sites.....#\n";
-               print "-------------------------------------\n";
+  print "\n\n#......Masking in informative sites.....#\n";
+  print "-------------------------------------\n";
+  for my $masking (@$maskingInfoHash) {
+    print ">". $$masking{full_id} ."\n";
+  }
 
-               masking($out_info_path);             #calling subroutine masking and passing out.info file as a parameter
-
-
-			   
-			   
-#-------------------------------------------------------------------------------------------------------------------------------#			   
-			   
-
-my @files = glob("*.bam");
-
-foreach my $i(@files)
-{
-
-               
-               ($basename = $i) =~ s/.fastq*.+//;            #Get the basename of files
+  foreach my $bam(glob("$bam_path/*.bam")){
+    # Example filename: bam/sample1.fastq.gz-reference.sorted.bam
+    # Example basename: sample1
+    my $basename = basename($bam,qw(.fastq.gz-reference.sorted.bam));
+    my $i=$bam;
 			   
 		       print ("\n------------------------------------------------------------------------------------------------------------------------------------------------------\n");
                print "\n\n\n---> Processing file: $basename...\n";
@@ -221,76 +173,99 @@ g. indelError = Likey artifcat due to indel reads at this position\n\n");
 				print("$vcf_out");
 				
 
-               }
+  }
 
+  return 0;
+}
 
-			  
-               
-               
-               
-               
-               
-               #subroutine to calculate masking from out.aln and out.informative file
-               sub masking()
-               {
-                              my ($file) = @_;
+#subroutine to calculate masking from out.aln and out.informative file
+sub masking() {
+  my ($file) = @_;
                               
-               #create one SeqIO object to read in
-               my $seq_in = Bio::SeqIO->new(
-                             -file   => "<$file",
-                             -format => "fasta",
-                             );
+  #create one SeqIO object to read in
+  my $seq_in = Bio::SeqIO->new(
+               -file   => "<$file",
+               -format => "fasta",
+               );
 
-                                                                                                         
-               my @unsorted1;  #array to hold scalar variables below 
-               my $id;        #scalar to hold sequence identifier    
-               my $string;    #scalar to hold the sequence
-               my $full_id;   #scalar to hold the full id including length etc. 
-                              
-               #write each entry in the input file to STDOUT, while the condition is true
-               #seq_in is the object that holds the file
-               #next seq passes each contig to the sequence object $seq
-               while (my $seq = $seq_in->next_seq ()) 
-               { 
-               
-                              #Initialize variables; start the counter at 0 for each contig that comes through the loop
-               
-                              my $count=0;  #total count
-                              my $countN=0; #number of ambiguous bases (N)
-               
-                              $id= $seq->id; #Get the header Id of each contig
-                              my $length=$seq->length;  #Declare variable for finding the length of each contig sequence
-               
-                              $string = $seq->seq;   #Each contig seq is treated as a string
-                              $countN = $string =~ s/(N)//sgi;
-                              my $percentN = ($countN / $length) *100;
-               
-                              $full_id= "$id %Ambiguous_bases(N)= $percentN Ambiguous_base_count(N)= $countN Contig_length= $length";
-               
-                              push (@unsorted1, [$full_id, $length]); #Push each scalar into the unsorted array (identifiers, sequence and percent ambiguous bases) 
-                                 #array elements 0,1,2    #Note $num  must also be added separately from the full_id for sorting on GC
-                                                                                                                                                                        
-               
-               }
-    #Declare a new array for the sorting the unsorted array. Use $$ to reference the other array. 
-               #Sort the array within an array on $num (the second element in the unsorted array) in ascending order (a <=> b) on GC content 
-               #my @sorted= sort {$$a[2] <=> $$b[2]} @unsorted;
-               
-               #Loop through the array.. Print the contig sequences in order of GC content (lowest to highest)
+                                                                                           
+  my @unsorted_id;  #array to hold sequence IDs and associated info
+                
+  #Save each entry in the input file.
+  #seq_in is the object that holds the file
+  #next seq passes each contig to the sequence object $seq
+  while (my $seq = $seq_in->next_seq()) { # Loops while condition is true
 
-               for (my $i=0;$i < @unsorted1; $i++) 
-               {
-               
-                              my $seqstruct=$unsorted1[$i];   #The current iteration through the array
-                              my $full_id=$$seqstruct[0];  #full id is the 0th element in the array 
-                              my $sequence=$$seqstruct[1]; #sequence is the 1st element in the array 
-               
-                              print ">$full_id\n"; 
+    #Initialize variables; start the counter at 0 for each contig that comes through the loop
 
-                              
-               }              
+    my $id= $seq->id; #Get the header Id of each contig
+    my $length=$seq->length;  #Declare variable for finding the length of each contig sequence
+
+    my $sequence = $seq->seq;   #Each contig seq is treated as a string
+    my $countN   = $sequence =~ s/(N)//sgi; # number of ambiguous bases (N)
+    my $percentN = sprintf("%0.2f", ($countN / $length) *100);
+    my $countGC       = $sequence =~ s/[GC]//sgi;
+    my $percentGC= sprintf("%0.2f",$countGC/$length * 100);
+
+    my $full_id= "$id %Ambiguous_bases(N)= $percentN Ambiguous_base_count(N)= $countN %GC= $percentGC Contig_length= $length";
+
+    #Push each scalar into the unsorted array (identifiers, sequence and percent ambiguous bases)
+    push (@unsorted_id,{
+        full_id    => $full_id, 
+        length     => $length,
+        percentN   => $percentN,
+        percentGC  => $percentGC,
+      }
+    );
+  }
+
+  #Declare a new array for the sorting the unsorted array. Use $$ to reference the other array. 
+  #Sort the array within an array on $num (the second element in the unsorted array) in ascending order (a <=> b) on GC content 
+  #my @sorted= sort {$$a[2] <=> $$b[2]} @unsorted;
                
-               
-               
-               
+  #Loop through the array.. Print the contig sequences in order of GC content (lowest to highest)
+  my @sorted_id = sort{ $$a{percentGC} <=> $$b{percentGC} } @unsorted_id;
+  return \@sorted_id;
+
 } #end of masking subroutine
+
+#Get total number of bases in the Reference
+sub gsize(){
+  my($reference)=@_;
+  #create one SeqIO object to read in
+  my $seq_in = Bio::SeqIO->new(
+               -file   => "<$reference",
+               -format => 'fasta',
+               );
+
+                                                                                           
+
+  my $id;        #scalar to hold sequence identifier    
+  my $string;    #scalar to hold the sequence
+  my $length =0;
+                
+  #write each entry in the input file to STDOUT, while the condition is true
+  #seq_in is the object that holds the file
+  #next seq passes each contig to the sequence object $seq
+  while (my $seq = $seq_in->next_seq ()) 
+                { 
+
+  #Initialize variables; start the counter at 0 for each contig that comes through the loop  
+
+  $id= $seq->id; #Get the header Id of each contig
+  $length +=$seq->length;  #Declare variable for finding the length of each contig sequence
+
+  $string = $seq->seq;   #Each contig seq is treated as a string
+
+
+  }
+
+  return $length;
+
+}
+
+sub usage{
+  "Runs a diagnosis on a finished Lyve-SET run
+  Usage: ./hqSNP_diagnose.pl projectdir
+  "
+}
