@@ -39,7 +39,6 @@ sub main{
   return 0;
 }
 
-# Filter the BCF query file into a new one, if any filters were given
 sub sitesToInclude{
   my($vcf,$settings)=@_;
 
@@ -106,7 +105,8 @@ sub usage{
   The first three columns of the matrix are contig/pos/ref, and the next columns are all GT.
 
   Usage: 
-    $0 file.vcf.gz > filtered.tsv
+    $0 file.vcf.gz > filtered.vcf
+    Default is to not filter.
   --density-filter    1         Number of sites allowed per window
   --density-window    1         Size of the window
   "
