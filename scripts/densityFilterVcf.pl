@@ -8,7 +8,7 @@ use Getopt::Long;
 use Bio::Perl;
 use File::Basename;
 use File::Temp qw/tempdir/;
-use List::Util qw/min max sum/;
+use List::Util qw/min max sum uniq/;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
@@ -27,13 +27,23 @@ sub main{
   die usage() if($$settings{help});
   $$settings{tempdir}||=tempdir("$0XXXXXX",TMPDIR=>1,CLEANUP=>1);
 
-  $$settings{'density-filter'}||=0;
-  $$settings{'density-window'}||=0;
+  # Ensure that the density filter and density window are >= 1
+  if(!$$settings{'density-filter'} || $$settings{'density-filter'} < 1){
+    $$settings{'density-filter'}=1;
+  }
+  if(!$$settings{'density-window'} || $$settings{'density-window'} < 1){
+    $$settings{'density-window'}=1;
+  }
 
   my($in)=@ARGV;
   $in or die "ERROR: need input file\n".usage();
 
   my $sites = sitesToInclude($in,$settings);
+
+  if(-s $sites == 0){
+    die "ERROR: all sites are excluded using the density filter of ".$$settings{'density-filter'}." in a window size ".$$settings{'density-window'};
+  }
+
   system("bcftools filter -R $sites '$in'"); die if $?;
 
   return 0;
@@ -60,7 +70,7 @@ sub sitesToInclude{
   my $includedSites="$$settings{tempdir}/regions.tsv";
   open(my $includedSitesFh, ">", $includedSites) or die "ERROR writing to $includedSites: $!";
   while(my($seq,$posArr) = each(%pos)){
-    my $filteredPos = densityFilter($posArr,$settings);
+    my $filteredPos = densityFilter($posArr,$$settings{'density-filter'},$$settings{'density-window'},$settings);
     for my $pos(@$filteredPos){
       print $includedSitesFh join("\t",$seq,$pos)."\n";
     }
@@ -72,29 +82,40 @@ sub sitesToInclude{
 
 # For an array of positions, run the density filter
 sub densityFilter{
-  my($posArr, $settings)=@_;
+  my($posArr,$densityFilter,$densityWindow, $settings)=@_;
 
+  # We will return filtered sites
   my @filtered;
 
   my @pos = sort {$a <=> $b} @$posArr;
-  my $numPos=@pos - $$settings{'density-filter'};
+  my $numPos=@pos;
   my $windowStartIndex=0;
-  for(my $i=0;$i<$numPos;$i++){
+  my $lastPos=$numPos - $densityFilter; # To capture the max value in the for loop
+  for(my $i=0;$i<$lastPos;$i++){
     # Advance ahead the number of sites allowed in the window.
     # Is the window size greater than the density-filter-window?
-    my $window=$pos[$i+$$settings{'density-filter'}] - $pos[$i];
-    if($window > $$settings{'density-window'}){
+    my $maxBound=$pos[$i+$densityFilter - 1];
+    my $minBound=$pos[$i];
+    my $window=$maxBound - $minBound;
+    if($window >= $densityWindow){
       push(@filtered,$pos[$i]);
     }
   }
   
   # Capture the last X sites if they are not within the window size
-  my $window = $pos[$numPos + $$settings{'density-filter'} - 1] - $pos[$numPos];
-  if($window > $$settings{'density-window'}){
-    for(my $i=$numPos;$i<@pos;$i++){
+  my $maxBound=$pos[$numPos-1];
+  my $minBound=$pos[$numPos - $densityFilter - 1];
+  my $window = $maxBound - $minBound;
+  if($window >= $densityWindow){
+    for(my $i=$numPos - $densityFilter;$i<$numPos;$i++){
       push(@filtered,$pos[$i]);
     }
   }
+
+  # Sort/unique all positions just in case the two loops
+  # are overlapping.
+  @filtered = uniq(@filtered);
+  @filtered = sort {$a <=> $b} @filtered;
 
   return \@filtered;
       
@@ -104,6 +125,12 @@ sub usage{
   "$0: filters a vcf file so that no window has too many sites. 
   The first three columns of the matrix are contig/pos/ref, and the next columns are all GT.
 
+  A site will get filtered if it is upstream a set of sites within
+  a given window size.  That window size is inclusive of start/stop
+  positions.  For example if the window size is 10 and the filter
+  density is 2, then there cannot be more than 2 sites between 
+  positions 1 and 10. This includes positions 1 and 10.
+
   Usage: 
     $0 file.vcf.gz > filtered.vcf
     Default is to not filter.
@@ -111,3 +138,4 @@ sub usage{
   --density-window    1         Size of the window
   "
 }
+
