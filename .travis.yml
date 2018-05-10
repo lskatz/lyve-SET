@@ -13,4 +13,5 @@ before_install:
 script: true
 install:
   - bash scripts/testInstallation.sh
+  - bash scripts/testScripts.sh
 language: shell

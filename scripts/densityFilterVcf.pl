@@ -37,6 +37,9 @@ sub main{
 
   my($in)=@ARGV;
   $in or die "ERROR: need input file\n".usage();
+  if(!-e $in){
+    die "ERROR: could not find input file $in";
+  }
 
   my $sites = sitesToInclude($in,$settings);
 
