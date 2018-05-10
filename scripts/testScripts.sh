@@ -8,16 +8,18 @@ testsDir=$(dirname $0)/unittests
 echo "Running tests in $testsDir"
 FAIL=0;
 for i in $testsDir/*.sh; do 
-  b=$(basename $i .sh)
-  echo "Running $b"
+  b=$(basename $i)
+  echo -n "Running $b .. "
   bash $i
+
   # If there is any failure, mark it and move on
   if [ $? -gt 0 ]; then
-    echo "$b failed"
+    echo -n "$b failed"
     FAIL=$(($FAIL + 1))
   else
-    echo "$b passed"
+    echo -n "$b passed"
   fi
+  echo
 done
 
 # Exit with how many tests failed

@@ -6,6 +6,7 @@ Requirements
 
 * **Perl, multithreaded**
 * **BLAST+**
+* **Edirect** (for downloading of test data)
 * **GIT**, **SVN** (for installation and updating)
 
 Quickie Installation
@@ -28,11 +29,15 @@ Download the latest stable version from https://github.com/lskatz/lyve-SET/relea
 Other Installation Options
 ------------
 * `make install`
+* `make install-optional` to install optional prerequisite software including bwa and snap
 * `make env` - update `PATH` and `PERL5LIB` in the `~/.bashrc` file.
 * `make check` - check and see if you have all the prerequisites
 * `make test` - run a test phage dataset provided by CFSAN
 * `make help` - for other `make` options
 * `make clean` - clean up an old installation in preparation for a new installation
+
+### Fine details
+
 * `make install-*` - Many other installation options are available including but not limited to:
   * `make install-smalt`
   * `make install-CGP`

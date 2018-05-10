@@ -29,7 +29,10 @@ install: install-prerequisites
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: install-mkdir install-vcftools install-CGP install-SGELK install-varscan install-phast install-samtools install-bcftools install-smalt install-snap install-bwa install-raxml install-perlModules install-config install-snpEff install-eutils
+install-prerequisites: check-edirect check-blast install-mkdir install-phast install-vcftools install-CGP install-SGELK install-varscan install-samtools install-bcftools install-smalt install-raxml install-perlModules install-config install-snpEff
+	@echo DONE installing prerequisites
+
+install-optional: install-prerequisites install-snap install-bwa install-eutils
 	@echo DONE installing prerequisites
 
 clean: clean-tmp clean-symlinks clean-vcftools clean-CGP clean-SGELK clean-varscan clean-phast clean-samtools clean-bcftools clean-smalt clean-bwa clean-snap clean-raxml clean-perlModules clean-config clean-snpEff clean-eutils
@@ -188,14 +191,6 @@ clean-raxml:
 	rm -rvf lib/standard-RAxML-8.1.16
 	rm -vf  scripts/raxmlHPC scripts/raxmlHPC-PTHREADS
 
-install-edirect:
-	cd build && perl -MNet::FTP -e '$$ftp = new Net::FTP("ftp.ncbi.nlm.nih.gov", Passive => 1); $$ftp->login; $$ftp->binary; $$ftp->get("/entrez/entrezdirect/edirect.zip");' && unzip -u -q edirect.zip && rm edirect.zip
-	cd build/edirect && sh setup.sh
-	mv -v build/edirect lib
-
-clean-edirect:
-	rm -rvf lib/edirect
-
 install-perlModules:
 	@echo "Installing Perl modules using cpanminus"
 	#for package in Config::Simple File::Slurp Math::Round Number::Range Statistics::Distributions Statistics::Descriptive Statistics::Basic Graph::Centrality::Pagerank String::Escape Statistics::LineFit; do
@@ -265,3 +260,5 @@ check-blast:
 	which blastx
 	which blastp
 	which makeblastdb
+check-edirect:
+	which esearch
