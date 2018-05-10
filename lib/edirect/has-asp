@@ -1,0 +1,61 @@
+#!/bin/sh
+DATAPATH="$1"
+APPPATH=
+# KEYPATH=
+KEYNAME=asperaweb_id_dsa.openssh
+
+case "`uname -s`" in
+  Darwin )
+    sysdir='/Applications/Aspera Connect.app/Contents/Resources'
+    sysdir2=/bin
+    userdir=$HOME$sysdir
+    ;;
+  CYGWIN_NT* )
+    sysdir='/cygdrive/c/Program Files/Aspera/Aspera Connect/bin'
+    sysdir2='/cygdrive/c/Program Files (x86)/Aspera/Aspera Connect/bin'
+    userdir="`cygpath -H`/$USER/AppData/Local/Programs/Aspera/Aspera Connect/bin"
+    ;;
+  * )
+    sysdir=/opt/aspera/bin
+    sysdir2=/bin
+    userdir=$HOME/.aspera/connect/bin
+    ;;
+esac
+for d in "$sysdir" "$sysdir2" "$userdir"
+do
+  if "$d/ascp" --version 2>&1 | grep '^Aspera' >/dev/null
+  then
+    APPPATH=$d
+    break
+  fi
+done
+if [ -z "$APPPATH" ]  &&  ascp --version 2>&1 | grep '^Aspera' >/dev/null
+then
+  APPPATH=`type -path ascp`
+  APPPATH=`dirname "$APPPATH"`
+fi
+if [ -z "$APPPATH" ]
+then
+  echo "false"
+  exit 1
+fi
+
+for d in "$APPPATH" "$sysdir" "$sysdir2" "$userdir"
+do
+  if [ -f "$d/../etc/$KEYNAME" ]
+  then
+    KEYPATH=$d/../etc
+    break
+  elif [ -f "$d/$KEYNAME" ]
+  then
+    KEYPATH=$d
+    break
+  fi
+done
+if [ -z "$KEYPATH" ]
+then
+  echo "false"
+  exit 1
+fi
+
+echo "true"

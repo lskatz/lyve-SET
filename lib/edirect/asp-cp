@@ -1,0 +1,119 @@
+#!/bin/sh
+DATAPATH="$1"
+APPPATH=
+# KEYPATH=
+KEYNAME=asperaweb_id_dsa.openssh
+
+case "`uname -s`" in
+  Darwin )
+    sysdir='/Applications/Aspera Connect.app/Contents/Resources'
+    sysdir2=/bin
+    userdir=$HOME$sysdir
+    ;;
+  CYGWIN_NT* )
+    sysdir='/cygdrive/c/Program Files/Aspera/Aspera Connect/bin'
+    sysdir2='/cygdrive/c/Program Files (x86)/Aspera/Aspera Connect/bin'
+    userdir="`cygpath -H`/$USER/AppData/Local/Programs/Aspera/Aspera Connect/bin"
+    ;;
+  * )
+    sysdir=/opt/aspera/bin
+    sysdir2=/bin
+    userdir=$HOME/.aspera/connect/bin
+    ;;
+esac
+for d in "$sysdir" "$sysdir2" "$userdir"
+do
+  if "$d/ascp" --version 2>&1 | grep '^Aspera' >/dev/null
+  then
+    APPPATH=$d
+    break
+  fi
+done
+if [ -z "$APPPATH" ]  &&  ascp --version 2>&1 | grep '^Aspera' >/dev/null
+then
+  APPPATH=`type -path ascp`
+  APPPATH=`dirname "$APPPATH"`
+fi
+if [ -z "$APPPATH" ]
+then
+  cat >&2 <<EOF
+
+Unable to find an Aspera ascp executable in any of the following locations:
+$sysdir
+$sysdir2
+$userdir
+$PATH
+
+If you have an installation in some other location, please add the path to
+that executable to your PATH environment variable and try again.
+
+EOF
+  exit 2
+fi
+
+for d in "$APPPATH" "$sysdir" "$sysdir2" "$userdir"
+do
+  if [ -f "$d/../etc/$KEYNAME" ]
+  then
+    KEYPATH=$d/../etc
+    break
+  elif [ -f "$d/$KEYNAME" ]
+  then
+    KEYPATH=$d
+    break
+  fi
+done
+if [ -z "$KEYPATH" ]
+then
+  cat >&2 <<EOF
+
+Unable to find $KEYNAME in any of the following locations:
+$APPPATH/../etc
+$APPPATH
+$sysdir/../etc
+$sysdir
+$sysdir2/../etc
+$sysdir2
+$userdir/../etc
+$userdir
+
+If you have this file in some other location, please set the KEYPATH
+environment variable accordingly and try again.
+
+EOF
+  exit 3
+fi
+
+failed=""
+if [ "$#" -gt 1 ]
+then
+  fl="$2"
+  if [ ! -f "$fl" ]
+  then
+    "$APPPATH/ascp" -T -q -k 1 -l 500m -i "$KEYPATH/$KEYNAME" \
+    "anonftp@ftp.ncbi.nlm.nih.gov:/$DATAPATH/$fl" "."
+  fi
+  if [ ! -f "$fl" ]
+  then
+    failed="$failed\n$fl"
+  fi
+else
+  while read fl
+  do
+    if [ ! -f "$fl" ]
+    then
+      echo "$fl"
+      "$APPPATH/ascp" -T -q -k 1 -l 500m -i "$KEYPATH/$KEYNAME" \
+      "anonftp@ftp.ncbi.nlm.nih.gov:/$DATAPATH/$fl" "."
+    fi
+    if [ ! -f "$fl" ]
+    then
+      failed="$failed\n$fl"
+    fi
+  done
+fi
+if [ -n "$failed" ]
+then
+  echo -e "\nFAILED TO DOWNLOAD:\n$failed\n" >&2
+  exit 1
+fi

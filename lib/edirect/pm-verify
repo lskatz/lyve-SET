@@ -1,0 +1,7 @@
+#!/bin/sh
+
+for fl in *.gz
+do
+  echo "$fl"
+  gunzip -c "$fl" | xtract -mixed -verify
+done

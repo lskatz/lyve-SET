@@ -1,0 +1,25 @@
+#!/bin/sh
+PATH=/bin:/usr/bin
+export PATH
+osname=`uname -s`
+cputype=`uname -m`
+case "$osname-$cputype" in
+  Linux-x86_64 )           platform=Linux ;;
+  Darwin-x86_64 )          platform=Darwin ;;
+  CYGWIN_NT-* | MINGW*-* ) platform=CYGWIN_NT ;;
+  Linux-*arm* )            platform=ARM ;;
+  * )                      platform=UNSUPPORTED ;;
+esac
+compiled=$0."$platform"
+if [ -x "$compiled" ]
+then
+  exec "$compiled" "$@"
+else
+  echo ""
+  echo "Unable to locate xtract executable. Please execute the following:"
+  echo ""
+  echo "  ftp-cp ftp.ncbi.nlm.nih.gov /entrez/entrezdirect xtract.$platform.gz"
+  echo "  gunzip -f xtract.$platform.gz"
+  echo "  chmod +x xtract.$platform"
+  echo ""
+fi

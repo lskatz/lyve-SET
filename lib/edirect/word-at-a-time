@@ -1,0 +1,4 @@
+#!/bin/bash -norc
+sed 's/[^a-zA-Z0-9]/ /g; s/^ *//' |
+tr 'A-Z' 'a-z' |
+fmt -w 1

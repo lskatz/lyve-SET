@@ -1,0 +1,515 @@
+#!/usr/bin/env perl
+
+# ===========================================================================
+#
+#                            PUBLIC DOMAIN NOTICE
+#            National Center for Biotechnology Information (NCBI)
+#
+#  This software/database is a "United States Government Work" under the
+#  terms of the United States Copyright Act.  It was written as part of
+#  the author's official duties as a United States Government employee and
+#  thus cannot be copyrighted.  This software/database is freely available
+#  to the public for use. The National Library of Medicine and the U.S.
+#  Government do not place any restriction on its use or reproduction.
+#  We would, however, appreciate having the NCBI and the author cited in
+#  any work or product based on this material.
+#
+#  Although all reasonable efforts have been taken to ensure the accuracy
+#  and reliability of the software and data, the NLM and the U.S.
+#  Government do not and cannot warrant the performance or results that
+#  may be obtained by using this software or data. The NLM and the U.S.
+#  Government disclaim all warranties, express or implied, including
+#  warranties of performance, merchantability or fitness for any particular
+#  purpose.
+#
+# ===========================================================================
+#
+# File Name:  gbf2xml
+#
+# Author:  Jonathan Kans
+#
+# Version Creation Date:   6/8/17
+#
+# ==========================================================================
+
+use strict;
+use warnings;
+
+
+#  Script to convert GenBank flatfiles to INSDSeq XML.
+#
+#  Feature intervals that refer to 'far' locations, i.e., those not within
+#  the cited record and which have an accession and colon, are suppressed.
+#  Those rare features (e.g., trans-splicing between molecules) are lost.
+#
+#  Keywords and References are currently not supported.
+
+
+# state variables for tracking current position in flatfile
+
+my $in_seq;
+my $in_feat;
+my $in_key;
+my $in_qual;
+my $in_def;
+my $in_tax;
+my $any_feat;
+my $any_qual;
+my $current_key;
+my $current_loc;
+my $current_qual;
+my $current_val;
+my $moltype;
+my $division;
+my $update_date;
+my $organism;
+my $source;
+my $taxonomy;
+my $topology;
+my $sequence;
+my $length;
+my $is_translation;
+my $curr_seq;
+my $locus;
+my $defline;
+my $accn;
+my $accndv;
+my $location_operator;
+my $is_comp;
+
+# subroutine to clear state variables for each flatfile
+# start in in_feat state to gracefully handle missing FEATURES/FH line
+
+sub clearflags {
+  $in_seq = 0;
+  $in_feat = 0;
+  $in_key = 0;
+  $in_qual = 0;
+  $in_def = 0;
+  $in_tax = 0;
+  $any_feat = 0;
+  $any_qual = 0;
+  $current_key = "";
+  $current_loc = "";
+  $current_qual = "";
+  $current_val = "";
+  $moltype = "";
+  $division = "";
+  $update_date = "";
+  $organism = "";
+  $source = "";
+  $taxonomy = "";
+  $topology = "";
+  $sequence = "";
+  $length = 0;
+  $is_translation = 0;
+  $curr_seq = "";
+  $locus = "";
+  $defline = "";
+  $accn = "";
+  $accndv = "";
+  $location_operator = "";
+  $is_comp = 0;
+}
+
+# recursive subroutine for parsing flatfile representation of feature location
+
+sub parseloc {
+  my $subloc = shift (@_);
+  my @working = ();
+
+  if ( $subloc =~ /^(join|order)\((.+)\)$/ ) {
+    $location_operator = $1;
+    my $temploc = $2;
+    my @items = split (',', $temploc);
+    foreach my $thisloc (@items ) {
+      if ( $thisloc !~ /^.*:.*$/ ) {
+        push (@working, parseloc ($thisloc));
+      }
+    }
+
+  } elsif ( $subloc =~ /^complement\((.+)\)$/ ) {
+    $is_comp = 1;
+    my $comploc = $1;
+    my @items = parseloc ($comploc);
+    my @rev = reverse (@items);
+    foreach my $thisloc (@rev ) {
+      if ( $thisloc =~ /^([^.]+)\.\.([^.]+)$/ ) {
+        $thisloc = "$2..$1";
+      }
+
+      if ( $thisloc =~ /^>([^.]+)\.\.([^.]+)$/ ) {
+        $thisloc = "<$1..$2";
+      }
+      if ( $thisloc =~ /^([^.]+)\.\.<([^.]+)$/ ) {
+        $thisloc = "$1..>$2";
+      }
+
+      if ( $thisloc !~ /^.*:.*$/ ) {
+        push (@working, parseloc ($thisloc));
+      }
+    }
+
+  } elsif ( $subloc !~ /^.*:.*$/ ) {
+    push (@working, $subloc);
+  }
+
+  return @working;
+}
+
+#subroutine to print next feature key / location / qualifier line
+
+sub flushline {
+  if ( $in_key == 1 ) {
+
+    if ( $any_qual == 1 ) {
+      print  "        </INSDFeature_quals>\n";
+      $any_qual = 0;
+    }
+
+    if ( $any_feat == 1 ) {
+      print  "      </INSDFeature>\n";
+    }
+    $any_feat = 1;
+
+    print  "      <INSDFeature>\n";
+
+    #print feature key and intervals
+    print  "        <INSDFeature_key>$current_key</INSDFeature_key>\n";
+
+    my $clean_loc = $current_loc;
+    $clean_loc =~ s/</&lt;/g;
+    $clean_loc =~ s/>/&gt;/g;
+    print  "        <INSDFeature_location>$clean_loc</INSDFeature_location>\n";
+
+    print  "        <INSDFeature_intervals>\n";
+
+    # parse join() order() complement() ###..### location
+    $location_operator = 0;
+    $is_comp = 0;
+    my @theloc = parseloc ($current_loc);
+
+    # convert number (dot) (dot) number to number (tab) number
+    my $numivals = 0;
+    my $prime5 = 0;
+    my $prime3 = 0;
+    foreach my $thisloc (@theloc ) {
+      $numivals++;
+      print  "          <INSDInterval>\n";
+      if ( $thisloc =~ /^([^.]+)\.\.([^.]+)$/ ) {
+        my $fr = $1;
+        my $to = $2;
+        if ( $thisloc =~ /^</ ) {
+          $prime5 = 1;
+        }
+        if ( $thisloc =~ /\.\.>/ ) {
+          $prime3 = 1;
+        }
+        $fr =~ s/[<>]//;
+        $to =~ s/[<>]//;
+        print  "            <INSDInterval_from>$fr</INSDInterval_from>\n";
+        print  "            <INSDInterval_to>$to</INSDInterval_to>\n";
+        if ( $is_comp ) {
+          print  "            <INSDInterval_iscomp value=\"true\"/>\n";
+        }
+        print  "            <INSDInterval_accession>$accndv</INSDInterval_accession>\n";
+      } elsif ( $thisloc =~ /^(.+)\^(.+)$/ ) {
+        my $fr = $1;
+        my $to = $2;
+        $fr =~ s/[<>]//;
+        $to =~ s/[<>]//;
+        print  "            <INSDInterval_from>$fr</INSDInterval_from>\n";
+        print  "            <INSDInterval_to>$to</INSDInterval_to>\n";
+        if ( $is_comp ) {
+          print  "            <INSDInterval_iscomp value=\"true\"/>\n";
+        }
+        print  "            <INSDInterval_interbp value=\"true\"/>\n";
+        print  "            <INSDInterval_accession>$accndv</INSDInterval_accession>\n";
+      } elsif ( $thisloc =~ /^([^.]+)$/ ) {
+        my $pt = $1;
+        $pt =~ s/[<>]//;
+        print  "            <INSDInterval_point>$pt</INSDInterval_point>\n";
+        print  "            <INSDInterval_accession>$accndv</INSDInterval_accession>\n";
+      }
+      print  "          </INSDInterval>\n";
+    }
+
+    print  "        </INSDFeature_intervals>\n";
+
+    if ( $numivals > 1 ) {
+      print  "        <INSDFeature_operator>$location_operator</INSDFeature_operator>\n";
+    }
+    if ( $prime5 ) {
+      print  "        <INSDFeature_partial5 value=\"true\"/>\n";
+    }
+    if ( $prime3 ) {
+      print  "        <INSDFeature_partial3 value=\"true\"/>\n";
+    }
+
+  } elsif ( $in_qual == 1 ) {
+
+    if ( $any_qual == 0 ) {
+      print  "        <INSDFeature_quals>\n";
+    }
+    $any_qual = 1;
+
+    if ( $current_val eq "" ) {
+      print  "          <INSDQualifier>\n";
+      print  "            <INSDQualifier_name>$current_qual</INSDQualifier_name>\n";
+      print  "          </INSDQualifier>\n";
+    } else {
+      print  "          <INSDQualifier>\n";
+      print  "            <INSDQualifier_name>$current_qual</INSDQualifier_name>\n";
+      my $clean_val = $current_val;
+      $clean_val =~ s/</&lt;/g;
+      $clean_val =~ s/>/&gt;/g;
+      print  "            <INSDQualifier_value>$clean_val</INSDQualifier_value>\n";
+      print  "          </INSDQualifier>\n";
+    }
+  }
+}
+
+# initialize flags and lists at start of program
+
+clearflags ();
+
+print  "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+print  "<!DOCTYPE INSDSet PUBLIC \"-//NCBI//INSD INSDSeq/EN\" \"https://www.ncbi.nlm.nih.gov/dtd/INSD_INSDSeq.dtd\">\n";
+print  "<INSDSet>\n";
+
+# main loop reads one line at a time
+
+while (<> ) {
+  chomp;
+  $_ =~ s/\r$//;
+
+  # first check for extra definition or taxonomy lines, otherwise clear continuation flags
+  if ( $in_def ) {
+    if ( /^ {12}(.*)$/ ) {
+      $defline = $defline . " " . $1;
+    } else {
+      $in_def = 0;
+    }
+  } elsif ( $in_tax ) {
+    if ( /^ {12}(.*)$/ ) {
+      if ( $taxonomy eq "" ) {
+        $taxonomy = $1;
+      } else {
+        $taxonomy = $taxonomy . " " . $1;
+      }
+    } else {
+      $in_tax = 0;
+    }
+  }
+
+  if ( $in_def == 1 || $in_tax == 1 ) {
+
+    # continuation lines taken care of above
+
+  } elsif ( /^LOCUS\s+(\S*).*$/ ) {
+
+    # record locus
+    $locus = $1;
+    if ( / (\d+) bp / || / (\d+) aa / ) {
+      $length = $1;
+    }
+
+    if ( /^.*\s(\S+\s+\S+\s+\S+\s+\d+-\S+-\d+)$/ ) {
+      my $tail = $1;
+      if ( $tail =~ /^(\S*)\s+(\S*)\s+(\S*)\s+(\d*-\S*-\d*)$/ ) {
+        $moltype = $1;
+        $topology = $2;
+        $division = $3;
+        $update_date = $4;
+        $moltype = uc $moltype;
+      }
+    }
+
+    print  "  <INSDSeq>\n";
+
+    print  "    <INSDSeq_locus>$locus</INSDSeq_locus>\n";
+    print  "    <INSDSeq_length>$length</INSDSeq_length>\n";
+
+    if ( $moltype ne "" ) {
+      print  "    <INSDSeq_moltype>$moltype</INSDSeq_moltype>\n";
+    }
+    if ( $topology ne "" ) {
+      print  "    <INSDSeq_topology>$topology</INSDSeq_topology>\n";
+    }
+    if ( $division ne "" ) {
+      print  "    <INSDSeq_division>$division</INSDSeq_division>\n";
+    }
+    if ( $update_date ne "" ) {
+      print  "    <INSDSeq_update-date>$update_date</INSDSeq_update-date>\n";
+    }
+
+  } elsif ( /^DEFINITION\s*(.*).*$/ ) {
+
+    # record first line of definition line
+    $defline = $1;
+    # next line with leading spaces will be continuation of definition line
+    $in_def = 1;
+
+  } elsif ( /^ACCESSION\s*(\S*).*$/ ) {
+
+    # record accession
+    $accn = $1;
+
+  } elsif ( /^VERSION\s*(\S*).*$/ ) {
+
+    # record accession.version
+    $accndv = $1;
+
+  } elsif ( /^SOURCE\s*(.*)$/ ) {
+
+    # record source
+    $source = $1;
+
+  } elsif ( /^ {1,3}ORGANISM\s+(.*)$/ ) {
+
+    # record organism
+    if ( $organism eq "" ) {
+      $organism = $1;
+      if ( $organism =~ /^([^(]*) \(.*\)/ ) {
+        $organism = $1;
+      }
+    }
+    # next line with leading spaces will be start of taxonomy
+    $in_tax = 1;
+
+  } elsif ( /^FEATURES\s+.*$/ ) {
+
+    # beginning of feature table, flags already set up
+
+    # first print saved fields
+    $defline =~ s/\.$//;
+    $defline =~ s/</&lt;/g;
+    $defline =~ s/>/&gt;/g;
+    if ( $defline ne "" ) {
+      print  "    <INSDSeq_definition>$defline</INSDSeq_definition>\n";
+    }
+    if ( $accn ne "" ) {
+      print  "    <INSDSeq_primary-accession>$accn</INSDSeq_primary-accession>\n";
+    }
+    if ( $accndv ne "" ) {
+      print  "    <INSDSeq_accession-version>$accndv</INSDSeq_accession-version>\n";
+    }
+
+    $in_feat = 1;
+
+    if ( $source ne "" ) {
+      print  "    <INSDSeq_source>$source</INSDSeq_source>\n";
+    }
+    if ( $organism ne "" ) {
+      print  "    <INSDSeq_organism>$organism</INSDSeq_organism>\n";
+    }
+    $taxonomy =~ s/\.$//;
+    if ( $taxonomy ne "" ) {
+      print  "    <INSDSeq_taxonomy>$taxonomy</INSDSeq_taxonomy>\n";
+    }
+
+    print  "    <INSDSeq_feature-table>\n";
+
+  } elsif ( /^ORIGIN\s*.*$/ ) {
+
+    # end of feature table, print final newline
+    flushline ();
+
+    if ( $any_qual == 1 ) {
+      print  "        </INSDFeature_quals>\n";
+      $any_qual = 0;
+    }
+
+    print  "      </INSDFeature>\n";
+
+    print  "    </INSDSeq_feature-table>\n";
+
+    $in_feat = 0;
+    $in_key = 0;
+    $in_qual = 0;
+    $is_translation = 0;
+    $in_seq = 1;
+
+  } elsif ( /^\/\/\.*/ ) {
+
+    # at end-of-record double slash
+    print  "    <INSDSeq_sequence>$sequence</INSDSeq_sequence>\n";
+    print  "  </INSDSeq>\n";
+    # reset variables for catenated flatfiles
+    clearflags ();
+
+  } elsif ( $in_seq == 1 ) {
+
+    if ( /^\s+\d+ (.*)$/ || /^\s+(.*)\s+\d+$/ ) {
+      # record sequence
+      $curr_seq = $1;
+      $curr_seq =~ s/ //g;
+      $curr_seq = lc $curr_seq;
+      if ( $sequence eq "" ) {
+        $sequence = $curr_seq;
+      } else {
+        $sequence = $sequence . $curr_seq;
+      }
+    }
+
+  } elsif ( $in_feat == 1 ) {
+
+    if ( /^ {1,10}(\w+)\s+(.*)$/ ) {
+      # new feature key and location
+      flushline ();
+
+      $in_key = 1;
+      $in_qual = 0;
+      $current_key = $1;
+      $current_loc = $2;
+
+    } elsif ( /^\s+\/(\w+)=(.*)$/ ) {
+      # new qualifier
+      flushline ();
+
+      $in_key = 0;
+      $in_qual = 1;
+      $current_qual = $1;
+      # remove leading double quote
+      my $val = $2;
+      $val =~ s/\"//g;
+      $current_val = $val;
+      if ( $current_qual =~ /(?:translation|transcription|peptide)/ ) {
+        $is_translation = 1;
+      } else {
+        $is_translation = 0;
+      }
+
+    } elsif ( /^\s+\/(\w+)$/ ) {
+      # new singleton qualifier - e.g., trans-splicing, pseudo
+      flushline ();
+
+      $in_key = 0;
+      $in_qual = 1;
+      $current_qual = $1;
+      $current_val = "";
+      $is_translation = 0;
+
+    } elsif ( /^\s+(.*)$/ ) {
+
+      if ( $in_key == 1 ) {
+        # continuation of feature location
+        $current_loc = $current_loc . $1;
+
+      } elsif ( $in_qual == 1 ) {
+        # continuation of qualifier
+        # remove trailing double quote
+        my $val = $1;
+        $val =~ s/\"//g;
+        if ( $is_translation == 1 ) {
+          $current_val = $current_val . $val;
+        } else {
+          $current_val = $current_val . " " . $val;
+        }
+      }
+    }
+  }
+}
+
+print  "</INSDSet>\n";
+

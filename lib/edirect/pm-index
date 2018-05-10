@@ -1,0 +1,26 @@
+#!/bin/sh
+
+if [ "$#" -eq 0 ]
+then
+  echo "Must supply path for indexed files"
+  exit 1
+fi
+
+target="$1"
+
+target=${target%/}
+
+rm -f "$target/versioned.e2x.gz"
+
+for fl in *.xml.gz
+do
+  base=${fl%.xml.gz}
+  if [ -f "$target/$base.e2x.gz" ]
+  then
+    continue
+  fi
+  echo "$base"
+  gunzip -c "$fl" |
+  xtract -mixed -stems -e2index PubmedArticle MedlineCitation/PMID ArticleTitle,Abstract/AbstractText |
+  gzip -1 > "$target/$base.e2x.gz"
+done

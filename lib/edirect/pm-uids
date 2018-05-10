@@ -1,0 +1,13 @@
+#!/bin/sh
+
+if [ "$#" -eq 0 ]
+then
+  echo "Must supply path to archive files"
+  exit 1
+fi
+
+target="$1"
+
+find "$target" -name "*.xml.gz" |
+sed -e 's,.*/\(.*\)\.xml\.gz,\1,' |
+sort -n | uniq

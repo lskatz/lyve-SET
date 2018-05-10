@@ -1,0 +1,50 @@
+#!/usr/bin/env perl
+use warnings;
+use strict;
+
+use Net::FTP;
+
+# Usage: ftp-cp SERVER PATH FILE...
+
+my $server = shift;
+my $dir    = shift;
+my $ftp    = new Net::FTP($server, Passive => 1)
+  or die "Unable to connect to FTP server: $!";
+
+my @failed = ();
+
+sub fetch {
+  my $fl = shift (@_);
+  if (! -e $fl) {
+    if (! $ftp->get($fl) ) {
+      my $msg = $ftp->message;
+      chomp $msg;
+      push (@failed, "$fl ($msg)");
+    }
+  }
+}
+
+$ftp->login or die "Unable to log in to FTP server: ", $ftp->message;
+$ftp->cwd($dir) or die "Unable to change to $dir: ", $ftp->message;
+$ftp->binary or warn "Unable to set binary mode: ", $ftp->message;
+
+if (@ARGV) {
+# file names on command line
+  for (@ARGV) {
+    fetch ($_)
+  }
+} else {
+# read file names from stdin
+  while (<> ) {
+    chomp;
+    $_ =~ s/\r$//;
+    print "$_\n";
+    fetch ($_)
+  }
+}
+
+if (@failed) {
+  my $errs = join ("\n", @failed);
+  print STDERR "\nFAILED TO DOWNLOAD:\n\n$errs\n";
+  exit 1;
+}

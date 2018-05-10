@@ -1,0 +1,40 @@
+ENTREZ DIRECT - README
+
+Entrez Direct (EDirect) is an advanced method for accessing the NCBI's set of interconnected Entrez databases (publication, nucleotide, protein, structure, gene, variation, expression, etc.) from a terminal window. It uses command-line arguments for the query terms and combines individual operations with UNIX pipes.
+
+EDirect also provides an argument-driven function that simplifies the extraction of data from document summaries or other results that are returned in XML format. Queries can move seamlessly between EDirect commands and UNIX utilities or scripts to perform actions that cannot be accomplished entirely within Entrez.
+
+EDirect consists of a set of scripts that are downloaded to the user's computer. If you extract the archive in your home directory, you may need to enter:
+
+  PATH=$PATH:$HOME/edirect
+
+in a terminal window to temporarily add EDirect functions to the PATH environment variable so they can be run by name. You can then try EDirect by copying the sample query below and pasting it into the terminal window for execution:
+
+  esearch -db pubmed -query "Beadle AND Tatum AND Neurospora" |
+  elink -related |
+  efilter -query "NOT historical article [FILT]" |
+  efetch -format docsum |
+  xtract -pattern DocumentSummary -if Author -and Title \
+    -element Id -first "Author/Name" -element Title |
+  grep -i -e enzyme -e synthesis |
+  sort -t $'\t' -k 2,3f |
+  column -s $'\t' -t |
+  head -n 10 |
+  cut -c 1-80
+
+This query returns the PubMed ID, first author name, and article title for PubMed "neighbors" (related citations) of the original publications. It then requires specific words in the resulting rows, sorts alphabetically by author name and title, aligns the columns, and truncates the lines for easier viewing:
+
+  2960822   Anton IA           A eukaryotic repressor protein, the qa-1S gene prod
+  5264137   Arroyo-Begovich A  In vitro formation of an active multienzyme complex
+  14942736  BONNER DM          Gene-enzyme relationships in Neurospora.
+  5361218   Caroline DF        Pyrimidine synthesis in Neurospora crassa: gene-enz
+  123642    Case ME            Genetic evidence on the organization and action of 
+  ...
+
+EDirect will run on UNIX and Macintosh computers that have the Perl language installed, and under the Cygwin UNIX-emulation environment on Windows PCs.
+
+Documentation for EDirect is on the web at:
+
+  http://www.ncbi.nlm.nih.gov/books/NBK179288
+
+Questions or comments on EDirect may be sent to eutilities@ncbi.nlm.nih.gov.

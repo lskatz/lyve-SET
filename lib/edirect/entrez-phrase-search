@@ -1,0 +1,167 @@
+#!/bin/bash -norc
+
+# simulates phrase search by queries on word pairs that may be indexed in specified field
+
+do_one_query() {
+  esearch -db "$database" -query "$*" < /dev/null |
+  xtract -pattern ENTREZ_DIRECT -element Count
+}
+
+word_at_a_time() {
+  sed 's/[^+a-zA-Z0-9]/ /g; s/^ *//' |
+  tr 'A-Z' 'a-z' |
+  fmt -w 1
+}
+
+replace_stop_words() {
+  while read line
+  do
+    case "$line" in
+      a | about | again | all | almost | also | although | always | \
+      among | an | and | another | any | are | as | at | be | \
+      because | been | before | being | between | both | but | by | \
+      can | could | did | do | does | done | due | during | each | \
+      either | enough | especially | etc | for | found | from | \
+      further | had | has | have | having | here | how | however | \
+      i | if | in | into | is | it | its | itself | just | kg | km | \
+      made | mainly | make | may | mg | might | ml | mm | most | \
+      mostly | must | nearly | neither | no | nor | obtained | of | \
+      often | on | our | overall | perhaps | pmid | quite | rather | \
+      really | regarding | seem | seen | several | should | show | \
+      showed | shown | shows | significantly | since | so | some | \
+      such | than | that | the | their | theirs | them | then | \
+      there | therefore | these | they | this | those | through | \
+      thus | to | upon | use | used | using | various | very | was | \
+      we | were | what | when | which | while | with | within | \
+      without | would )
+        echo "+"
+        ;;
+      * )
+        echo "$line"
+        ;;
+    esac
+  done
+}
+
+group_phrases() {
+  uniq |
+  paste -sd "," - |
+  sed -e 's/^+//g' -e 's/+$//g' -e 's/,+,/+/g' -e 's/^,//g' -e 's/,$//g' -e 's/+/ /g'
+}
+
+word_pairs() {
+  while read first rest
+  do
+    if [ -z "$rest" ]
+    then
+      echo "$first"
+      continue
+    fi
+    prev=$first
+    for curr in $rest
+    do
+      echo "$prev $curr"
+      prev="$curr"
+    done
+  done
+}
+
+get_phrase_counts() {
+  echo "$*" |
+  word_at_a_time |
+  replace_stop_words |
+  group_phrases |
+  fmt -w 1 |
+  tr ',' ' ' |
+  word_pairs |
+  while read qry
+  do
+    counts=`do_one_query "\"$qry\" [$field]"`
+    if [ $counts -gt 0 ]
+    then
+      echo "$counts $qry"
+    fi
+  done
+}
+
+make_phrase_search() {
+  get_phrase_counts "$@" |
+  while read counts qry
+  do
+    if [ $counts -gt 9 ]
+    then
+      echo "\"$qry\" [$field]"
+    fi
+  done | sort -u | tr '\n' '*' | sed -e 's/*$//g' -e 's/*/ AND /g'
+}
+
+database="pubmed"
+field="TIAB"
+mode="search"
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -h | -help | --help )
+      mode=help
+      break
+      ;;
+    -db | -database )
+      database=$2
+      shift
+      shift
+      ;;
+    -field )
+      field=$2
+      shift
+      shift
+      ;;
+    -count | -counts )
+      mode=count
+      shift
+      ;;
+    -string )
+      mode=string
+      shift
+      ;;
+    -* )
+      exec >&2
+      echo "$0: Unrecognized option $1"
+      mode=usage
+      shift
+      ;;
+    * )
+      break
+      ;;
+  esac
+done
+
+if [ $# -eq 0 ]
+then
+  mode=usage
+fi
+
+case "$mode" in
+   help | usage )
+     cat <<EOF
+USAGE: $0
+       [-count|-counts|-string]
+       [-db database|-database database]
+       [-field field]
+       query
+EOF
+     if [ $mode = usage ]
+     then
+       exit 1
+     fi
+     ;;
+   count )
+     get_phrase_counts "$@" | sed -e 's/^0/-/' | perl -pe 's/\s*(\d+)\s(.+)/$1\t$2/'
+     ;;
+   search )
+     esearch -db "$database" -query "$(make_phrase_search "$@")"
+     ;;
+   string )
+     make_phrase_search "$@"
+     ;;
+esac

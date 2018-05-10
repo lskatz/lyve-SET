@@ -1,0 +1,54 @@
+#!/bin/sh
+
+useasp=`has-asp`
+
+filter() {
+  while read fl
+  do
+    if [ -f "$fl" ]
+    then
+      continue
+    fi
+    echo "$fl"
+  done
+}
+
+download() {
+  if [ "$useasp" = "true" ]
+  then
+    asp-ls "pubmed/$1" |
+    grep -v ".md5" | grep "xml.gz" |
+    filter |
+    asp-cp "pubmed/$1"
+  else
+    ftp-ls ftp.ncbi.nlm.nih.gov "pubmed/$1" |
+    grep -v ".md5" | grep "xml.gz" |
+    filter |
+    ftp-cp ftp.ncbi.nlm.nih.gov "pubmed/$1"
+  fi
+}
+
+if [ "$#" -eq 0 ]
+then
+  download "baseline"
+  if [ $? -ne 0 ]
+  then
+    download "baseline"
+  fi
+  download "updatefiles"
+  if [ $? -ne 0 ]
+  then
+    download "updatefiles"
+  fi
+fi
+
+while [ "$#" -gt 0 ]
+do
+  sect="$1"
+  shift
+  download "$sect"
+  if [ $? -ne 0 ]
+  then
+    download "$sect"
+  fi
+done

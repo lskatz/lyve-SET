@@ -1,0 +1,17 @@
+#!/bin/sh
+
+if [ "$#" -eq 0 ]
+then
+  echo "Must supply path to archive files"
+  exit 1
+fi
+
+target="$1"
+
+target=${target%/}
+
+rchive -trie -gzip |
+while read dir
+do
+  rm "$target/$dir"
+done

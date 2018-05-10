@@ -1,0 +1,42 @@
+#!/bin/sh
+
+flag="none"
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -path )
+      shift
+      ;;
+    -* )
+      exec >&2
+      echo "$0: Unrecognized option $1"
+      exit 1
+      ;;
+    * )
+      break
+      ;;
+  esac
+done
+
+if [ "$#" -gt 0 ]
+then
+  argument="$1"
+  target=$(cd "$argument" && pwd)
+else
+  if [ -z "${EDIRECT_PUBMED_MASTER}" ]
+  then
+    echo "Must supply path to archive files or set EDIRECT_PUBMED_MASTER environment variable"
+    exit 1
+  else
+    MASTER="${EDIRECT_PUBMED_MASTER}"
+    MASTER=${MASTER%/}
+    target="$MASTER/Archive"
+  fi
+fi
+
+target=${target%/}
+
+cat "$target/pmset-head.xml.gz"
+rchive -stream "$target"
+cat "$target/pmset-tail.xml.gz"

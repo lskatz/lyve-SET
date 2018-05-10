@@ -1,0 +1,24 @@
+#!/bin/sh
+
+printAdditions() {
+  f="$1"
+  base=${f%.xml.gz}
+  gunzip -c "$f" |
+  xtract -strict -pattern PubmedArticle \
+    -block MedlineCitation/PMID -lbl "$base" -sep "." \
+      -element MedlineCitation/PMID,MedlineCitation/PMID@Version
+}
+
+printDeletions() {
+  f="$1"
+  base=${f%.xml.gz}
+  gunzip -c "$f" |
+  xtract -strict -pattern DeleteCitation \
+    -block PMID -lbl "$base" -tab "\tD\n" -sep "." -element "PMID,@Version"
+}
+
+for fl in *.xml.gz
+do
+  printAdditions "$fl"
+  printDeletions "$fl"
+done > transactions.txt

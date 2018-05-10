@@ -1,0 +1,13 @@
+#!/bin/sh
+flags="f"
+if [ -n "$*" ]
+then
+  flags=`echo " $*" | sed 's/[^bfinrs]//g'`
+  if [ -z "$flags" ]
+  then
+    flags="s"
+  fi
+fi
+sort "-$flags" |
+uniq -i -c |
+perl -pe 's/\s*(\d+)\s(.+)/$1\t$2/'

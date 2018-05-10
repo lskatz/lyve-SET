@@ -1,0 +1,36 @@
+#!/bin/sh
+
+useasp=`has-asp`
+
+filt=""
+while [ "$#" -gt 0 ]
+do
+  filt=`echo "$filt -e $1"`
+  shift
+done
+
+download() {
+  if [ "$useasp" = "true" ]
+  then
+    asp-ls ncbi-asn1 |
+    grep "aso.gz" | eval "$filt" |
+    asp-cp ncbi-asn1
+  else
+    ftp-ls ftp.ncbi.nlm.nih.gov ncbi-asn1 |
+    grep "aso.gz" | eval "$filt" |
+    ftp-cp ftp.ncbi.nlm.nih.gov ncbi-asn1
+  fi
+}
+
+if [ -z "$filt" ]
+then
+  echo "Must have at least one sequence division abbreviation"
+  exit 1
+fi
+
+filt=`echo "grep$filt"`
+download
+if [ $? -ne 0 ]
+then
+  download
+fi

@@ -1,0 +1,2 @@
+#!/bin/bash -norc
+awk -F '\t' -v 'OFS=\t' "/^$1\t/{a++}/^$2\t/{a++}a>0{print}a>1{exit}"

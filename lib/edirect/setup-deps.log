@@ -1,0 +1,263 @@
+Missing local::lib; initializing CPAN.
+Sorry, we have to rerun the configuration dialog for CPAN.pm due to
+some missing parameters. Configuration will be written to
+ <<_cpan/CPAN/MyConfig.pm>>
+
+ <install_help>
+
+Warning: You do not have write permission for Perl library directories.
+
+To install modules, you need to configure a local Perl library directory or
+escalate your privileges.  CPAN can help you by bootstrapping the local::lib
+module or by configuring itself to use 'sudo' (if available).  You may also
+resolve this problem manually if you need to customize your setup.
+
+What approach do you want?  (Choose 'local::lib', 'sudo' or 'manual')
+ [manual] manual
+
+Your 'urllist' is already configured. Type 'o conf init urllist' to change it.
+
+Autoconfiguration complete.
+
+commit: wrote '_cpan/CPAN/MyConfig.pm'
+
+You can re-run configuration any time with 'o conf init' in the CPAN shell
+Fetching with LWP:
+http://www.perl.org/CPAN/authors/01mailrc.txt.gz
+Reading '/scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/_cpan/sources/authors/01mailrc.txt.gz'
+............................................................................DONE
+Fetching with LWP:
+http://www.perl.org/CPAN/modules/02packages.details.txt.gz
+Reading '/scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/_cpan/sources/modules/02packages.details.txt.gz'
+  Database was generated on Thu, 10 May 2018 14:29:03 GMT
+.............
+  New CPAN.pm version (v2.16) available.
+  [Currently running version is v1.9800]
+  You might want to try
+    install CPAN
+    reload cpan
+  to both upgrade CPAN.pm and run the new version without leaving
+  the current session.
+
+
+...............................................................DONE
+Fetching with LWP:
+http://www.perl.org/CPAN/modules/03modlist.data.gz
+Reading '/scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/_cpan/sources/modules/03modlist.data.gz'
+DONE
+Writing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/_cpan/Metadata
+Running get for module 'local::lib'
+Fetching with LWP:
+http://www.perl.org/CPAN/authors/id/H/HA/HAARG/local-lib-2.000024.tar.gz
+Fetching with LWP:
+http://www.perl.org/CPAN/authors/id/H/HA/HAARG/CHECKSUMS
+Checksum for /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/_cpan/sources/authors/id/H/HA/HAARG/local-lib-2.000024.tar.gz ok
+Found Encode::Locale.
+Found File::Listing.
+Found HTML::Parser.
+Found HTML::Tagset.
+Missing HTML::Tree; initializing CPAN.
+Running install for module 'HTML::Tree'
+Running make for K/KE/KENTNL/HTML-Tree-5.07.tar.gz
+Fetching with LWP:
+http://www.perl.org/CPAN/authors/id/K/KE/KENTNL/HTML-Tree-5.07.tar.gz
+Fetching with LWP:
+http://www.perl.org/CPAN/authors/id/K/KE/KENTNL/CHECKSUMS
+Checksum for /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/_cpan/sources/authors/id/K/KE/KENTNL/HTML-Tree-5.07.tar.gz ok
+
+  CPAN.pm: Building K/KE/KENTNL/HTML-Tree-5.07.tar.gz
+
+Checking prerequisites...
+  recommends:
+    *  HTML::FormatText is not installed
+
+   HTML::FormatText is only required if you want to use HTML::Element's
+   "format" method, which converts HTML to formatted plain text.
+
+   If you install this module later, you do NOT need to reinstall HTML-Tree.
+
+ERRORS/WARNINGS FOUND IN PREREQUISITES.  You may wish to install the versions
+of the modules indicated above before proceeding with this installation
+
+Created MYMETA.yml and MYMETA.json
+Creating new 'Build' script for 'HTML-Tree' version '5.07'
+Building HTML-Tree
+  KENTNL/HTML-Tree-5.07.tar.gz
+  ./Build -- OK
+Running Build test
+t/00-all_prereqs.t .. ok
+t/00system.t ........ ok
+t/assubs.t .......... ok
+t/attributes.t ...... ok
+t/body.t ............ ok
+t/building.t ........ ok
+t/children.t ........ ok
+t/clonei.t .......... ok
+t/comment.t ......... ok
+t/construct_tree.t .. ok
+t/doctype.t ......... ok
+t/escape.t .......... ok
+t/leaktest.t ........ skipped: Test::LeakTrace required for testing memory leaks
+t/oldparse.t ........ ok
+t/parents.t ......... ok
+t/parse.t ........... ok
+t/parsefile.t ....... ok
+t/refloop.t ......... ok
+t/split.t ........... ok
+t/subclass.t ........ ok
+t/tag-rendering.t ... ok
+t/unicode.t ......... ok
+t/whitespace.t ...... ok
+All tests successful.
+Files=23, Tests=969,  2 wallclock secs ( 0.14 usr  0.03 sys +  0.91 cusr  0.22 csys =  1.30 CPU)
+Result: PASS
+  KENTNL/HTML-Tree-5.07.tar.gz
+  ./Build test -- OK
+Running Build install
+Building HTML-Tree
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/man/man1/htmltree.1
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/lib/perl5/HTML/Element.pm
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/lib/perl5/HTML/Parse.pm
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/lib/perl5/HTML/Tree.pm
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/lib/perl5/HTML/AsSubs.pm
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/lib/perl5/HTML/TreeBuilder.pm
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/lib/perl5/HTML/Element/traverse.pm
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/lib/perl5/HTML/Tree/AboutObjects.pod
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/lib/perl5/HTML/Tree/AboutTrees.pod
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/lib/perl5/HTML/Tree/Scanning.pod
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/man/man3/HTML::Element::traverse.3
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/man/man3/HTML::AsSubs.3
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/man/man3/HTML::Tree::AboutTrees.3
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/man/man3/HTML::TreeBuilder.3
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/man/man3/HTML::Parse.3
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/man/man3/HTML::Tree::Scanning.3
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/man/man3/HTML::Tree.3
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/man/man3/HTML::Tree::AboutObjects.3
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/man/man3/HTML::Element.3
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/bin/htmltree
+  KENTNL/HTML-Tree-5.07.tar.gz
+  ./Build install  -- OK
+Missing HTTP:Cookies; CPAN already initialized.
+Running install for module 'HTTP::Cookies'
+Running make for O/OA/OALDERS/HTTP-Cookies-6.04.tar.gz
+Fetching with LWP:
+http://www.perl.org/CPAN/authors/id/O/OA/OALDERS/HTTP-Cookies-6.04.tar.gz
+Fetching with LWP:
+http://www.perl.org/CPAN/authors/id/O/OA/OALDERS/CHECKSUMS
+Checksum for /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/_cpan/sources/authors/id/O/OA/OALDERS/HTTP-Cookies-6.04.tar.gz ok
+
+  CPAN.pm: Building O/OA/OALDERS/HTTP-Cookies-6.04.tar.gz
+
+Checking if your kit is complete...
+Looks good
+Have /apps/x86_64/perl/perl-5.16.1-MT/lib/5.16.1/5.16.1/x86_64-linux-thread-multi
+Want /apps/x86_64/perl/perl-5.16.1-MT/lib/5.16.1/x86_64-linux-thread-multi
+Your perl and your Config.pm seem to have different ideas about the
+architecture they are running on.
+Perl thinks: [x86_64-linux-thread-multi]
+Config says: [x86_64-linux-thread-multi]
+This may or may not cause problems. Please check your installation of perl
+if you have problems building this extension.
+Generating a Unix-style Makefile
+Writing Makefile for HTTP::Cookies
+Writing MYMETA.yml and MYMETA.json
+make[1]: Entering directory `/scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/_cpan/build/HTTP-Cookies-6.04-DdtaY2'
+make[1]: Warning: File `Makefile' has modification time 135 s in the future
+cp lib/HTTP/Cookies/Netscape.pm blib/lib/HTTP/Cookies/Netscape.pm
+cp lib/HTTP/Cookies/Microsoft.pm blib/lib/HTTP/Cookies/Microsoft.pm
+cp lib/HTTP/Cookies.pm blib/lib/HTTP/Cookies.pm
+Manifying 3 pod documents
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Leaving directory `/scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/_cpan/build/HTTP-Cookies-6.04-DdtaY2'
+  OALDERS/HTTP-Cookies-6.04.tar.gz
+  /usr/bin/make -- OK
+Running make test
+make[1]: Entering directory `/scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/_cpan/build/HTTP-Cookies-6.04-DdtaY2'
+make[1]: Warning: File `Makefile' has modification time 134 s in the future
+PERL_DL_NONLAZY=1 "/apps/x86_64/perl/perl-5.16.1-MT/bin/perl" "-MExtUtils::Command::MM" "-MTest::Harness" "-e" "undef *Test::Harness::Switches; test_harness(0, 'blib/lib', 'blib/arch')" t/*.t
+# 
+# Versions for all modules listed in MYMETA.json (including optional ones):
+# 
+# === Configure Requires ===
+# 
+#     Module              Want Have
+#     ------------------- ---- ----
+#     ExtUtils::MakeMaker  any 7.10
+# 
+# === Build Requires ===
+# 
+#     Module              Want Have
+#     ------------------- ---- ----
+#     ExtUtils::MakeMaker  any 7.10
+# 
+# === Test Requires ===
+# 
+#     Module              Want     Have
+#     ------------------- ---- --------
+#     ExtUtils::MakeMaker  any     7.10
+#     File::Spec           any  3.39_02
+#     HTTP::Response       any     6.11
+#     Test                 any  1.25_02
+#     Test::More           any 1.001014
+#     URI                  any     1.69
+#     warnings             any     1.13
+# 
+# === Test Recommends ===
+# 
+#     Module         Want     Have
+#     ---------- -------- --------
+#     CPAN::Meta 2.120900 2.150005
+# 
+# === Runtime Requires ===
+# 
+#     Module              Want   Have
+#     ------------------- ---- ------
+#     Carp                 any   1.26
+#     HTTP::Date             6   6.02
+#     HTTP::Headers::Util    6   6.11
+#     HTTP::Request        any   6.11
+#     Time::Local          any 1.2000
+#     locale               any   1.01
+#     strict               any   1.07
+#     vars                 any   1.02
+# 
+t/00-report-prereqs.t .. ok
+t/10-original_spec.t ... ok
+t/11-rfc_2965.t ........ ok
+t/cookies.t ............ ok
+t/publicsuffix.t ....... ok
+All tests successful.
+Files=5, Tests=116,  1 wallclock secs ( 0.04 usr  0.01 sys +  0.36 cusr  0.08 csys =  0.49 CPU)
+Result: PASS
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Leaving directory `/scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/_cpan/build/HTTP-Cookies-6.04-DdtaY2'
+  OALDERS/HTTP-Cookies-6.04.tar.gz
+  /usr/bin/make test -- OK
+Running make install
+make[1]: Entering directory `/scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/_cpan/build/HTTP-Cookies-6.04-DdtaY2'
+make[1]: warning: jobserver unavailable: using -j1.  Add `+' to parent make rule.
+make[1]: Warning: File `Makefile' has modification time 133 s in the future
+Manifying 3 pod documents
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/lib/perl5/HTTP/Cookies.pm
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/lib/perl5/HTTP/Cookies/Netscape.pm
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/lib/perl5/HTTP/Cookies/Microsoft.pm
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/man/man3/HTTP::Cookies::Netscape.3
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/man/man3/HTTP::Cookies::Microsoft.3
+Installing /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/man/man3/HTTP::Cookies.3
+Appending installation info to /scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/aux/lib/perl5/x86_64-linux-thread-multi/perllocal.pod
+make[1]: warning:  Clock skew detected.  Your build may be incomplete.
+make[1]: Leaving directory `/scicomp/home/gzu2/bin/lyve-set-v2.0.0-head/lib/edirect/_cpan/build/HTTP-Cookies-6.04-DdtaY2'
+  OALDERS/HTTP-Cookies-6.04.tar.gz
+  /usr/bin/make install  -- OK
+Found HTTP::Date.
+Found HTTP::Message.
+Found HTTP::Negotiate.
+Found IO::Socket::SSL.
+Found LWP::MediaTypes.
+Found LWP::Protocol::https.
+Found Net::HTTP.
+Found URI.
+Found WWW::RobotRules.
+Found Mozilla::CA.
+Found Time::HiRes.
+Found LWP.
