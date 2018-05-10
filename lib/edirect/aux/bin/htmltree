@@ -1,6 +1,6 @@
-#!/apps/x86_64/perl/perl-5.16.1-MT/bin/perl 
+#!/apps/x86_64/perl/5.22.1/bin/perl 
 
-eval 'exec /apps/x86_64/perl/perl-5.16.1-MT/bin/perl  -S $0 ${1+"$@"}'
+eval 'exec /apps/x86_64/perl/5.22.1/bin/perl  -S $0 ${1+"$@"}'
     if 0; # not running under some shell
 
 use warnings;
