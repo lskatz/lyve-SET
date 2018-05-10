@@ -9,17 +9,19 @@ echo "Running tests in $testsDir"
 FAIL=0;
 for i in $testsDir/*.sh; do 
   b=$(basename $i)
-  echo -n "Running $b .. "
-  bash $i
+  echo "Running $b"
+
+  # While running the program, indent any output.
+  bash $i 2>&1 | perl -lane 'chomp; print "  $_";'
+  exit_code=${PIPESTATUS[0]}
 
   # If there is any failure, mark it and move on
-  if [ $? -gt 0 ]; then
-    echo -n "$b failed"
+  if [ $exit_code -gt 0 ]; then
+    echo "$b failed"
     FAIL=$(($FAIL + 1))
   else
-    echo -n "$b passed"
+    echo "$b passed"
   fi
-  echo
 done
 
 # Exit with how many tests failed
