@@ -29,7 +29,7 @@ install: install-prerequisites
 	@echo "'make env' performs this step for you"
 	@echo "DONE: installation of Lyve-SET complete."
 
-install-prerequisites: check-edirect check-blast install-mkdir install-phast install-vcftools install-CGP install-SGELK install-varscan install-samtools install-bcftools install-smalt install-raxml install-perlModules install-config install-snpEff
+install-prerequisites: check-blast install-mkdir install-phast install-vcftools install-CGP install-SGELK install-varscan install-samtools install-bcftools install-smalt install-raxml install-perlModules install-config install-snpEff
 	@echo DONE installing prerequisites
 
 install-optional: install-prerequisites install-snap install-bwa install-eutils
