@@ -9,9 +9,9 @@ before_install:
   - yes no | cpanm -l ~ Bio::TreeIO
   - cpanm -l ~ File::Slurp
   - cpanm -l ~ String::Escape
-  - make install
-script: true
 install:
+  - make install
+script: 
   - bash scripts/testInstallation.sh
   - bash scripts/testScripts.sh
 language: shell

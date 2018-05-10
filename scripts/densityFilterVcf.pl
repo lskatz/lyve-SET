@@ -8,7 +8,7 @@ use Getopt::Long;
 use Bio::Perl;
 use File::Basename;
 use File::Temp qw/tempdir/;
-use List::Util qw/min max sum uniq/;
+use List::Util qw/min max sum/;
 
 use FindBin;
 use lib "$FindBin::RealBin/../lib";
@@ -122,6 +122,11 @@ sub densityFilter{
 
   return \@filtered;
       
+}
+
+sub uniq {
+  my %seen;
+  return grep { !$seen{$_}++ } @_;
 }
 
 sub usage{

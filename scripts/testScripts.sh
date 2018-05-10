@@ -17,7 +17,7 @@ for i in $testsDir/*.sh; do
   exit_code=${PIPESTATUS[0]}
 
   # If there is any failure, mark it and move on
-  if [ $exit_code -gt 0 ]; then
+  if [ "$exit_code" -gt 0 ]; then
     echo "$b failed"
     FAIL=$(($FAIL + 1))
   else
