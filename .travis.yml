@@ -4,9 +4,11 @@ before_install:
   - sudo apt-get install ncbi-blast+
   - export PATH=$PATH:$(pwd)/scripts
   - export PERL5LIB=PERL5LIB:$HOME/lib/perl5
+    # Say no for all bioperl prompts
   - yes no | cpanm -l ~ Bio::Perl
   - yes no | cpanm -l ~ Bio::FeatureIO
   - yes no | cpanm -l ~ Bio::TreeIO
+  # two more modules
   - cpanm -l ~ File::Slurp
   - cpanm -l ~ String::Escape
 install:

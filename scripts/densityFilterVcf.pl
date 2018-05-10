@@ -140,7 +140,7 @@ sub usage{
   positions 1 and 10. This includes positions 1 and 10.
 
   Usage: 
-    $0 file.vcf.gz > filtered.vcf
+    $0 snps.vcf.gz > filtered.vcf
     Default is to not filter.
   --density-filter    1         Number of sites allowed per window
   --density-window    1         Size of the window
