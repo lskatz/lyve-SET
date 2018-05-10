@@ -69,6 +69,7 @@ sub main{
   # If no project is given, then assign based on what the user specified
   else {
     ($$settings{matrix})=@ARGV;
+    logmsg "Setting matrix file to $$settings{matrix} because --project was not given";
   }
 
   # Now do some diagnostics

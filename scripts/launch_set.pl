@@ -68,7 +68,7 @@ sub main{
   # Initialize settings by reading the global configuration
   # file, LyveSET.conf
   my $settings=readGlobalSettings(1);
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help help2 numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s qsub!)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help help2 numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! diagnose! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s qsub!)) or die $!;
 
   # What options change when --fast is used?
   if($$settings{fast}){
@@ -733,6 +733,11 @@ sub compareTaxa{
     logmsg "The phylogeny was not requested; wrapping up";
   }
 
+  if(!$$settings{diagnose}){
+    logmsg "Diagnostics were not requested; wrapping up.";
+    return 1;
+  }
+
   # Diagnose the project
   # Make sure this gets printed to stdout
   logmsg "Running set_diagnose.pl";
@@ -824,6 +829,7 @@ sub usage{
 
     SKIP CERTAIN STEPS
     --nomatrix                     Do not create an hqSNP matrix
+    --nodiagnose                   Do not run diagnostics
     --nomsa                        Do not make a multiple sequence alignment
     --notrees                      Do not make phylogenies
     --singleend                    Treat everything like single-end. Useful 
