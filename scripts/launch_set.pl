@@ -844,7 +844,7 @@ sub usage{
   $help.="
     MODULES
     --read_cleaner none            Which read cleaner? Choices: none, CGP, BayesHammer
-    --mapper       $$settings{mapper} Which mapper? Choices: smalt, snap
+    --mapper       $$settings{mapper} Which mapper? Choices: smalt, snap, bwa
     --snpcaller    $$settings{snpcaller} Which SNP caller? Choices: varscan, vcftools
 
     SCHEDULER AND MULTITHREADING OPTIONS
