@@ -9,6 +9,15 @@ Requirements
 * **Edirect** (for downloading of test data)
 * **GIT**, **SVN** (for installation and updating)
 
+### Other requirements
+
+Usually these packages are installed, but if you have a totally fresh system, you might want to consider installing the following
+
+* zlib
+* curses
+* zip/unzip
+* build-essential
+
 Quickie Installation
 --------------------
 
