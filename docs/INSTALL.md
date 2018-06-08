@@ -5,6 +5,7 @@ Requirements
 ------------
 
 * **Perl, multithreaded**
+  * BioPerl
 * **BLAST+**
 * **Edirect** (for downloading of test data)
 * **GIT**, **SVN** (for installation and updating)
@@ -17,6 +18,11 @@ Usually these packages are installed, but if you have a totally fresh system, yo
 * curses
 * zip/unzip
 * build-essential
+
+Some Perl modules are needed in earlier versions of Lyve-SET including v1.1.4f.
+
+* File::Slurp
+* URI::Escape
 
 Quickie Installation
 --------------------
