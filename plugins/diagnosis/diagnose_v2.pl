@@ -1,7 +1,8 @@
-#!/usr/bin/env perl  
+#!/usr/bin/env perl
 # Authors: Khushbu Patel and Lori Gladney 3-16-18
 # Lyve-SET diagnosis/QC script
 # Edited, Lee Katz 2018-05-08
+# Usage: ./hqSNP_diagnose.pl projectdir /path/to/reference/ref.fasta
 
 use warnings;
 use strict;
@@ -19,8 +20,8 @@ $ENV{PATH} = "$ENV{PATH}:$RealBin/../../scripts";
 
 # Global variables
 my @maskingHeaders=qw(alignment ambiguous_base_count ambiguous_base_percent GC% contig_length);
-my @bamHeaders=qw(bam total_reads mapped_reads mapped_reads_ge30 unmapped_reads percent_mapped percent_mapped_gt30 proper_pairs inward_pairs outward_pairs pairs_with_other_orientation percentage_proper_pairs insert_size_avg number_sites_with_coverage_lt20 breadth_coverage total_sites_covered_ge20 avg_coverage_per_site);
-my @vcfHeaders=qw(vcf PASS DP RF AF isIndel masked str10 indelError);
+my @bamHeaders=qw(bam total_reads mapped_reads mapped_reads_ge30 unmapped_reads percent_mapped percent_mapped_gt30 proper_pairs inward_pairs outward_pairs pairs_with_other_orientation percentage_proper_pairs insert_size_avg number_sites_with_coverage_lt20 breadth_coverage total_sites_covered_ge20 avg_coverage_per_site perc_reference_coverage);
+my @vcfHeaders=qw(vcf PASS AF0.95 AF0.95;str10 DP20 AF0.95;DP20 DP20;AF0.95 DP20;AF0.95;str10 AF0.95;DP20;str10 AF0.95;isIndel AF0.95;RF0.95 AF0.95;isIndel;RF0.95 isIndel isIndel;AF0.95 RF0.95 isIndel;RF0.95 str10 str10;AF0.95 str10;DP20;AF0.95 indelError);
 
 # Run the main subroutine, and the exit code for the script
 # is the return integer from main().
@@ -40,16 +41,45 @@ sub main{
   my $bam_path           = "$project/bam";
   my $out_aln_path       = "$project/msa/out.aln.fasta";
   my $out_info_path      = "$project/msa/out.informative.fasta";
-  my $reference          = "$project/reference/reference.fasta";
+  my $reference          = "$ARGV[1]";
+  my $out_pool_vcf		 = "$project/msa/out.pooled.vcf.gz";
+  
 
   if(!-e $reference){
     die "ERROR: could not find reference file $reference";
   }
 
-  # the reference size 
+  # the reference size
   logmsg "Reading the reference genome";
   my $total_ref_bases = gsize($reference);
+  
+  # out.pool.vcf info
+  print "# Out.pool.vcf Info\n";
+  #system("zcat $out_pool_vcf | grep -v '^#' | cut -f 7| sort | uniq -c");
+  my $poolVCF = glob("$project/msa/out.pooled.vcf.gz");
+  print join("\t",@vcfHeaders)."\n";
+  
+  # set defaults
+  my %filter_code;
+  for(@vcfHeaders){
+    $filter_code{$_}//=".";
+	}
+	
+  open(pool_vcf,"zcat $out_pool_vcf | ") or die "ERROR: could not zcat $out_pool_vcf: $!";
+  while(<pool_vcf>){
+    next if(/^#/);
+    chomp;
 
+    my(@F) = split('\t');
+	$filter_code{$F[6]}++;
+	}
+	
+	close pool_vcf;
+	
+
+  print $filter_code{$_}."\t" for(@vcfHeaders);
+  print "\n\n";
+	
   # Masking information on both pseudo alignments
   logmsg "Reading pseudo alignments";
   my $maskingInfoHash = masking($out_info_path);
@@ -94,15 +124,16 @@ sub bamInfo{
   my($bam,$path_cleaned_reads,$total_ref_bases,$vcf_path)=@_;
 
   # Default return hash
-  my %bamInfo=(bam=>$bam); 
+  my %bamInfo=(bam=>$bam);
   for my $field (@bamHeaders){
     $bamInfo{$field}//=".";
   }
 
   # Example filename: bam/sample1.fastq.gz-reference.sorted.bam
   # Example basename: sample1
-  my $basename = basename($bam,qw(.fastq.gz-reference.sorted.bam));
+  my $basename = basename($bam,qw(.fastq.gz-reference.sorted.bam));	
   $bamInfo{bam}=$basename;
+  
 
   #Fetching total number of mapped reads
   #NOTE: saving system() output to perl variable, returns 0
@@ -118,10 +149,11 @@ sub bamInfo{
   $bamInfo{mapped_reads}     =$total_mapped_reads + 0;
   $bamInfo{mapped_reads_ge30}=$mapped_reads_ge_30 + 0;
   $bamInfo{mapped_reads_lt30}=$mapped_reads_lt_30 + 0;
-               
+
   #Calculating total number of reads from clean_reads files
   # Gather hopefully just one file pertaining to this bam
-  my @file = glob("$path_cleaned_reads"."/"."$basename*fastq*");
+  my $temp = $basename =~ s/.fastq*.+//;
+  my @file = glob("$path_cleaned_reads"."/"."$basename*gz");
   if(@file > 1){
     logmsg "Warning: found more than one fastq file for $bam";
   } elsif(@file < 1){
@@ -139,7 +171,7 @@ sub bamInfo{
   $bamInfo{unmapped_reads} = $tot_reads - $total_mapped_reads; # Calculating number of reads that are not mapped
   $bamInfo{percent_mapped} = ($total_mapped_reads/$tot_reads) * 100; #Calculating percentage of mapped reads
   $bamInfo{percent_mapped_gt30} = ($mapped_reads_ge_30/$total_mapped_reads) * 100; #Calculating percentage of mapped reads > Q30
-			 
+
   #my @bamHeaders=qw(bam total_reads mapped_reads mapped_reads_gt30 unmapped_reads percent_mapped percent_mapped_gt30 proper_pairs inward_pairs outward_pairs pairs_with_other_orientation percentage_proper_pairs insert_size_avg number_sites_with_coverage_lt20 breadth_coverage total_sites_covered_ge20 avg_coverage_per_site);
 
   # Run samtools one time and fill in some more variables
@@ -186,6 +218,8 @@ sub bamInfo{
   $bamInfo{total_sites_covered_ge20}=$sites_ge20;
   $bamInfo{breadth_coverage}=$bam_sites;
   $bamInfo{avg_coverage_per_site}=sprintf("%0.2f",$coverage_count/$total_ref_bases);
+  $bamInfo{perc_reference_coverage}= ((($total_ref_bases - $sites_lt20)/$total_ref_bases)*100);
+
 
   return \%bamInfo;
 }
@@ -210,35 +244,38 @@ sub vcfInfo{
   my %filter_code = (vcf=>$basename);
   for(@vcfHeaders){
     $filter_code{$_}//=".";
+	
   }
+  
 
   open(VCF,"zcat $vcf | ") or die "ERROR: could not zcat $vcf: $!";
   while(<VCF>){
     next if(/^#/);
     chomp;
 
-    my(@F) = split(/\t/);
-    $filter_code{$F[6]}++;
+    my(@F) = split('\t');
+	$filter_code{$F[6]}++;
+	
   }
   close VCF;
 
   return \%filter_code;
-}
+} # end of vcfInfo subroutine
 
 
 #subroutine to calculate masking from out.aln and out.informative file
 sub masking() {
   my ($file) = @_;
-                              
+
   #create one SeqIO object to read in
   my $seq_in = Bio::SeqIO->new(
                -file   => "<$file",
                -format => "fasta",
                );
 
-                                                                                           
+
   my @unsorted_id;  #array to hold sequence IDs and associated info
-                
+
   #Save each entry in the input file.
   #seq_in is the object that holds the file
   #next seq passes each contig to the sequence object $seq
@@ -261,7 +298,7 @@ sub masking() {
     #Push each scalar into the unsorted array (identifiers, sequence and percent ambiguous bases)
     push (@unsorted_id,{
         id         => $id,
-        full_id    => $full_id, 
+        full_id    => $full_id,
         length     => $length,
         countN     => $countN,
         percentN   => $percentN,
@@ -285,17 +322,17 @@ sub gsize(){
                -format => 'fasta',
                );
 
-                                                                                           
 
-  my $id;        #scalar to hold sequence identifier    
+
+  my $id;        #scalar to hold sequence identifier
   my $string;    #scalar to hold the sequence
   my $length =0;
-                
+
   #write each entry in the input file to STDOUT, while the condition is true
   #seq_in is the object that holds the file
   #next seq passes each contig to the sequence object $seq
-  while (my $seq = $seq_in->next_seq ()) { 
-    #Initialize variables; start the counter at 0 for each contig that comes through the loop  
+  while (my $seq = $seq_in->next_seq ()) {
+    #Initialize variables; start the counter at 0 for each contig that comes through the loop
     $length +=$seq->length;  #Declare variable for finding the length of each contig sequence
   }
 
@@ -305,7 +342,6 @@ sub gsize(){
 
 sub usage{
   "Runs a diagnosis on a finished Lyve-SET run
-  Usage: ./hqSNP_diagnose.pl projectdir
+  Usage: ./hqSNP_diagnose.pl projectdir reference.fasta
   "
 }
-
