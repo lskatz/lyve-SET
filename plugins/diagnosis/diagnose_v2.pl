@@ -50,8 +50,9 @@ sub main{
   }
 
   # the reference size
-  logmsg "Reading the reference genome";
+  logmsg "Reading the reference genome\n";
   my $total_ref_bases = gsize($reference);
+  print("Reference genome size: $total_ref_bases\n\n");
   
   # out.pool.vcf info
   print "# Out.pool.vcf Info\n";
