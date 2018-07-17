@@ -5,7 +5,7 @@ require 5.12.0;  # includes the "not implemented/yadda yadda operator (...)"
 # Update paths
 use FindBin qw/$RealBin/;
 use lib "$FindBin::RealBin/../lib";
-# Make sure the path is set up correctly but do not take priority 
+# Make sure the path is set up correctly but do not take priority
 # over what the user truly wants, as dictated by the already-existing path.
 # This cannot be used as a solution if the user has the incorrect
 # software version in the path (e.g., samtools 0.1.19)
@@ -39,7 +39,7 @@ $scriptsdir=rel2abs($scriptsdir);
 my $logmsgFh;
 sub logmsg {
   local $0=basename $0;
-  my $FH = *STDOUT; 
+  my $FH = *STDOUT;
   my $caller=(caller(1))[3];
   $caller=(caller(2))[3] if($caller=~/__ANON__/); # Don't care about __ANON__ subroutines
   $caller=~s/(main:*)+//;
@@ -197,7 +197,7 @@ sub main{
 }
 
 # Pick information about SET from the Makefile where it is stored.
-# If overwrite is set to true, then existing settings will be 
+# If overwrite is set to true, then existing settings will be
 # overwritten. Otherwise, settings will be applied if no other
 # value was there beforehand.
 sub readGlobalSettings{
@@ -252,7 +252,7 @@ sub simulateReads{
     my $outGz="$outFastq.gz";
     my $out1="$$settings{tmpdir}/$b.1.fastq";
     my $out2="$$settings{tmpdir}/$b.2.fastq";
-    next if(-e $outGz && !-e $outFastq); 
+    next if(-e $outGz && !-e $outFastq);
     logmsg "I did not find $outFastq simulated reads. Simulating now with $exec.";
 
     # How many simulated reads should there be with a reasonable coverage?
@@ -328,7 +328,7 @@ sub maskReference{
   }
 
   # Write the masked ranges to a file
-  my @masked; 
+  my @masked;
   my $maskedRegions="$$settings{refdir}/maskedRegions.bed";
   open(MASKEDBED,">$maskedRegions") or die "ERROR: could not open $maskedRegions: $!";
   while(my($contig,$RangeObj)=each(%maskedRange)){
@@ -460,7 +460,7 @@ sub mapReads{
       # Make a tmpdir for stampy since each invocation needs its own space
       my $stampydir=tempdir("$tmpdir/stampyXXXXXX",CLEANUP=>1);
       $sge->pleaseExecute("$scriptsdir/launch_stampy.sh $stampyxopts -r $ref -f $fastq -b $bamPrefix.sorted.bam -t $stampydir --numcpus $$settings{numcpus} ",{jobname=>"stampy$b"});
-    } 
+    }
     elsif($$settings{mapper} eq 'bowtie2'){
       my $bowtie2dir=tempdir("$tmpdir/bowtie2XXXXXX",CLEANUP=>1);
       $sge->pleaseExecute("$scriptsdir/launch_bowtie2.sh $bowtie2xopts -r $ref -f $fastq -b $bamPrefix.sorted.bam -t $bowtie2dir --numcpus $$settings{numcpus} ",{jobname=>"bowtie2$b"});
@@ -562,8 +562,8 @@ sub variantCalls{
   my $bgzip=`which bgzip 2>/dev/null`; chomp($bgzip);
   my $tabix=`which tabix 2>/dev/null`; chomp($tabix);
 
-  # If --fast is given, choose a genome. Find possible 
-  # variant sites in that genome and use those regions 
+  # If --fast is given, choose a genome. Find possible
+  # variant sites in that genome and use those regions
   # for the next SNP-calling instances.
   my $regionsFile="";
   if($$settings{'sample-sites'}){
@@ -643,8 +643,8 @@ sub variantCalls{
       logmsg $varscanCommand;
       $sge->pleaseExecute($varscanCommand,{numcpus=>$$settings{numcpus},jobname=>$jobname,qsubxopts=>""});
       # sort VCF
-      $sge->pleaseExecute("mv $vcfdir/$b.vcf $vcfdir/$b.vcf.tmp && 
-          vcf-sort < $vcfdir/$b.vcf.tmp > $vcfdir/$b.vcf && 
+      $sge->pleaseExecute("mv $vcfdir/$b.vcf $vcfdir/$b.vcf.tmp &&
+          vcf-sort < $vcfdir/$b.vcf.tmp > $vcfdir/$b.vcf &&
           rm -v $vcfdir/$b.vcf.tmp",
           {jobname=>"sort$b",qsubxopts=>"-hold_jid $jobname",numcpus=>1}
       );
@@ -725,7 +725,7 @@ sub compareTaxa{
 
   if($$settings{msa} || $$settings{trees}){
     logmsg "Launching set_processPooledVcf.pl";
-    my $command="set_processPooledVcf.pl $pooled --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} > $$settings{logdir}/launch_processpooledVcf.log 2>&1";
+    my $command="set_processPooledVcf.pl $pooled --makeTree $$settings{trees} --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} > $$settings{logdir}/launch_processpooledVcf.log 2>&1";
     logmsg "Processing the pooled VCF\n  $command";
     $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"set_processPooledVcf.pl"});
     $sge->wrapItUp();
@@ -800,8 +800,8 @@ sub usage{
 
     If project is not given, then it is assumed to be the current working directory.
 
-    -ref               ref.fasta      The reference genome assembly. If it is 
-                                      a genbank or embl file, then it will be 
+    -ref               ref.fasta      The reference genome assembly. If it is
+                                      a genbank or embl file, then it will be
                                       converted to reference.gbk.fasta and will
                                       be used for SNP annotation. If a fasta
                                       is given, then no SNP annotation will
@@ -809,13 +809,13 @@ sub usage{
                                       Default: project/reference/reference.fasta
 
     COMMON OPTIONS
-    --allowedFlanking  $$settings{allowedFlanking}allowed flanking distance in bp. 
-                                      Nucleotides this close together cannot be 
+    --allowedFlanking  $$settings{allowedFlanking}allowed flanking distance in bp.
+                                      Nucleotides this close together cannot be
                                       considered as high-quality.
-    --min_alt_frac     $$settings{min_alt_frac}The percent consensus that needs 
-                                      to be reached before a SNP is called. 
+    --min_alt_frac     $$settings{min_alt_frac}The percent consensus that needs
+                                      to be reached before a SNP is called.
                                       Otherwise, 'N'
-    --min_coverage     $$settings{min_coverage}Minimum coverage needed before a 
+    --min_coverage     $$settings{min_coverage}Minimum coverage needed before a
                                       SNP is called. Otherwise, 'N'
     --presets          \"\"             See presets.conf for more information
     --numcpus          $$settings{numcpus}number of cpus
@@ -832,17 +832,17 @@ sub usage{
     --nodiagnose                   Do not run diagnostics
     --nomsa                        Do not make a multiple sequence alignment
     --notrees                      Do not make phylogenies
-    --singleend                    Treat everything like single-end. Useful 
+    --singleend                    Treat everything like single-end. Useful
                                    for when you think there is a single-
                                    end/paired-end bias.
     OTHER SHORTCUTS
-    --fast                         Shorthand for --downsample --mapper snap --nomask-phages 
+    --fast                         Shorthand for --downsample --mapper snap --nomask-phages
                                                  --nomask-cliffs --sample-sites
-    --downsample                   Downsample all reads to 50x. Approximated according 
+    --downsample                   Downsample all reads to 50x. Approximated according
                                    to the ref genome assembly
-    --sample-sites                 Randomly choose a genome and find SNPs in a quick 
-                                   and dirty way. Then on the SNP-calling stage, 
-                                   only interrogate those sites for SNPs for each 
+    --sample-sites                 Randomly choose a genome and find SNPs in a quick
+                                   and dirty way. Then on the SNP-calling stage,
+                                   only interrogate those sites for SNPs for each
                                    genome (including the randomly-sampled genome).
   ";
   return "$help\n  --help2 To view the complete set of options\n\n" if(!$$settings{help2});
@@ -856,7 +856,7 @@ sub usage{
     SCHEDULER AND MULTITHREADING OPTIONS
     --queue        $$settings{queue}           default queue to use
     --numnodes     $$settings{numnodes}              maximum number of nodes
-    --qsubxopts    '-N lyve-set'   Extra options to pass to qsub. This is not 
+    --qsubxopts    '-N lyve-set'   Extra options to pass to qsub. This is not
                                    sanitized; internal options might overwrite yours.
     --noqsub                       Do not use the scheduler, even if it exists
 
@@ -867,10 +867,9 @@ sub usage{
     --tmpdir    $$settings{tmpdir}    tmp/ Where to put temporary files
     --msadir    $$settings{msadir}    multiple sequence alignment and tree files (final output)
     --logdir    $$settings{logdir}    Where to put log files. Qsub commands are also stored here.
-    --asmdir    $$settings{asmdir}    directory of assemblies. Copy or symlink the reference genome assembly 
+    --asmdir    $$settings{asmdir}    directory of assemblies. Copy or symlink the reference genome assembly
                                    to use it if it is not already in the raw reads directory
 
   ";
   return $help;
 }
-

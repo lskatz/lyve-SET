@@ -27,7 +27,7 @@ sub main{
   local $0=basename $0;
   my $settings={};
 
-  GetOptions($settings,qw(help prefix=s numcpus=i tempdir=s allowed|allowedFlanking=i));
+  GetOptions($settings,qw(help makeTree=i prefix=s numcpus=i tempdir=s allowed|allowedFlanking=i));
   $$settings{prefix}||="./out";
   $$settings{numcpus}||=1;
   $$settings{tempdir}||=tempdir("XXXXXX",TMPDIR=>1,CLEANUP=>1);
@@ -80,26 +80,32 @@ sub main{
 
   # TODO Fst
 
-  # Can work with trees if there are enough samples
-  if($numSamples >= 4){
-    # RAxML puts everything into the CWD and so we have to work around that.
-    system("cp $filteredAlignment $$settings{tempdir}/; cd $$settings{tempdir}; launch_raxml.sh -n $$settings{numcpus} $filteredAlignment suffix");
-    die "ERROR with launch_raxml.sh" if $?;
-    for (qw(RAxML_bestTree RAxML_bipartitionsBranchLabels RAxML_bipartitions RAxML_bootstrap RAxML_info)){
-      system("mv -v $$settings{tempdir}/$_.suffix $$settings{prefix}.$_");
-      die "ERROR: could not move $$settings{tempdir}/$_.suffix: $!" if $?;
+  # Check if user requested to build tree
+  if($$settings{makeTree} == 1){
+    # Can work with trees if there are enough samples
+    if($numSamples >= 4){
+      # RAxML puts everything into the CWD and so we have to work around that.
+      system("cp $filteredAlignment $$settings{tempdir}/; cd $$settings{tempdir}; launch_raxml.sh -n $$settings{numcpus} $filteredAlignment suffix");
+      die "ERROR with launch_raxml.sh" if $?;
+      for (qw(RAxML_bestTree RAxML_bipartitionsBranchLabels RAxML_bipartitions RAxML_bootstrap RAxML_info)){
+        system("mv -v $$settings{tempdir}/$_.suffix $$settings{prefix}.$_");
+        die "ERROR: could not move $$settings{tempdir}/$_.suffix: $!" if $?;
+      }
+
+      # TODO: reroot the tree
+      #rerootLongestBranch("$$settings{prefix}.RAxML_bipartitions",$settings);
+
+      ## removing clade distances since Tinsel is coming out
+
+      # Get combined distance statistics on the tree
+      #system("cladeDistancesFromTree.pl -t $$settings{prefix}.RAxML_bipartitions -p $$settings{prefix}.pairwise.tsv --outprefix $$settings{prefix}");
+      #die "ERROR with cladeDistancesFromTree.pl" if $?;
+    } else {
+      logmsg "WARNING: only $numSamples samples are in the alignment; skipping tree-building.";
     }
 
-    # TODO: reroot the tree
-    #rerootLongestBranch("$$settings{prefix}.RAxML_bipartitions",$settings);
-
-    ## removing clade distances since Tinsel is coming out
-    
-    # Get combined distance statistics on the tree
-    #system("cladeDistancesFromTree.pl -t $$settings{prefix}.RAxML_bipartitions -p $$settings{prefix}.pairwise.tsv --outprefix $$settings{prefix}");
-    #die "ERROR with cladeDistancesFromTree.pl" if $?;
   } else {
-    logmsg "WARNING: only $numSamples samples are in the alignment; skipping tree-building.";
+    logmsg "Skipping tree construction as requested.";
   }
 
   return 0;
@@ -107,7 +113,7 @@ sub main{
 
 sub rerootLongestBranch{
   my($file,$settings)=@_;
-  
+
   my $tmpTree="$file.rerooted";
   my $tree=Bio::TreeIO->new(-file=>$file,-format=>"newick")->next_tree;
   my $out=Bio::TreeIO->new(-file=>">$tmpTree",-format=>"newick");
@@ -125,7 +131,7 @@ sub rerootLongestBranch{
   }
 
   $tree->reroot($outgroup);
-  
+
   $out->write_tree($tree);
   system("mv -v $tmpTree $file");
   die if $?;
