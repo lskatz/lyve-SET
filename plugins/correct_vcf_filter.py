@@ -24,12 +24,13 @@ old_filter = 0
 
 with open(outfile_vcf, 'a') as f1:
 	with open(outfile_txt, 'a') as f2:
-		f2.write( "CHROM\tPOS\tNEW_FILTER\tDEPTH\tFREQ\tOLD_FILTER")
+		f2.write( "CHROM\tPOS\tNEW_FILTER\tDEPTH\tFREQ\tOLD_FILTER\n")
 		for line in f:
 			line =line.rstrip()
 			if line.startswith('#'):
 				ID = line					# Printing the headers
 				f1.write(ID)
+				f1.write("\n")
 		
 			else:
 				array = line.split()
@@ -45,26 +46,25 @@ with open(outfile_vcf, 'a') as f1:
 							count += 1					# Count the number of sites that have been assigned wrong filter
 							out = '\t'.join(array)
 							f1.write(out)
-							str = array[0]+'\t'+array[1]+'\t'+array[6]+'\t'+temp[3]+'\t'+temp[6]+'\t'+old_filter
+							str = array[0]+'\t'+array[1]+'\t'+array[6]+'\t'+temp[3]+'\t'+temp[6]+'\t'+old_filter+'\n'
 							f2.write(str)
 						
 						
 						else:							# if allele frequency is greater than 5% or coverage does not meet; keep the filter
 							out = '\t'.join(array)
 							f1.write(out)
+							f1.write("\n")
 	
 					else:									# else - print everything as is
 						out = '\t'.join(array)
 						f1.write(out)
+						f1.write("\n")
 				
 				else:									# else - print everything as is
 					out = '\t'.join(array)
 					f1.write(out)
+					f1.write("\n")
 	
 	
 	
 print('Number of sites that had been assigned wrong filters %d'%count)
-
-
-
-		
