@@ -35,25 +35,19 @@ sub main{
       my $value = $F[$i];
       my $query = $header[$i];
 
+      my($g1, $g2) = sort($ref, $query);
+
       $value = 0 if($value eq '-');
-      $matrix{$ref}{$query} = $value;
+      $matrix{$g1}{$g2} = $value;
     }
   }
   close STDIN;
 
-  my @sortedRef = sort{$a cmp $b} grep {$_ ne '.'} values(@header);
-  for(my $i=0; $i<@sortedRef; $i++){
-    for(my $j=0; $j<@sortedRef; $j++){
-      my $query = $sortedRef[$j] || "";
-      my $ref = $sortedRef[$i] || "";
-      print join("\t", $ref,
-                       $query,
-                       $matrix{$ref}{$query},
-                     );
-      print "\n";
+  while(my($g1, $distances) = each(%matrix)){
+    while(my($g2, $dist) = each(%$distances)){
+      print join("\t", $g1, $g2, $matrix{$g1}{$g2})."\n";
     }
   }
-
   return 0;
 }
 
