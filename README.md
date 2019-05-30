@@ -24,7 +24,12 @@ Here is a way to just try out the test dataset. It runs the lambda dataset (1st 
 ### With your data
 
     set_manage.pl --create yourProject
-    cp shuffledReads/*.fastq.gz yourProject/reads/
+    # paired end reads have to be shuffled into one file per sample
+    shuffleSplitReads.pl --numcpus 8 -o interleaved *.fastq.gz
+    # then moved into your project dir
+    mv interleaved/*.fastq.gz yourProject/reads/
+    # cleanup
+    rmdir interleaved
     cp reference.fasta yourProject/ref/
     launch_set.pl --numcpus 8 -ref yourProject/ref/reference.fasta yourProject
 
