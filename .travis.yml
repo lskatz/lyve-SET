@@ -5,7 +5,7 @@ before_install:
   - export PATH=$PATH:$(pwd)/scripts
   - export PERL5LIB=PERL5LIB:$HOME/lib/perl5
     # Say no for all bioperl prompts
-  - yes no | cpanm -l ~ Bio::Perl
+  - yes no | cpanm -l ~ CJFIELDS/BioPerl-1.6.924.tar.gz
   - yes no | cpanm -l ~ Bio::FeatureIO
   - yes no | cpanm -l ~ Bio::TreeIO
   # two more modules
