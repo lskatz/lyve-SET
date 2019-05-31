@@ -1,7 +1,7 @@
 before_install:
   # workaround for silly public keys bug in travis
-  #- sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6B05F25D762E3157; 
-  - sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 762E3157
+  - sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6B05F25D762E3157; 
+  #- sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 762E3157
   - perl -Mthreads -e 'print "this perl is multithreaded\n";'
   - export PATH=$PATH:$(pwd)/scripts
   - export PERL5LIB=PERL5LIB:$HOME/lib/perl5
