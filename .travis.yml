@@ -16,10 +16,13 @@ script:
 language: shell
 addons:
   apt:
-    sources:- deadsnakes
-    - sourceline: 'ppa:ubuntu-toolchain-r/test'
-    - sourceline: 'deb https://packagecloud.io/chef/stable/ubuntu/precise main'
-      key_url: 'https://packagecloud.io/gpg.key'
+    sources:
+      #- deadsnakes
+      - extras-precise
+      - lucid
+      #- sourceline: 'ppa:ubuntu-toolchain-r/test'
+      #- sourceline: 'deb https://packagecloud.io/chef/stable/ubuntu/precise main'
+      #  key_url: 'https://packagecloud.io/gpg.key'
     packages:
       - bioperl
       - default-jre
