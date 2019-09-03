@@ -12,15 +12,26 @@ See [INSTALL.md](docs/INSTALL.md) for more information including prerequisite so
 
 For the impatient
 -----------------
+
+### Toy dataset
+
 Here is a way to just try out the test dataset. It runs the lambda dataset (1st param) and places the results into the lambda directory (2nd param)
 
     set_test.pl --numcpus 8 lambda lambda
     # try out a larger dataset
     set_test.pl --numcpus 8 listeria_monocytogenes listeria_monocytogenes 
+    
+### With your data
 
-Make Lyve-SET go quickly with `--fast`!  This option is shorthand for several other options that save on computational time. See `launch_set.pl` usage below for more details.
-
-    set_test.pl --numcpus 8 --fast listeria_monocytogenes listeria_monocytogenes 
+    set_manage.pl --create yourProject
+    # paired end reads have to be shuffled into one file per sample
+    shuffleSplitReads.pl --numcpus 8 -o interleaved *.fastq.gz
+    # then moved into your project dir
+    mv interleaved/*.fastq.gz yourProject/reads/
+    # cleanup
+    rmdir interleaved
+    cp reference.fasta yourProject/ref/
+    launch_set.pl --numcpus 8 -ref yourProject/ref/reference.fasta yourProject
 
 Usage
 -----

@@ -1,14 +1,11 @@
 before_install:
-  - sudo apt-get install default-jre
+  # workaround for silly public keys bug in travis
+  # - sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6B05F25D762E3157; 
+  #- sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 762E3157
   - perl -Mthreads -e 'print "this perl is multithreaded\n";'
-  - sudo apt-get install ncbi-blast+
   - export PATH=$PATH:$(pwd)/scripts
   - export PERL5LIB=PERL5LIB:$HOME/lib/perl5
-    # Say no for all bioperl prompts
-  - yes no | cpanm -l ~ Bio::Perl
-  - yes no | cpanm -l ~ Bio::FeatureIO
-  - yes no | cpanm -l ~ Bio::TreeIO
-  # two more modules
+  # Ensure two bioperl modules
   - cpanm -l ~ File::Slurp
   - cpanm -l ~ String::Escape
 install:
@@ -17,3 +14,16 @@ script:
   - bash scripts/testInstallation.sh
   - bash scripts/testScripts.sh
 language: shell
+addons:
+  apt:
+    sources:
+      #- deadsnakes
+      - extras-precise
+      - lucid
+      #- sourceline: 'ppa:ubuntu-toolchain-r/test'
+      #- sourceline: 'deb https://packagecloud.io/chef/stable/ubuntu/precise main'
+      #  key_url: 'https://packagecloud.io/gpg.key'
+    packages:
+      - bioperl
+      - default-jre
+      - ncbi-blast+
