@@ -8,7 +8,7 @@ use warnings;
 use strict;
 use Getopt::Long;
 use Data::Dumper;
-use File::Basename qw/fileparse/;
+use File::Basename qw/fileparse dirname/;
 use File::Temp qw/tempdir/;
 use List::Util qw/min max/;
 use List::MoreUtils qw(uniq);
@@ -22,6 +22,7 @@ use LyveSET qw/logmsg/;
 use lib "$FindBin::RealBin/../lib/lib/perl5";
 use Array::IntSpan;
 
+my $thisDir = dirname($0);
 local $0=fileparse $0;
 exit main();
 sub main{
@@ -52,7 +53,7 @@ sub phast{
 
   # longest gene in phast is 8573bp, and all regions produced should have 
   # at least that length just in case.
-  my $regions=`makeRegions.pl $fasta --numcpus $$settings{numcpus} --numchunks $$settings{numcpus} --overlapby 9999`;
+  my $regions=`$thisDir/makeRegions.pl $fasta --numcpus $$settings{numcpus} --numchunks $$settings{numcpus} --overlapby 9999`;
   die "ERROR: problem with makeRegions.pl" if $?;
   my @regions=split(/\n/,$regions);
   logmsg "Regions are: ".join(", ",@regions);
