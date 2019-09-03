@@ -13,12 +13,13 @@ sub logmsg{$|++;print STDERR "@_\n"; $|--;}
 exit main();
 sub main{
   my $settings={};
-  GetOptions($settings,qw(help verbose ambiguities-allowed gaps-allowed sort=s)) or die $!;
+  GetOptions($settings,qw(help verbose remove-minority=f ambiguities-allowed gaps-allowed sort=s)) or die $!;
   die usage() if($$settings{help});
   $$settings{"ambiguities-allowed"} ||=0;
   $$settings{"gaps-allowed"} ||=0;
   $$settings{sort}||="";
   $$settings{sort}=lc($$settings{sort});
+  $$settings{'remove-minority'}||=0;
 
   ## read in the fasta file into @seq and %seq, and keep the deflines
   my $in;
@@ -58,6 +59,8 @@ sub main{
     # See if the rest of this column shows that it is informative.
     # Cycle through the rest of the members of this column to check.
     my $informative=0; # guilty until proven innocent
+    my %countNtAtPos;
+    my $ntCounter=0;
     for(my $i=0;$i<$numSeq;$i++){
       my $nt=uc(substr($seq[$i],$j,1)); # compare everything on the uppercase level
       die "ERROR: Sequence $i does not have a nucleotide at position $j! Is the MSA flush?" if(!$nt);
@@ -72,8 +75,21 @@ sub main{
       next POSITION if($removeAmbiguities && $nt eq 'N');
       # Check to make sure there is no gap at all
       next POSITION if($removeGaps && $nt eq '-');
+
+      # For percentages
+      $countNtAtPos{$nt}++;
+      $ntCounter++;
     } 
     next if(!$informative);
+
+    # Convert to percentages and filter
+    while(my($nt,$count)=each(%countNtAtPos)){
+      my $percent = $count/$ntCounter;
+      if($percent < $$settings{'remove-minority'}){
+        next POSITION;
+      }
+    }
+
     push(@pos,$j); # retain this informative position
     
     $informativeCount++;
@@ -124,9 +140,13 @@ sub usage{
   -v for verbose (technically makes the script slower)
 
   Using the following two options will allow you to keep a master MSA list at-hand if you are converting all VCFs in a project
-  --gaps-allowed Allow gaps in the alignment
-  --ambiguities-allowed Allow ambiguous bases in the alignment
-  --sort alpha,num Sort the sequences by their deflines.  Values for sort are either ALPHA or NUM (case insensitive)
+  --gaps-allowed               Allow gaps in the alignment
+  --ambiguities-allowed        Allow ambiguous bases in the alignment
+  --remove-minority      0.05  Remove sites which have an allele less
+                               than a frequency
+  --sort                       Sort the sequences by their deflines.
+                               Values for sort are either ALPHA or
+                               NUM (case insensitive)
   "
 }
 
