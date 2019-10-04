@@ -1,0 +1,27 @@
+before_install:
+  - perl -Mthreads -e 'print "this perl is multithreaded\n";'
+  - export PATH=$PATH:$(pwd)/scripts
+  - export PERL5LIB=PERL5LIB:$HOME/lib/perl5
+  # Ensure two bioperl modules
+  - cpanm -l ~ File::Slurp
+  - cpanm -l ~ String::Escape
+  - cpanm -l ~ Bio::FeatureIO --notest --force
+install:
+  - make install
+script: 
+  - bash scripts/testInstallation.sh
+  - bash scripts/testScripts.sh
+language: shell
+addons:
+  apt:
+    sources:
+      #- deadsnakes
+      - extras-precise
+      - lucid
+      #- sourceline: 'ppa:ubuntu-toolchain-r/test'
+      #- sourceline: 'deb https://packagecloud.io/chef/stable/ubuntu/precise main'
+      #  key_url: 'https://packagecloud.io/gpg.key'
+    packages:
+      - bioperl
+      - default-jre
+      - ncbi-blast+
