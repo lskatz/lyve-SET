@@ -68,7 +68,7 @@ sub main{
   # Initialize settings by reading the global configuration
   # file, LyveSET.conf
   my $settings=readGlobalSettings(1);
-  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help help2 numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s qsub!)) or die $!;
+  GetOptions($settings,qw(ref=s bamdir=s logdir=s vcfdir=s tmpdir=s readsdir=s asmdir=s msadir=s help help2 numcpus=s numnodes=i allowedFlanking=s keep min_alt_frac=s min_coverage=i trees|tree! queue=s qsubxopts=s msa! matrix! mapper=s snpcaller=s mask-phages! mask-cliffs! fast downsample sample-sites singleend presets=s read_cleaner=s qsub!)) or die $!;
 
   # What options change when --fast is used?
   if($$settings{fast}){
@@ -184,7 +184,11 @@ sub main{
   my $absDir=rel2abs($$settings{msadir}); # save the abs. path
   my $outPrefix="$project/out"; # consistent output naming
 
-  symlink("out.RAxML_bipartitions","$$settings{msadir}/tree.dnd");
+  # Relative symlink to tree if it exists. It might not exist due to
+  # many reasons like too few samples or by specifying --notrees
+  if(-e "$$settings{msadir}/out.RAxML_bipartitions"){
+    symlink("out.RAxML_bipartitions","$$settings{msadir}/tree.dnd");
+  }
 
   my $stopTimestamp=time();
   logmsg "Finished at ".strftime("\%F \%T",localtime());
@@ -725,7 +729,11 @@ sub compareTaxa{
 
   if($$settings{msa} || $$settings{trees}){
     logmsg "Launching set_processPooledVcf.pl";
-    my $command="set_processPooledVcf.pl $pooled --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} > $$settings{logdir}/launch_processpooledVcf.log 2>&1";
+    my $treeArg = "--tree";
+    if(!$$settings{trees}){
+      $treeArg = "--notree";
+    }
+    my $command="set_processPooledVcf.pl $pooled $treeArg --allowedFlanking $$settings{allowedFlanking} --prefix $$settings{msadir}/out --numcpus $$settings{numcpus} > $$settings{logdir}/launch_processpooledVcf.log 2>&1";
     logmsg "Processing the pooled VCF\n  $command";
     $sge->pleaseExecute($command,{numcpus=>$$settings{numcpus},jobname=>"set_processPooledVcf.pl"});
     $sge->wrapItUp();
