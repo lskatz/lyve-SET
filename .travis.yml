@@ -3,7 +3,7 @@ before_install:
   - export PATH=$PATH:$(pwd)/scripts
   - export PERL5LIB=PERL5LIB:$HOME/lib/perl5
   # Ensure two bioperl modules
-  - cpanm -l ~ File::Slurp
+  - yes | cpanm -l ~ File::Slurp
   - cpanm -l ~ String::Escape
   - cpanm -l ~ Bio::FeatureIO --notest --force
 install:
