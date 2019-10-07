@@ -7,6 +7,7 @@ before_install:
   - cpanm -l ~ String::Escape
   - cpanm -l ~ Bio::FeatureIO --notest --force
 install:
+  - travis_wait 30 make install-eutils
   - make install
 script: 
   - bash scripts/testInstallation.sh
