@@ -1,6 +1,14 @@
 Installation
 ============
 
+## Containers
+
+Here are the methods for installing with either Docker or Singularity.
+
+    docker pull staphb/lyveset:1.1.4f
+
+    singularity build lyveset.1.1.4f.sif docker://staphb/lyveset:1.1.4f
+
 Requirements
 ------------
 
