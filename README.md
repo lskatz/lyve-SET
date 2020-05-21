@@ -6,7 +6,7 @@ LYVE version of the Snp Extraction Tool (SET), a method of using hqSNPs to creat
 Installation
 ------------
 
-After downloading, run `make install`.  Some versions are unstable.  For the latest stable version, please see the releases tag on GitHub.
+After downloading, run `make install`.  Some versions are unstable.  For the latest stable version, please see the releases tag on GitHub.  Additionally, there is a method for installing by containers.
 
 See [INSTALL.md](docs/INSTALL.md) for more information including prerequisite software
 
