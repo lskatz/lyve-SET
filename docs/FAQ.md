@@ -9,6 +9,17 @@ How do I choose a reference genome?
 -----------------------------------
 The best reference genome for an outbreak is something in-clade.  You might even need to assemble the genome from your own reads before starting.  An outgroup is not as related to your clade by definition and so it is probably not the best genome to use.  The next best quality is a closed genome, or a genome with a high N50.
 
+How to I include my reference genome in my analysis?
+----------------------------------------------------
+You might have noticed that your reference genome is not included in the final analysis.
+If you want to include the reference genome in your final tree or SNP matrix, there are about two ways.
+Either:
+
+*	Copy the assembly into the asm subfolder.  There is a more automated way to do that with the `set_manage.pl` script, using `--add-assembly` as shown [here](EXAMPLES.md#prepare-the-project-directory)
+*	Find the original raw reads, e.g. Illumina fastq files, and place them into he reads folder.  You can directly copy the interleaved files into that folder, or you can run `set_manage.pl --add-reads` on those interleaved files.
+
+**NOTE** Keep the assembly in the `reference/` subfolder and continue to point `-ref` to the assembly in the `reference` subfolder.
+
 High-quality-ness
 =================
 
