@@ -32,6 +32,25 @@ In the case where you have all pileups finished and want to call SNPs on a singl
 
 ## SNP interrogation
 
+### What are the differences between just two isolates?
+
+Sometimes you just want to know the SNPs that define one isolate, or maybe find which SNPs define which clades.
+Here is a method to show unique SNPs between two isolates.
+You can expand this idea to more isolates or otherwise refine it as needed.
+
+```bash
+$ cut -f 1,2,5,6 out.snpmatrix.tsv | awk '$3!=$4 && $3!="N" && $4!="N"' | head -n 3
+# [1]CHROM      [2]POS  [5]sample1:GT   [6]sample2:GT
+gi|9626243|ref|NC_001416.1|     403     A       G
+gi|9626243|ref|NC_001416.1|     753     A       G
+```
+
+In this example, only the first two sites are shown (`head -n 3`)
+and show that at positions 403 and 753, there are differences between sample1 and sample2.
+Sites with `N` are ignored with logic like `$3!="N"`.
+Otherwise `awk` is just selecting for rows where the samples differ (`$3!=$4`)
+`cut` is used to grab only the position columns 1 and 2 and then to keep only two samples at columns 5 and 6.
+
 ### SNP counting
 
 How many sites are in the Lyve-SET analysis?  Count the number of lines in `out.snpmatrix.tsv`. Subtract 1 for the header.
