@@ -105,6 +105,96 @@ For example, `DP10` indicates that the user set 10x as a threshold and the site 
     ##FILTER=<ID=str10,Description="Less than 10% or more than 90% of variant supporting reads on one strand">
     ##FILTER=<ID=indelError,Description="Likely artifact due to indel reads at this position">
 
+### Find constant sites
+
+Lyve-SET focuses on variable sites, but what if you wanted to look at how many constant sites there are?
+This is at least useful for when you need to tell BEAST or other similar programs what your constant sites are.
+
+To get the full alignment, you can run the following `bcftools` command, 
+followed by some parsing
+
+```bash
+bcftools query -f '%CHROM\t%POS\t%REF\t[%TGT\t]\n' --print-header out.pooled.vcf.gz > full.tsv.unrefined.tmp
+
+# Get the first nucleotide of every nucleotide call to convert from diploid to haploid
+perl -lane '
+  BEGIN{
+  # print the header
+  $line=<>;
+  chomp($line);
+  print $line;
+  $numFields=scalar(split(/\t/,$line));
+  $lastIndex=$numFields-1;
+}
+for(@F[3..$lastIndex]){
+  $_=substr($_,0,1);
+}
+print join("\t",@F);
+' < full.tsv.unrefined.tmp > full.tsv
+# Now you have full.tsv
+
+# Parse full.tsv to get counts of constant sites
+tail -n +2 full.tsv | perl -MData::Dumper -lane '
+  # Print a dot every 100k lines
+  print STDERR "Looked at $. lines" if($. % 100000 == 0);
+
+  # Remove the contig, pos, ref fields
+  splice(@F,0,3);
+  # Pretend the first sample is the reference
+  # and remove it from the list of samples with shift()
+  $ref=shift(@F);
+  # Skip if "reference" base is ambiguous
+  next if($ref eq "N");
+  # The site is constant until proven otherwise
+  $is_constant=1;
+  # Loop through all samples after the first
+  for my $nt(@F){
+    # If the samples nucleotide is not equal to the first samples,
+    # then label as not constant and go to the next site
+    if($nt ne $ref){
+      $is_constant=0;
+      last;
+    }
+  }
+  $const{$ref} += $is_constant;
+  END{
+    print Dumper \%const;
+    print STDERR "\n";
+  }
+'
+```
+
+This will give you output similar to
+
+```text
+$VAR1 = {
+          'A' => 638550,
+          'T' => 683152,
+          'C' => 443617,
+          '.' => 0,
+          'G' => 412973
+        };
+```
+
+Where you get counts for every nucleotide where it was constant at any given site in the set of samples.
+You might be able to put it into BEAST with some syntax similar to (but not necessarily):
+
+```xml
+  <alignment dataType="nucleotide">
+    <sequence idref="taxon1" value="G" count="412973"/>
+    <sequence idref="taxon1" value="C" count="443617"/>
+    <sequence idref="taxon1" value="T" count="683152"/>
+    <sequence idref="taxon1" value="." count="0"/>
+    <sequence idref="taxon1" value="A" count="638550"/>
+    <!-- Add more sequence elements for each taxon and its corresponding nucleotide with their respective counts -->
+  </alignment>
+```
+
+And then, lastly, to get the full alignment including constant sites, you can transform `full.tsv` like so
+
+```bash
+matrixToAlignment.pl full.tsv > full.fasta
+```
 
 Other manual steps in Lyve-SET
 -------------------------------------------------
