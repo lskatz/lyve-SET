@@ -51,6 +51,60 @@ Sites with `N` are ignored with logic like `$3!="N"`.
 Otherwise `awk` is just selecting for rows where the samples differ (`$3!=$4`)
 `cut` is used to grab only the position columns 1 and 2 and then to keep only two samples at columns 5 and 6.
 
+### What are the differences between two groups of isolates?
+
+To do this, we can run `bcftools isec` in combination with `bcftools filter` and `bcftools view`.
+In this section, we can use the lambda subset to pretend that there are two clades with clade1 having sample1 and sample2,
+and clade2 having samples 3 and 4.
+
+Go into the `msa` subfolder with `cd msa`.
+
+    # Make files with sample1 and sample2, and then sample3 and sample4
+    echo -e "sample1\nsample2" > clade1.txt
+    echo -e "sample3\nsample4" > clade2.txt
+
+Use the file that already contains SNPs for all samples and divide it into the two clades
+
+    bcftools filter -i '%TYPE="snp" && ALT!="N"' out.pooled.snps.vcf.gz | \
+      bcftools view -S clade1.txt | \
+      bgzip -c > clade1.snps.vcf.gz
+    bcftools filter -i '%TYPE="snp" && ALT!="N"' out.pooled.snps.vcf.gz | \
+      bcftools view -S clade2.txt | \
+      bgzip -c > clade2.snps.vcf.gz
+
+Index the new VCF files
+
+    tabix clade1.snps.vcf.gz
+    tabix clade2.snps.vcf.gz
+
+Find the intersection of all SNPs between the two clades
+
+    bcftools isec -p isec clade1.snps.vcf.gz clade2.snps.vcf.gz
+
+Go into the new `isec` folder and format all the vcf files
+
+    cd isec
+    for i in *.vcf; do
+      bgzip $i
+      tabix $i.gz
+    done
+
+View the notes on which file is which. Typically, `0000.vcf.gz` is going to be sites exclusive to only clade1.
+`0001.vcf.gz` is going to be sites exclusive to only clade2.
+`0002.vcf.gz` is records in clade1 that are also in clade2.
+`0003.vcf.gz` is records in clade2 that are also in clade1.
+
+    cat README.txt
+
+    This file was produced by vcfisec.
+    The command line was:   bcftools isec  -p isec clade1.snps.vcf.gz clade2.snps.vcf.gz
+    
+    Using the following file names:
+    isec/0000.vcf   for records private to  clade1.snps.vcf.gz
+    isec/0001.vcf   for records private to  clade2.snps.vcf.gz
+    isec/0002.vcf   for records from clade1.snps.vcf.gz shared by both      clade1.snps.vcf.gz clade2.snps.vcf.gz
+    isec/0003.vcf   for records from clade2.snps.vcf.gz shared by both      clade1.snps.vcf.gz clade2.snps.vcf.gz
+
 ### SNP counting
 
 How many sites are in the Lyve-SET analysis?  Count the number of lines in `out.snpmatrix.tsv`. Subtract 1 for the header.
