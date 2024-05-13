@@ -65,10 +65,10 @@ Go into the `msa` subfolder with `cd msa`.
 
 Use the file that already contains SNPs for all samples and divide it into the two clades
 
-    bcftools filter -i '%TYPE="snp" && ALT!="N"' out.pooled.snps.vcf.gz | \
+    bcftools filter -i 'ALT!="N"' out.pooled.snps.vcf.gz | \
       bcftools view -S clade1.txt | \
       bgzip -c > clade1.snps.vcf.gz
-    bcftools filter -i '%TYPE="snp" && ALT!="N"' out.pooled.snps.vcf.gz | \
+    bcftools filter -i 'ALT!="N"' out.pooled.snps.vcf.gz | \
       bcftools view -S clade2.txt | \
       bgzip -c > clade2.snps.vcf.gz
 
@@ -104,6 +104,20 @@ View the notes on which file is which. Typically, `0000.vcf.gz` is going to be s
     isec/0001.vcf   for records private to  clade2.snps.vcf.gz
     isec/0002.vcf   for records from clade1.snps.vcf.gz shared by both      clade1.snps.vcf.gz clade2.snps.vcf.gz
     isec/0003.vcf   for records from clade2.snps.vcf.gz shared by both      clade1.snps.vcf.gz clade2.snps.vcf.gz
+
+Merge back into one happy VCF file
+
+    bcftools merge 0002.vcf.gz 0003.vcf.gz > merged.vcf
+    bgzip merged.vcf
+    tabix merged.vcf.gz
+
+View it. These are now SNPs that _could_ differentiate clade1 from clade2, but not necessarily 100%.
+For example, a SNP might only occur in sample1 but not sample2 even though it's the same clade.
+
+    query -H -f '%CHROM\t%POS\t%REF\t%ALT[\t%GT]\n' merged.vcf.gz | column -ts $'\t' | less -S
+
+In our example with lambda, with its star phylogeny, however, we do not have SNPs that are 100%.
+Hopefully your results differ in this regard :) 
 
 ### SNP counting
 
