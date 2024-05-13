@@ -119,6 +119,13 @@ For example, a SNP might only occur in sample1 but not sample2 even though it's 
 In our example with lambda, with its star phylogeny, however, we do not have SNPs that are 100%.
 Hopefully your results differ in this regard :) 
 
+    # [1]CHROM                   [2]POS  [3]REF  [4]ALT  [5]sample1:GT  [6]sample2:GT  [7]sample3:GT  [8]sample4:GT
+    gi|9626243|ref|NC_001416.1|  403     G       A       1/1            0/0            0/0            0/0
+    gi|9626243|ref|NC_001416.1|  550     G       A       0/0            0/0            0/0            1/1
+    gi|9626243|ref|NC_001416.1|  586     C       G       0/0            0/0            0/0            1/1
+    gi|9626243|ref|NC_001416.1|  753     G       A       1/1            0/0            0/0            0/0
+    gi|9626243|ref|NC_001416.1|  1019    C       T       0/0            0/0            0/0            1/1
+
 ### SNP counting
 
 How many sites are in the Lyve-SET analysis?  Count the number of lines in `out.snpmatrix.tsv`. Subtract 1 for the header.
