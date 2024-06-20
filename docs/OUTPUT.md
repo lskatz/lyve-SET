@@ -1,3 +1,99 @@
+Below is a visualization of the workflow with output files.
+Then in the next section, a table with the description of all output files.
+
+Visualization of output files
+=============================
+
+```mermaid
+flowchart TD
+  subgraph LOGDIR ["log directory"]
+    LOG["main log file"]
+    subgraph LOGSUBDIR ["SGELK subfolder"]
+      LOGS["launch_set.pl.$$.log: individual log files"]
+      JOBS["qsub.$$.pl: individual jobs to execute"]
+      FINISHED["launch_set.pl.$$.finished: individual jobs that were finished"]
+      SUBMITTED["launch_set.pl.$$.submitted: individual jobs that were submitted"]
+      RUNNING["launch_set.pl.$$.running: individual jobs that are running"]
+    end
+  end
+  
+  SET_MANAGE_CREATE[--create] --> |Create all directories such as reads, reference| READSDIR
+  SET_MANAGE_READS[--add-reads] --> |Create all directories such as reads, reference| READSDIR
+  SET_MANAGE_ASM[--add-assembly] --> |Add an assembly| ASMDIR
+  SET_MANAGE_REF[--change-reference] --> |Add a reference genome| REFDIR
+  SET_MANAGE --- SET_MANAGE_CREATE
+  SET_MANAGE --- SET_MANAGE_READS
+  SET_MANAGE --- SET_MANAGE_ASM
+  SET_MANAGE --- SET_MANAGE_REF
+  subgraph READSDIR ["reads directory"]
+    direction LR;
+    SEQUENCER["R1 R2 fastq files"]
+    RAW["Raw reads"]
+    CLEANED["Cleaned reads"]
+
+    RAW --> |run_assembly_trimClean.pl| CLEANED
+    SEQUENCER --> |shuffleSplitReads.pl| RAW
+
+  end
+  subgraph REFDIR ["reference directory"]
+    direction LR;
+    REF["Reference genome"]
+    UNMASKEDBED["unmaskedRegions.bed"]
+    MASKEDBED["maskedRegions.bed"]
+
+    REF --> |findPhages.pl| MASKEDBED
+    MASKEDBED --> |invert| UNMASKEDBED
+  end
+  subgraph ASMDIR ["asm directory"]
+    INASM["input assemblies"]
+  end
+  ASMDIR --> |samtools wgsim| READSDIR
+  READSDIR --> |launch_smalt.pl| BAMDIR
+  REFDIR --> |launch_smalt.pl; only accept unmasked regions| BAMDIR
+  subgraph BAMDIR ["bam directory"]
+    direction LR;
+    BAM["*.bam"]
+    BAMIDX["*.bam.bai"]
+    BAMCLIFFS["*.bam.cliffs.bed"]
+
+    BAM --> |set_findCliffs.pl| BAMCLIFFS
+    BAM --> |samtools index| BAMIDX
+  end
+  BAMDIR --> |launch_varscan.pl \nexclude any regions in *.bam.cliffs.bed\nAccept SNPs at %consenus, X depth, fwd/rev support| VCFDIR
+  REFDIR --> |launch_varscan.pl\ndo not reprocess with unmaskedRegions.bed \nb/c launch_smalt.pl already used it| VCFDIR
+  subgraph VCFDIR ["VCF directory"]
+    direction LR;
+    VCF["vcf files"]
+    VCFIDX["vcf index files"]
+
+    VCF --> |bcftools index| VCFIDX
+  end
+  VCFDIR --> |set_mergeVcf.sh: combine all Vcfs into \nout.pooled.vcf.gz and out.pooled.snps.vcf.gz| MSADIR
+  subgraph MSADIR ["MSA directory"]
+    direction LR;
+    MERGEVCF{{set_mergeVcf.sh}}
+    VCFPOOLED["out.pooled.vcf.gz"]
+    VCFSNPSPOOLED["out.pooled.snps.vcf.gz"]
+    SNPMATRIX["out.snpmatrix.tsv"]
+    FILTEREDMATRIX["out.filteredMatrix.tsv"]
+    FULLALN["out.aln.fasta"]
+    INFORMATIVEALN["out.informative.aln.fasta"]
+    TREE["out.RAxML_bipartitions; tree.dnd"]
+    PAIRWISE["out.pairwise.tsv"]
+    PAIRWISEMATRIX["out.pairwiseMatrix.tsv"]
+
+    MERGEVCF --> VCFPOOLED
+    MERGEVCF --> VCFSNPSPOOLED
+    VCFPOOLED --> |pooledToMatrix.sh| SNPMATRIX
+    SNPMATRIX --> |filterMatrix.pl| FILTEREDMATRIX
+    SNPMATRIX --> |matrixToAlignment.pl| FULLALN
+    FILTEREDMATRIX --> |matrixToAlignment.pl| INFORMATIVEALN
+    FULLALN --> |pairwiseDistances.pl| PAIRWISE
+    PAIRWISE --> |pairwiseTo2d.pl| PAIRWISEMATRIX
+    INFORMATIVEALN --> |launch_raxml.sh| TREE
+  end
+```
+
 Output files
 ============
 | File    |   Description  | Notes |
