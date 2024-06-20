@@ -47,9 +47,12 @@ flowchart TD
   subgraph ASMDIR ["asm directory"]
     INASM["input assemblies"]
   end
+  LAUNCH_SMALT{{launch_smalt.pl}}
+
   ASMDIR --> |samtools wgsim| READSDIR
-  READSDIR --> |launch_smalt.pl| BAMDIR
-  REFDIR --> |launch_smalt.pl; only accept unmasked regions| BAMDIR
+  READSDIR --> |launch_smalt.pl| LAUNCH_SMALT
+  REFDIR --> |launch_smalt.pl; only accept unmasked regions| LAUNCH_SMALT
+  LAUNCH_SMALT --> |make a bam, once per genome| BAMDIR
   subgraph BAMDIR ["bam directory"]
     direction LR;
     BAM["*.bam"]
@@ -59,8 +62,11 @@ flowchart TD
     BAM --> |set_findCliffs.pl| BAMCLIFFS
     BAM --> |samtools index| BAMIDX
   end
-  BAMDIR --> |launch_varscan.pl \nexclude any regions in *.bam.cliffs.bed\nAccept SNPs at %consenus, X depth, fwd/rev support| VCFDIR
-  REFDIR --> |launch_varscan.pl\ndo not reprocess with unmaskedRegions.bed \nb/c launch_smalt.pl already used it| VCFDIR
+  LAUNCH_VARSCAN{{launch_varscan.pl}}
+
+  BAMDIR --> |launch_varscan.pl \nexclude any regions in *.bam.cliffs.bed\nAccept SNPs at %consenus, X depth, fwd/rev support| LAUNCH_VARSCAN
+  REFDIR --> |launch_varscan.pl\ndo not reprocess with unmaskedRegions.bed \nb/c launch_smalt.pl already used it| LAUNCH_VARSCAN
+  LAUNCH_VARSCAN --> |make a vcf, once per genome| VCFDIR
   subgraph VCFDIR ["VCF directory"]
     direction LR;
     VCF["vcf files"]
