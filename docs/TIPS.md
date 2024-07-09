@@ -1,16 +1,14 @@
-Tips and Tricks
-===============
+# Tips and Tricks
 
 Here are just some tips and tricks that I have used or that others have contributed
 
-Masking a region in your reference genome
------------------------------------------
+## Masking a region in your reference genome
+
 Yes, there is actually a mechanism to manually mask troublesome regions in the reference genome!  Under `project/reference/maskedRegions`, create a file with an extension `.bed`.  This file has at least three columns: `contig`, `start`, `stop`.  BED is a standard file format and is better described here: https://genome.ucsc.edu/FAQ/FAQformat.html#format1 
 
 The Lyve-SET phage-finding tool that uses PHAST actually puts a `phages.bed` file into that directory.  In the course of the pipeline, Lyve-SET will use any BED files in that directory to 1) ignore any reads that are mapped entirely in those regions and 2) ignore any SNPs that are found in those regions.  In the future, Lyve-SET will also use individualized BED files in the bam directory to mask SNPs found on a per-genome basis.
 
-Using multiple processors on a single-node machine
---------------------------------------------------
+## Using multiple processors on a single-node machine
 
 Unfortunately if you are not on a cluster, then Lyve-SET will only work on a single node.  Here are some ways of using xargs to speed up certain steps of Lyve-SET. Incorporating these changes or something similar is on my todo list but for now it is easier to post them.
 
@@ -271,8 +269,60 @@ And then, lastly, to get the full alignment including constant sites, you can tr
 matrixToAlignment.pl full.tsv > full.fasta
 ```
 
-Other manual steps in Lyve-SET
--------------------------------------------------
+## A word on Grapetree and other minimum spanning tree software
+
+It has been asked before if you can use Grapetree or something similar with Lyve-SET results.
+First, yes you can but second, _why_?
+A minimum spanning tree (MST) is useful for grouping similar profiles into the same circle.
+Circles of profiles are linked by lines of a certain distance.
+Then, circles of profiles are larger or smaller depending on how many members are in the circle.
+This is a great way to visualize something like an outbreak.
+However, it is not so great if every single sample has a different profile.
+If you have different profiles, suddenly the MST becomes less informative and more chaotic.
+
+If you still want to do this, then here are some example steps on how to run Grapetree on Lyve-SET results.
+
+```bash
+# make the profile spreadsheet from the alignment 
+# by formatting the alignment into two-lines-per-entry fasta
+seqtk seq -l 0 out.informative.fasta | \
+  perl -lane '
+    # Get the defline
+    $sample=$_; 
+    # Get the sequence
+    $seq=<>; 
+    # Remove the newlines
+    chomp($sample, $seq);
+    # Remove the > from the defline 
+    $sample =~ s/>//; 
+    # Transform the sequence into a set of sites in an array
+    @seq=split(//, $seq); 
+    # Print the profile 
+    print join("\t", $sample, @seq);
+    # Find out how many sites there are for the next step using STDERR 
+    print STDERR "# numSites: ".scalar(@seq);
+  ' > profile.tmp.tsv
+# numSites: 168
+# numSites: 168
+# numSites: 168
+# numSites: 168
+```
+
+Now that we have a profile in `profile.tmp.tsv`, we still need a header using `168` sites.
+
+```bash
+# Generate a header of sites. "0" for the column of samples.
+seq 0 168 | tr '\n' '\t' > profile.tsv
+# Punctuate the header with a newline
+echo >> profile.tsv
+# Grab the data
+cat profile.tmp.tsv >> profile.tsv
+# Run grapetree however you want. Here is a very simple invocation.
+grapetree --profile profile.tsv
+(sample1:85,sample2:80,sample3:75,sample4:0);
+```
+
+## Other manual steps in Lyve-SET
 
 ### From a set of VCFs to finished results
 
