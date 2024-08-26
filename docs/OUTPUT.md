@@ -83,7 +83,7 @@ flowchart TD
     SNPMATRIX["out.snpmatrix.tsv"]
     FILTEREDMATRIX["out.filteredMatrix.tsv"]
     FULLALN["out.aln.fasta"]
-    INFORMATIVEALN["out.informative.aln.fasta"]
+    INFORMATIVEALN["out.informative.fasta"]
     TREE["out.RAxML_bipartitions; tree.dnd"]
     PAIRWISE["out.pairwise.tsv"]
     PAIRWISEMATRIX["out.pairwiseMatrix.tsv"]
@@ -110,8 +110,8 @@ Output files
 |`project/msa/out.pooled.vcf.gz.tbi`, `out.pooled.snps.vcf.gz.tbi` | the tabix index file for each VCF | 
 |`project/msa/out.snpmatrix.tsv` | The `bcftools query` output | This file is essentially the main SNP matrix and describes the position and allele for each genome.  Each allele is in the genotype (GT) format, as specified in the vcf format specification |
 |`project/msa/out.filteredMatrix.tsv` | The filtered `bcftools query` output | After `out.snpmatrix.tsv` is generated, this file describes remaining SNPs after some are filtered out, usually because the `--allowedFlanking` option in `launch_set.pl`, `--allowed` in `filterMatrix.pl`, or similar parameters in other scripts |
-|`project/msa/out.aln.fasta` | The output alignment file in fasta format. | Make any changes to this file before running a phylogeny |program.  Do not use `informative.aln.fasta` to make edits because positions might come and go and therefore you might lose resolution. After any edits, use `removeUninformativeSites.pl` to re-create `informative.aln.fasta`  |
-| `project/msa/informative.aln.fasta` | The alignment after removing uninformative columns (ambiguities, invariants, gaps) | Do not make any changes to this file before running a phylogeny. Make the changes in `out.aln.fasta` |
+|`project/msa/out.aln.fasta` | The output alignment file in fasta format. | Make any changes to this file before running a phylogeny |program.  Do not use `out.informative.fasta` to make edits because positions might come and go and therefore you might lose resolution. After any edits, use `removeUninformativeSites.pl` to re-create `out.informative.fasta`  |
+| `project/msa/out.informative.fasta` | The alignment after removing uninformative columns (ambiguities, invariants, gaps) | Do not make any changes to this file before running a phylogeny. Make the changes in `out.aln.fasta` |
 | `project/msa/out.RAxML_bipartitions` | RAxML-generated tree in newick format | 
 | `project/msa/tree.dnd` | Symlink to `out.RAxML_bipartitions`| 
 | `project/msa/out.pairwise.tsv` | Pairwise distances file | Format: tab-delimited with three columns: genome1, genome2, hqSNP distance |
